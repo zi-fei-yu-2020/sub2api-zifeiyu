@@ -34,7 +34,7 @@
             {{ t('auth.emailLabel') }}
           </label>
           <div class="relative">
-            <div class="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3.5">
+            <div v-if="!formData.email" class="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3.5 transition-opacity duration-150">
               <Icon name="mail" size="md" class="text-slate-400 dark:text-dark-500" />
             </div>
             <input
@@ -45,8 +45,8 @@
               autofocus
               autocomplete="email"
               :disabled="registrationActionDisabled"
-              class="input pl-11"
-              :class="{ 'input-error': errors.email }"
+              class="input transition-all duration-150"
+              :class="[formData.email ? `px-3.5` : `pl-11`, errors.email ? `input-error` : ``]"
               :placeholder="t('auth.emailPlaceholder')"
             />
           </div>
@@ -58,18 +58,18 @@
             {{ t('auth.passwordLabel') }}
           </label>
           <div class="relative">
-            <div class="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3.5">
+            <div v-if="!formData.password" class="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3.5 transition-opacity duration-150">
               <Icon name="lock" size="md" class="text-slate-400 dark:text-dark-500" />
             </div>
             <input
               id="password"
               v-model="formData.password"
-              :type="showPassword ? 'text' : 'password'"
+              :type="showPassword ? `text` : `password`"
               required
               autocomplete="new-password"
               :disabled="registrationActionDisabled"
-              class="input pl-11 pr-11"
-              :class="{ 'input-error': errors.password }"
+              class="input pr-11 transition-all duration-150"
+              :class="[formData.password ? `px-3.5` : `pl-11`, errors.password ? `input-error` : ``]"
               :placeholder="t('auth.createPasswordPlaceholder')"
             />
             <button
@@ -93,64 +93,19 @@
             {{ t('auth.invitationCodeLabel') }}
           </label>
           <div class="relative">
-            <div class="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3.5">
-              <Icon name="key" size="md" :class="invitationValidation.valid ? 'text-green-500' : 'text-slate-400 dark:text-dark-500'" />
+            <div v-if="!formData.invitation_code" class="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3.5 transition-opacity duration-150">
+              <Icon name="key" size="md" :class="invitationValidation.valid ? `text-primary-600` : `text-slate-400 dark:text-dark-500`" />
             </div>
             <input
               id="invitation_code"
               v-model="formData.invitation_code"
               type="text"
+              autocomplete="off"
               :disabled="registrationActionDisabled"
-              class="input pl-11 pr-10"
-              :class="{
-                'border-green-500 focus:border-green-500 focus:ring-green-500': invitationValidation.valid,
-                'border-red-500 focus:border-red-500 focus:ring-red-500': invitationValidation.invalid || errors.invitation_code
-              }"
+              class="input pr-11 transition-all duration-150"
+              :class="[formData.invitation_code ? `px-3.5` : `pl-11`, errors.invitation_code ? `input-error` : ``]"
               :placeholder="t('auth.invitationCodePlaceholder')"
               @input="handleInvitationCodeInput"
-            />
-            <!-- Validation indicator -->
-            <div v-if="invitationValidating" class="absolute inset-y-0 right-0 flex items-center pr-3.5">
-              <svg class="h-4 w-4 animate-spin text-slate-400" fill="none" viewBox="0 0 24 24">
-                <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
-                <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-              </svg>
-            </div>
-            <div v-else-if="invitationValidation.valid" class="absolute inset-y-0 right-0 flex items-center pr-3.5">
-              <Icon name="checkCircle" size="md" class="text-green-500" />
-            </div>
-            <div v-else-if="invitationValidation.invalid || errors.invitation_code" class="absolute inset-y-0 right-0 flex items-center pr-3.5">
-              <Icon name="exclamationCircle" size="md" class="text-red-500" />
-            </div>
-          </div>
-          <!-- Invitation code validation result -->
-          <transition name="fade">
-            <div v-if="invitationValidation.valid" class="mt-2 flex items-center gap-2 rounded-lg bg-green-50 px-3 py-2 dark:bg-green-900/20">
-              <Icon name="checkCircle" size="sm" class="text-green-600 dark:text-green-400" />
-              <span class="text-sm text-green-700 dark:text-green-400">
-                {{ t('auth.invitationCodeValid') }}
-              </span>
-            </div>
-          </transition>
-        </div>
-
-        <!-- Affiliate Invitation Code Input (Optional) -->
-        <div v-else-if="affiliateEnabled" data-testid="affiliate-invitation-field">
-          <label for="affiliate_code" class="input-label">
-            {{ t('auth.invitationCodeLabel') }}
-            <span class="ml-1 text-xs font-normal text-slate-400 dark:text-dark-500">({{ t('common.optional') }})</span>
-          </label>
-          <div class="relative">
-            <div class="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3.5">
-              <Icon name="key" size="md" class="text-slate-400 dark:text-dark-500" />
-            </div>
-            <input
-              id="affiliate_code"
-              v-model="formData.aff_code"
-              type="text"
-              :disabled="registrationActionDisabled"
-              class="input pl-11"
-              :placeholder="t('auth.invitationCodePlaceholder')"
             />
           </div>
         </div>
