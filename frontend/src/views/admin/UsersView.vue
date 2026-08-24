@@ -149,7 +149,7 @@
                 <!-- Dropdown menu -->
                 <div
                   v-if="showFilterDropdown"
-                  class="absolute right-0 top-full z-50 mt-1 w-48 rounded-xl border border-slate-200 bg-white py-1 shadow-lg dark:border-slate-700 dark:bg-slate-900"
+                  class="absolute right-0 top-full z-50 mt-1 w-48 rounded-md border border-slate-200 bg-white py-1 shadow-lg dark:border-slate-700 dark:bg-slate-900"
                 >
                   <!-- Built-in filters -->
                   <button
@@ -205,7 +205,7 @@
                 <!-- Dropdown menu -->
                 <div
                   v-if="showColumnDropdown"
-                  class="absolute right-0 top-full z-50 mt-1 max-h-80 w-48 overflow-y-auto rounded-xl border border-slate-200 bg-white py-1 shadow-lg dark:border-slate-700 dark:bg-slate-900"
+                  class="absolute right-0 top-full z-50 mt-1 max-h-80 w-48 overflow-y-auto rounded-md border border-slate-200 bg-white py-1 shadow-lg dark:border-slate-700 dark:bg-slate-900"
                 >
                   <button
                     v-for="col in toggleableColumns"
@@ -355,7 +355,7 @@
                 <!-- 点击展开分组操作菜单 -->
                 <div
                   v-if="expandedGroupUserId === row.id"
-                  class="absolute left-0 top-full z-50 mt-1.5 min-w-[160px] overflow-hidden rounded-xl border border-slate-200 bg-white py-1 text-xs shadow-xl dark:border-slate-700 dark:bg-slate-800"
+                  class="absolute left-0 top-full z-50 mt-1.5 min-w-[160px] overflow-hidden rounded-md border border-slate-200 bg-white py-1 text-xs shadow-xl dark:border-slate-700 dark:bg-slate-800"
                 >
                   <div class="border-b border-slate-100 px-3 py-1.5 text-[10px] font-medium uppercase tracking-wider text-slate-400 dark:border-slate-700 dark:text-dark-400">
                     {{ t('admin.users.clickToReplace') }}
@@ -414,7 +414,7 @@
             </div>
             <span
               v-else
-              class="inline-flex items-center gap-1.5 rounded-xl bg-slate-50 px-2 py-1 text-xs text-slate-400 dark:bg-slate-800/50 dark:text-dark-500"
+              class="inline-flex items-center gap-1.5 rounded-md bg-slate-50 px-2 py-1 text-xs text-slate-400 dark:bg-slate-800/50 dark:text-dark-500"
             >
               <Icon name="ban" size="xs" class="h-3.5 w-3.5" />
               <span>{{ t('admin.users.noSubscription') }}</span>
@@ -502,7 +502,7 @@
                 <!-- 弹出菜单：今日 / 近30天，点击进行三态循环切换。 -->
                 <div
                   v-if="openUsageSortMenu === usageKey"
-                  class="absolute right-0 top-full z-50 mt-1 min-w-[120px] rounded-xl border border-slate-200 bg-white py-1 shadow-lg dark:border-slate-700 dark:bg-slate-900"
+                  class="absolute right-0 top-full z-50 mt-1 min-w-[120px] rounded-md border border-slate-200 bg-white py-1 shadow-lg dark:border-slate-700 dark:bg-slate-900"
                 >
                   <button
                     v-for="metric in (['today', 'total'] as const)"
@@ -604,7 +604,7 @@
               <!-- Edit Button -->
               <button
                 @click="handleEdit(row)"
-                class="flex flex-col items-center gap-0.5 rounded-xl p-1.5 text-slate-400 transition-colors hover:bg-slate-100 hover:text-primary-600 dark:hover:bg-dark-700 dark:hover:text-primary-400"
+                class="flex flex-col items-center gap-0.5 rounded-md p-1.5 text-slate-400 transition-colors hover:bg-slate-100 hover:text-primary-600 dark:hover:bg-dark-700 dark:hover:text-primary-400"
               >
                 <Icon name="edit" size="sm" />
                 <span class="text-xs">{{ t('common.edit') }}</span>
@@ -615,7 +615,7 @@
                 v-if="row.role !== 'admin'"
                 @click="handleToggleStatus(row)"
                 :class="[
-                  'flex flex-col items-center gap-0.5 rounded-xl p-1.5 text-slate-400 transition-colors',
+                  'flex flex-col items-center gap-0.5 rounded-md p-1.5 text-slate-400 transition-colors',
                   row.status === 'active'
                     ? 'hover:bg-orange-50 hover:text-orange-600 dark:hover:bg-orange-900/20 dark:hover:text-orange-400'
                     : 'hover:bg-green-50 hover:text-primary-600 dark:hover:bg-green-900/20 dark:hover:text-green-400'
@@ -629,7 +629,7 @@
               <!-- More Actions Menu Trigger -->
               <button
                 @click="openActionMenu(row, $event)"
-                class="action-menu-trigger flex flex-col items-center gap-0.5 rounded-xl p-1.5 text-slate-400 transition-colors hover:bg-slate-100 hover:text-slate-900 dark:hover:bg-dark-700 dark:hover:text-white"
+                class="action-menu-trigger flex flex-col items-center gap-0.5 rounded-md p-1.5 text-slate-400 transition-colors hover:bg-slate-100 hover:text-slate-900 dark:hover:bg-dark-700 dark:hover:text-white"
                 :class="{ 'bg-slate-100 text-slate-900 dark:bg-slate-800 dark:text-white': activeMenuId === row.id }"
               >
                 <Icon name="more" size="sm" />
@@ -666,7 +666,7 @@
     <Teleport to="body">
       <div
         v-if="activeMenuId !== null && menuPosition"
-        class="action-menu-content fixed z-[9999] w-48 overflow-hidden rounded-xl bg-white shadow-lg ring-1 ring-black/5 dark:bg-slate-900 dark:ring-white/10"
+        class="action-menu-content fixed z-[9999] w-48 overflow-hidden rounded-md bg-white shadow-lg ring-1 ring-black/5 dark:bg-slate-900 dark:ring-white/10"
         :style="{ top: menuPosition.top + 'px', left: menuPosition.left + 'px' }"
       >
         <div class="py-1">
