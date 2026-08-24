@@ -11,7 +11,7 @@
               <Icon
                 name="search"
                 size="md"
-                class="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400"
+                class="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400"
               />
               <input
                 v-model="searchQuery"
@@ -149,7 +149,7 @@
                 <!-- Dropdown menu -->
                 <div
                   v-if="showFilterDropdown"
-                  class="absolute right-0 top-full z-50 mt-1 w-48 rounded-lg border border-slate-200 bg-white py-1 shadow-lg dark:border-dark-600 dark:bg-dark-800"
+                  class="absolute right-0 top-full z-50 mt-1 w-48 rounded-xl border border-slate-200 bg-white py-1 shadow-lg dark:border-slate-700 dark:bg-slate-900"
                 >
                   <!-- Built-in filters -->
                   <button
@@ -170,7 +170,7 @@
                   <!-- Divider if custom attributes exist -->
                   <div
                     v-if="filterableAttributes.length > 0"
-                    class="my-1 border-t border-slate-100 dark:border-dark-700"
+                    class="my-1 border-t border-slate-100 dark:border-slate-800"
                   ></div>
                   <!-- Custom attribute filters -->
                   <button
@@ -205,7 +205,7 @@
                 <!-- Dropdown menu -->
                 <div
                   v-if="showColumnDropdown"
-                  class="absolute right-0 top-full z-50 mt-1 max-h-80 w-48 overflow-y-auto rounded-lg border border-slate-200 bg-white py-1 shadow-lg dark:border-dark-600 dark:bg-dark-800"
+                  class="absolute right-0 top-full z-50 mt-1 max-h-80 w-48 overflow-y-auto rounded-xl border border-slate-200 bg-white py-1 shadow-lg dark:border-slate-700 dark:bg-slate-900"
                 >
                   <button
                     v-for="col in toggleableColumns"
@@ -215,7 +215,7 @@
                     :class="[
                       'flex w-full items-center justify-between px-4 py-2 text-left text-sm',
                       isForcedVisibleColumn(col.key)
-                        ? 'cursor-not-allowed text-gray-400 dark:text-slate-400'
+                        ? 'cursor-not-allowed text-slate-400 dark:text-slate-400'
                         : 'text-slate-700 hover:bg-slate-100 dark:text-gray-300 dark:hover:bg-dark-700'
                     ]"
                     :title="isForcedVisibleColumn(col.key) ? t('admin.users.columnAlwaysVisible') : ''"
@@ -225,7 +225,7 @@
                       v-if="isColumnVisible(col.key)"
                       name="check"
                       size="sm"
-                      :class="isForcedVisibleColumn(col.key) ? 'text-gray-400 dark:text-slate-400' : 'text-primary-500'"
+                      :class="isForcedVisibleColumn(col.key) ? 'text-slate-400 dark:text-slate-400' : 'text-primary-500'"
                       :stroke-width="2"
                     />
                   </button>
@@ -301,11 +301,11 @@
               <span
                 v-if="value"
                 :title="value.length > 30 ? value : undefined"
-                class="block truncate text-sm text-gray-600 dark:text-gray-400"
+                class="block truncate text-sm text-slate-600 dark:text-slate-400"
               >
                 {{ value.length > 30 ? value.substring(0, 25) + '...' : value }}
               </span>
-              <span v-else class="text-sm text-gray-400">-</span>
+              <span v-else class="text-sm text-slate-400">-</span>
             </div>
           </template>
 
@@ -355,9 +355,9 @@
                 <!-- 点击展开分组操作菜单 -->
                 <div
                   v-if="expandedGroupUserId === row.id"
-                  class="absolute left-0 top-full z-50 mt-1.5 min-w-[160px] overflow-hidden rounded-lg border border-slate-200 bg-white py-1 text-xs shadow-xl dark:border-dark-600 dark:bg-dark-700"
+                  class="absolute left-0 top-full z-50 mt-1.5 min-w-[160px] overflow-hidden rounded-xl border border-slate-200 bg-white py-1 text-xs shadow-xl dark:border-slate-700 dark:bg-slate-800"
                 >
-                  <div class="border-b border-slate-100 px-3 py-1.5 text-[10px] font-medium uppercase tracking-wider text-gray-400 dark:border-dark-600 dark:text-dark-400">
+                  <div class="border-b border-slate-100 px-3 py-1.5 text-[10px] font-medium uppercase tracking-wider text-slate-400 dark:border-slate-700 dark:text-dark-400">
                     {{ t('admin.users.clickToReplace') }}
                   </div>
                   <div
@@ -376,9 +376,9 @@
                 v-if="getUserGroups(row).publicGroups.length > 0"
                 class="group/pub relative inline-flex cursor-default items-center gap-1 whitespace-nowrap text-xs"
               >
-                <Icon name="globe" size="xs" class="h-3.5 w-3.5 text-gray-400 dark:text-dark-500" />
-                <span class="font-medium text-gray-600 dark:text-dark-300">{{ getUserGroups(row).publicGroups.length }}</span>
-                <span class="text-gray-400 dark:text-dark-500">{{ t('admin.users.publicLabel') }}</span>
+                <Icon name="globe" size="xs" class="h-3.5 w-3.5 text-slate-400 dark:text-dark-500" />
+                <span class="font-medium text-slate-600 dark:text-dark-300">{{ getUserGroups(row).publicGroups.length }}</span>
+                <span class="text-slate-400 dark:text-dark-500">{{ t('admin.users.publicLabel') }}</span>
                 <!-- Tooltip: 向下弹出 -->
                 <div class="pointer-events-none absolute left-0 top-full z-50 mt-1.5 rounded bg-gray-900 px-2.5 py-1.5 text-xs text-white opacity-0 shadow-lg transition-opacity duration-75 group-hover/pub:opacity-100 dark:bg-dark-600">
                   <div class="absolute left-4 bottom-full border-4 border-transparent border-b-gray-900 dark:border-b-dark-600"></div>
@@ -390,10 +390,10 @@
               <!-- 都没有 -->
               <span
                 v-if="getUserGroups(row).exclusive.length === 0 && getUserGroups(row).publicGroups.length === 0"
-                class="text-xs text-gray-400 dark:text-dark-500"
+                class="text-xs text-slate-400 dark:text-dark-500"
               >-</span>
             </div>
-            <span v-else class="text-xs text-gray-400 dark:text-dark-500">-</span>
+            <span v-else class="text-xs text-slate-400 dark:text-dark-500">-</span>
           </template>
 
           <template #cell-subscriptions="{ row }">
@@ -414,7 +414,7 @@
             </div>
             <span
               v-else
-              class="inline-flex items-center gap-1.5 rounded-md bg-slate-50 px-2 py-1 text-xs text-gray-400 dark:bg-dark-700/50 dark:text-dark-500"
+              class="inline-flex items-center gap-1.5 rounded-xl bg-slate-50 px-2 py-1 text-xs text-slate-400 dark:bg-slate-800/50 dark:text-dark-500"
             >
               <Icon name="ban" size="xs" class="h-3.5 w-3.5" />
               <span>{{ t('admin.users.noSubscription') }}</span>
@@ -473,7 +473,7 @@
                   class="flex items-center gap-1 rounded px-1 py-0.5 transition-colors hover:bg-gray-200 dark:hover:bg-dark-700"
                   :class="usageSort && usageSort.key === usageKey
                     ? 'text-primary-600 dark:text-primary-400'
-                    : 'text-gray-400 dark:text-dark-500'"
+                    : 'text-slate-400 dark:text-dark-500'"
                   :title="t('admin.users.sortBy')"
                   :data-test="`usage-sort-trigger-${usageKey}`"
                   @click.stop="toggleUsageSortMenu(usageKey)"
@@ -502,7 +502,7 @@
                 <!-- 弹出菜单：今日 / 近30天，点击进行三态循环切换。 -->
                 <div
                   v-if="openUsageSortMenu === usageKey"
-                  class="absolute right-0 top-full z-50 mt-1 min-w-[120px] rounded-lg border border-slate-200 bg-white py-1 shadow-lg dark:border-dark-600 dark:bg-dark-800"
+                  class="absolute right-0 top-full z-50 mt-1 min-w-[120px] rounded-xl border border-slate-200 bg-white py-1 shadow-lg dark:border-slate-700 dark:bg-slate-900"
                 >
                   <button
                     v-for="metric in (['today', 'total'] as const)"
@@ -530,7 +530,7 @@
                       />
                     </svg>
                   </button>
-                  <div class="mt-1 border-t border-slate-100 px-3 py-1 text-[10px] normal-case tracking-normal text-gray-400 dark:border-dark-700 dark:text-dark-500">
+                  <div class="mt-1 border-t border-slate-100 px-3 py-1 text-[10px] normal-case tracking-normal text-slate-400 dark:border-slate-800 dark:text-dark-500">
                     {{ t('admin.users.sortCurrentPageOnly') }}
                   </div>
                 </div>
@@ -604,7 +604,7 @@
               <!-- Edit Button -->
               <button
                 @click="handleEdit(row)"
-                class="flex flex-col items-center gap-0.5 rounded-lg p-1.5 text-slate-400 transition-colors hover:bg-slate-100 hover:text-primary-600 dark:hover:bg-dark-700 dark:hover:text-primary-400"
+                class="flex flex-col items-center gap-0.5 rounded-xl p-1.5 text-slate-400 transition-colors hover:bg-slate-100 hover:text-primary-600 dark:hover:bg-dark-700 dark:hover:text-primary-400"
               >
                 <Icon name="edit" size="sm" />
                 <span class="text-xs">{{ t('common.edit') }}</span>
@@ -615,10 +615,10 @@
                 v-if="row.role !== 'admin'"
                 @click="handleToggleStatus(row)"
                 :class="[
-                  'flex flex-col items-center gap-0.5 rounded-lg p-1.5 text-slate-400 transition-colors',
+                  'flex flex-col items-center gap-0.5 rounded-xl p-1.5 text-slate-400 transition-colors',
                   row.status === 'active'
                     ? 'hover:bg-orange-50 hover:text-orange-600 dark:hover:bg-orange-900/20 dark:hover:text-orange-400'
-                    : 'hover:bg-green-50 hover:text-green-600 dark:hover:bg-green-900/20 dark:hover:text-green-400'
+                    : 'hover:bg-green-50 hover:text-primary-600 dark:hover:bg-green-900/20 dark:hover:text-green-400'
                 ]"
               >
                 <Icon v-if="row.status === 'active'" name="ban" size="sm" />
@@ -629,8 +629,8 @@
               <!-- More Actions Menu Trigger -->
               <button
                 @click="openActionMenu(row, $event)"
-                class="action-menu-trigger flex flex-col items-center gap-0.5 rounded-lg p-1.5 text-slate-400 transition-colors hover:bg-slate-100 hover:text-slate-900 dark:hover:bg-dark-700 dark:hover:text-white"
-                :class="{ 'bg-gray-100 text-slate-900 dark:bg-dark-700 dark:text-white': activeMenuId === row.id }"
+                class="action-menu-trigger flex flex-col items-center gap-0.5 rounded-xl p-1.5 text-slate-400 transition-colors hover:bg-slate-100 hover:text-slate-900 dark:hover:bg-dark-700 dark:hover:text-white"
+                :class="{ 'bg-slate-100 text-slate-900 dark:bg-slate-800 dark:text-white': activeMenuId === row.id }"
               >
                 <Icon name="more" size="sm" />
                 <span class="text-xs">{{ t('common.more') }}</span>
@@ -666,7 +666,7 @@
     <Teleport to="body">
       <div
         v-if="activeMenuId !== null && menuPosition"
-        class="action-menu-content fixed z-[9999] w-48 overflow-hidden rounded-xl bg-white shadow-lg ring-1 ring-black/5 dark:bg-dark-800 dark:ring-white/10"
+        class="action-menu-content fixed z-[9999] w-48 overflow-hidden rounded-xl bg-white shadow-lg ring-1 ring-black/5 dark:bg-slate-900 dark:ring-white/10"
         :style="{ top: menuPosition.top + 'px', left: menuPosition.left + 'px' }"
       >
         <div class="py-1">
@@ -677,7 +677,7 @@
                 @click="handleViewApiKeys(user); closeActionMenu()"
                 class="flex w-full items-center gap-2 px-4 py-2 text-sm text-slate-700 hover:bg-slate-100 dark:text-gray-300 dark:hover:bg-dark-700"
               >
-                <Icon name="key" size="sm" class="text-gray-400" :stroke-width="2" />
+                <Icon name="key" size="sm" class="text-slate-400" :stroke-width="2" />
                 {{ t('admin.users.apiKeys') }}
               </button>
 
@@ -686,11 +686,11 @@
                 @click="handleAllowedGroups(user); closeActionMenu()"
                 class="flex w-full items-center gap-2 px-4 py-2 text-sm text-slate-700 hover:bg-slate-100 dark:text-gray-300 dark:hover:bg-dark-700"
               >
-                <Icon name="users" size="sm" class="text-gray-400" :stroke-width="2" />
+                <Icon name="users" size="sm" class="text-slate-400" :stroke-width="2" />
                 {{ t('admin.users.groups') }}
               </button>
 
-              <div class="my-1 border-t border-slate-100 dark:border-dark-700"></div>
+              <div class="my-1 border-t border-slate-100 dark:border-slate-800"></div>
 
               <!-- Deposit -->
               <button
@@ -717,7 +717,7 @@
                 @click="handlePlatformQuota(user); closeActionMenu()"
                 class="flex w-full items-center gap-2 px-4 py-2 text-sm text-slate-700 hover:bg-slate-100 dark:text-gray-300 dark:hover:bg-dark-700"
               >
-                <Icon name="chartBar" size="sm" class="text-gray-400" :stroke-width="2" />
+                <Icon name="chartBar" size="sm" class="text-slate-400" :stroke-width="2" />
                 {{ t('admin.users.platformQuota.menuItem') }}
               </button>
 
@@ -726,11 +726,11 @@
                 @click="handleBalanceHistory(user); closeActionMenu()"
                 class="flex w-full items-center gap-2 px-4 py-2 text-sm text-slate-700 hover:bg-slate-100 dark:text-gray-300 dark:hover:bg-dark-700"
               >
-                <Icon name="dollar" size="sm" class="text-gray-400" :stroke-width="2" />
+                <Icon name="dollar" size="sm" class="text-slate-400" :stroke-width="2" />
                 {{ t('admin.users.balanceHistory') }}
               </button>
 
-              <div class="my-1 border-t border-slate-100 dark:border-dark-700"></div>
+              <div class="my-1 border-t border-slate-100 dark:border-slate-800"></div>
 
               <!-- Delete (not for admin) -->
               <button

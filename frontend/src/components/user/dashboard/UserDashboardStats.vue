@@ -3,7 +3,7 @@
     <!-- Row 1: Core Stats (Blue Accent Top Border & Glow) -->
     <div class="grid grid-cols-2 gap-4 lg:grid-cols-4">
       <!-- Balance -->
-      <div v-if="!isSimple" class="card relative overflow-hidden p-5 transition-all duration-200 hover:-translate-y-1 hover:shadow-lg hover:shadow-blue-500/10 hover:border-blue-300">
+      <div v-if="!isSimple" class="card-featured">
         <div class="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-blue-500 to-sky-400"></div>
         <div class="flex items-center gap-3.5">
           <div class="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-blue-50 text-primary-600 border border-blue-100 dark:bg-blue-950/50 dark:text-blue-400 dark:border-blue-900/40">
@@ -20,7 +20,7 @@
       </div>
 
       <!-- API Keys -->
-      <div class="card relative overflow-hidden p-5 transition-all duration-200 hover:-translate-y-1 hover:shadow-lg hover:shadow-blue-500/10 hover:border-blue-300">
+      <div class="card-featured">
         <div class="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-blue-500 to-sky-400"></div>
         <div class="flex items-center gap-3.5">
           <div class="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-blue-50 text-primary-600 border border-blue-100 dark:bg-blue-950/50 dark:text-blue-400 dark:border-blue-900/40">
@@ -35,7 +35,7 @@
       </div>
 
       <!-- Today Requests -->
-      <div class="card relative overflow-hidden p-5 transition-all duration-200 hover:-translate-y-1 hover:shadow-lg hover:shadow-blue-500/10 hover:border-blue-300">
+      <div class="card-featured">
         <div class="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-blue-500 to-sky-400"></div>
         <div class="flex items-center gap-3.5">
           <div class="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-blue-50 text-primary-600 border border-blue-100 dark:bg-blue-950/50 dark:text-blue-400 dark:border-blue-900/40">
@@ -50,7 +50,7 @@
       </div>
 
       <!-- Today Cost -->
-      <div class="card relative overflow-hidden p-5 transition-all duration-200 hover:-translate-y-1 hover:shadow-lg hover:shadow-blue-500/10 hover:border-blue-300">
+      <div class="card-featured">
         <div class="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-blue-500 to-sky-400"></div>
         <div class="flex items-center gap-3.5">
           <div class="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-blue-50 text-primary-600 border border-blue-100 dark:bg-blue-950/50 dark:text-blue-400 dark:border-blue-900/40">
@@ -74,7 +74,7 @@
     <!-- Row 2: Token Stats & Performance -->
     <div class="grid grid-cols-2 gap-4 lg:grid-cols-4">
       <!-- Today Tokens -->
-      <div class="card p-5 transition-all duration-200 hover:border-blue-200 hover:shadow-md hover:shadow-blue-500/5">
+      <div class="card">
         <div class="flex items-center gap-3.5">
           <div class="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-blue-50 text-primary-600 border border-blue-100 dark:bg-blue-950/50 dark:text-blue-400 dark:border-blue-900/40">
             <Icon name="cube" size="md" :stroke-width="2" />
@@ -88,7 +88,7 @@
       </div>
 
       <!-- Total Tokens -->
-      <div class="card p-5 transition-all duration-200 hover:border-blue-200 hover:shadow-md hover:shadow-blue-500/5">
+      <div class="card">
         <div class="flex items-center gap-3.5">
           <div class="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-blue-50 text-primary-600 border border-blue-100 dark:bg-blue-950/50 dark:text-blue-400 dark:border-blue-900/40">
             <Icon name="database" size="md" :stroke-width="2" />
@@ -102,7 +102,7 @@
       </div>
 
       <!-- Performance (RPM/TPM) -->
-      <div class="card p-5 transition-all duration-200 hover:border-blue-200 hover:shadow-md hover:shadow-blue-500/5">
+      <div class="card">
         <div class="flex items-center gap-3.5">
           <div class="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-blue-50 text-primary-600 border border-blue-100 dark:bg-blue-950/50 dark:text-blue-400 dark:border-blue-900/40">
             <Icon name="bolt" size="md" :stroke-width="2" />
@@ -119,7 +119,7 @@
       </div>
 
       <!-- Avg Response Time -->
-      <div class="card p-5 transition-all duration-200 hover:border-blue-200 hover:shadow-md hover:shadow-blue-500/5">
+      <div class="card">
         <div class="flex items-center gap-3.5">
           <div class="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-blue-50 text-primary-600 border border-blue-100 dark:bg-blue-950/50 dark:text-blue-400 dark:border-blue-900/40">
             <Icon name="clock" size="md" :stroke-width="2" />

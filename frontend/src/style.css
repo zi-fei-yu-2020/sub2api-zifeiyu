@@ -191,11 +191,11 @@
     @apply rounded-xl p-2;
   }
 
-  /* ============ 输入框/表单控件样式 ============ */
-  .input {
-    @apply w-full rounded-xl px-3.5 py-2 text-sm;
+  /* ============ 全局输入框/表单控件样式 (利落微圆角 rounded-md) ============ */
+  .input, input[type="text"], input[type="password"], input[type="email"], input[type="number"], textarea, select {
+    @apply w-full rounded-md px-3 py-2 text-sm;
     @apply bg-white dark:bg-slate-900;
-    @apply border border-slate-200 dark:border-slate-800;
+    @apply border border-slate-200/90 dark:border-slate-800;
     @apply text-slate-900 dark:text-slate-100;
     @apply placeholder:text-slate-400 dark:placeholder:text-slate-500;
     @apply transition-all duration-150 ease-out;
@@ -227,14 +227,21 @@
     @apply mt-1 text-xs text-slate-500 dark:text-slate-400;
   }
 
-  /* ============ 全局卡片容器样式 (顶部蓝光条 + 立体悬浮 + 柔光微投影) ============ */
+  /* ============ 普通稳定卡片 (平稳无位移) ============ */
   .card {
+    @apply rounded-2xl bg-white p-5 dark:bg-slate-900;
+    @apply border border-slate-200/80 dark:border-slate-800;
+    @apply shadow-sm shadow-slate-200/50 dark:shadow-none;
+  }
+
+  /* ============ 核心关键卡片 (顶部蓝光条 + 悬浮交互) ============ */
+  .card-featured {
     @apply relative overflow-hidden rounded-2xl bg-white p-5 dark:bg-slate-900;
     @apply border border-slate-200/90 dark:border-slate-800;
     @apply shadow-sm shadow-blue-500/5 transition-all duration-200;
   }
 
-  .card::before {
+  .card-featured::before {
     content: '';
     position: absolute;
     top: 0;
@@ -242,11 +249,11 @@
     right: 0;
     height: 3px;
     background: linear-gradient(90deg, #3b82f6 0%, #60a5fa 100%);
-    opacity: 0.85;
+    opacity: 0.9;
     pointer-events: none;
   }
 
-  .card:hover, .card-hover {
+  .card-featured:hover, .card-hover {
     @apply -translate-y-1 border-blue-300 shadow-lg shadow-blue-500/10 dark:border-blue-800/80;
   }
 

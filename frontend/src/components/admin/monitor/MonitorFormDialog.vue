@@ -22,7 +22,7 @@
             :data-testid="`monitor-check-mode-${opt.value}`"
             :aria-pressed="form.check_mode === opt.value"
             :disabled="opt.disabled"
-            class="rounded-lg border-2 px-3 py-2 text-left transition-colors disabled:cursor-not-allowed disabled:opacity-50"
+            class="rounded-xl border-2 px-3 py-2 text-left transition-colors disabled:cursor-not-allowed disabled:opacity-50"
             :class="checkModeButtonClass(opt.value)"
             @click="selectCheckMode(opt.value)"
           >
@@ -41,7 +41,7 @@
             type="button"
             :data-testid="`monitor-provider-${opt.value}`"
             :aria-pressed="form.provider === opt.value"
-            class="flex items-center justify-center gap-2 rounded-lg border-2 px-3 py-2.5 text-sm font-medium transition-colors"
+            class="flex items-center justify-center gap-2 rounded-xl border-2 px-3 py-2.5 text-sm font-medium transition-colors"
             :class="providerPickerClass(opt.value, form.provider === opt.value)"
             @click="selectProvider(opt.value)"
           >
@@ -66,7 +66,7 @@
             @search="onAccountSearch"
           />
         </div>
-        <p class="mt-1 text-xs text-gray-400">{{ t('admin.channelMonitor.form.linkedAccountHint') }}</p>
+        <p class="mt-1 text-xs text-slate-400">{{ t('admin.channelMonitor.form.linkedAccountHint') }}</p>
         <p v-if="form.provider === PROVIDER_OPENAI" class="mt-1 text-xs text-amber-600 dark:text-amber-400">
           {{ t('admin.channelMonitor.form.openAIQuotaProbeHint') }}
         </p>
@@ -78,7 +78,7 @@
         </p>
       </div>
 
-      <div v-if="form.provider === PROVIDER_OPENAI && usesProbePart" class="rounded-lg border border-blue-100 bg-blue-50/50 p-3 dark:border-blue-500/20 dark:bg-blue-500/10">
+      <div v-if="form.provider === PROVIDER_OPENAI && usesProbePart" class="rounded-xl border border-blue-100 bg-blue-50/50 p-3 dark:border-blue-500/20 dark:bg-blue-500/10">
         <label class="input-label">{{ t('admin.channelMonitor.form.apiMode') }}</label>
         <div class="grid gap-3 sm:grid-cols-2">
           <button
@@ -86,7 +86,7 @@
             :key="opt.value"
             type="button"
             :aria-pressed="form.api_mode === opt.value"
-            class="rounded-lg border-2 px-3 py-2 text-left transition-colors"
+            class="rounded-xl border-2 px-3 py-2 text-left transition-colors"
             :class="apiModeButtonClass(opt.value)"
             @click="form.api_mode = opt.value"
           >
@@ -122,7 +122,7 @@
             {{ t('admin.channelMonitor.form.useMyKey') }}
           </button>
         </div>
-        <p v-if="editing && editing.api_key_masked" class="mt-1 text-xs text-gray-400">{{ editing.api_key_masked }}</p>
+        <p v-if="editing && editing.api_key_masked" class="mt-1 text-xs text-slate-400">{{ editing.api_key_masked }}</p>
       </div>
 
       <div v-if="usesProbePart">
@@ -156,13 +156,13 @@
       <div>
         <label class="input-label">{{ t('admin.channelMonitor.form.intervalSeconds') }} <span class="text-red-500">*</span></label>
         <input v-model.number="form.interval_seconds" type="number" min="15" max="3600" required class="input" />
-        <p class="mt-1 text-xs text-gray-400">{{ t('admin.channelMonitor.form.intervalSecondsHint') }}</p>
+        <p class="mt-1 text-xs text-slate-400">{{ t('admin.channelMonitor.form.intervalSecondsHint') }}</p>
       </div>
 
       <div>
         <label class="input-label">{{ t('admin.channelMonitor.form.jitterSeconds') }}</label>
         <input v-model.number="form.jitter_seconds" type="number" min="0" :max="maxJitterSeconds" class="input" />
-        <p class="mt-1 text-xs text-gray-400">{{ t('admin.channelMonitor.form.jitterSecondsHint') }}</p>
+        <p class="mt-1 text-xs text-slate-400">{{ t('admin.channelMonitor.form.jitterSecondsHint') }}</p>
       </div>
 
       <div class="flex items-center justify-between">
@@ -171,11 +171,11 @@
       </div>
 
       <!-- 高级设置区：请求模板 + 自定义 headers/body（仅探活模式有意义） -->
-      <details v-if="usesProbePart" class="rounded-lg border border-gray-200 bg-gray-50/50 p-3 dark:border-dark-700 dark:bg-dark-900/30">
-        <summary class="cursor-pointer text-sm font-medium text-gray-700 dark:text-gray-300">
+      <details v-if="usesProbePart" class="rounded-xl border border-slate-200 bg-slate-50/50 p-3 dark:border-slate-800 dark:bg-dark-900/30">
+        <summary class="cursor-pointer text-sm font-medium text-slate-700 dark:text-gray-300">
           {{ t('admin.channelMonitor.advanced.section') }}
         </summary>
-        <p class="mt-1 text-xs text-gray-400">{{ t('admin.channelMonitor.advanced.sectionHint') }}</p>
+        <p class="mt-1 text-xs text-slate-400">{{ t('admin.channelMonitor.advanced.sectionHint') }}</p>
 
         <div class="mt-4 space-y-4">
           <div>
@@ -185,7 +185,7 @@
               :options="templateOptions"
               :placeholder="t('admin.channelMonitor.templateField.placeholder')"
             />
-            <p class="mt-1 text-xs text-gray-400">{{ t('admin.channelMonitor.templateField.applyHint') }}</p>
+            <p class="mt-1 text-xs text-slate-400">{{ t('admin.channelMonitor.templateField.applyHint') }}</p>
           </div>
 
           <MonitorAdvancedRequestConfig
@@ -441,7 +441,7 @@ function apiModeButtonClass(mode: APIMode): string {
   if (active) {
     return 'border-primary-500 bg-white text-primary-700 shadow-sm dark:border-primary-400 dark:bg-primary-500/15 dark:text-primary-300'
   }
-  return 'border-blue-100 bg-white/70 text-gray-600 hover:border-primary-300 dark:border-dark-700 dark:bg-dark-800 dark:text-gray-400'
+  return 'border-blue-100 bg-white/70 text-slate-600 hover:border-primary-300 dark:border-slate-800 dark:bg-slate-900 dark:text-slate-400'
 }
 
 function templateOptionLabel(tpl: ChannelMonitorTemplate): string {
@@ -517,7 +517,7 @@ function checkModeButtonClass(mode: CheckMode): string {
   if (active) {
     return 'border-primary-500 bg-white text-primary-700 shadow-sm dark:border-primary-400 dark:bg-primary-500/15 dark:text-primary-300'
   }
-  return 'border-blue-100 bg-white/70 text-gray-600 hover:border-primary-300 dark:border-dark-700 dark:bg-dark-800 dark:text-gray-400'
+  return 'border-blue-100 bg-white/70 text-slate-600 hover:border-primary-300 dark:border-slate-800 dark:bg-slate-900 dark:text-slate-400'
 }
 
 function selectCheckMode(mode: CheckMode) {

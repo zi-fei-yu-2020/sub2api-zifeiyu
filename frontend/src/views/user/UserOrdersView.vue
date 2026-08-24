@@ -1,49 +1,55 @@
 <template>
   <AppLayout>
-    <div class="space-y-4">
+    <TablePageLayout>
       <!-- Filters -->
-      <div class="card p-4">
-        <div class="flex flex-wrap items-center gap-3">
-          <Select v-model="currentFilter" :options="statusFilters" class="w-36" @change="fetchOrders" />
-          <div class="flex flex-1 items-center justify-end gap-2">
-            <button @click="fetchOrders" :disabled="loading" class="btn btn-secondary" :title="t('common.refresh')">
-              <Icon name="refresh" size="md" :class="loading ? 'animate-spin' : ''" />
-            </button>
-            <button class="btn btn-primary" @click="router.push('/purchase')">{{ t('payment.result.backToRecharge') }}</button>
-          </div>
+      <template #filters>
+        <Select v-model="currentFilter" :options="statusFilters" class="w-36" @change="fetchOrders" />
+      </template>
+
+      <!-- Actions -->
+      <template #actions>
+        <div class="flex items-center gap-2">
+          <button @click="fetchOrders" :disabled="loading" class="btn btn-secondary" :title="t('common.refresh')">
+            <Icon name="refresh" size="md" :class="loading ? 'animate-spin' : ''" />
+          </button>
+          <button class="btn btn-primary" @click="router.push('/purchase')">{{ t('payment.result.backToRecharge') }}</button>
         </div>
-      </div>
+      </template>
 
       <!-- Table -->
-      <OrderTable :orders="orders" :loading="loading">
-        <template #actions="{ row }">
-          <div class="flex items-center gap-2">
-            <button v-if="row.status === 'PENDING'" @click="handleCancel(row.id)" class="inline-flex items-center gap-1 rounded-md px-2 py-1 text-xs font-medium text-yellow-600 hover:bg-yellow-50 dark:text-yellow-400 dark:hover:bg-yellow-900/20">
-              <Icon name="x" size="sm" />
-              <span>{{ t('payment.orders.cancel') }}</span>
-            </button>
-            <button v-if="canRequestRefund(row)" @click="openRefundDialog(row)" class="inline-flex items-center gap-1 rounded-md px-2 py-1 text-xs font-medium text-purple-600 hover:bg-purple-50 dark:text-purple-400 dark:hover:bg-purple-900/20">
-              <Icon name="dollar" size="sm" />
-              <span>{{ t('payment.orders.requestRefund') }}</span>
-            </button>
-          </div>
-        </template>
-      </OrderTable>
+      <template #table>
+        <OrderTable :orders="orders" :loading="loading">
+          <template #actions="{ row }">
+            <div class="flex items-center gap-2">
+              <button v-if="row.status === 'PENDING'" @click="handleCancel(row.id)" class="inline-flex items-center gap-1 rounded-md px-2 py-1 text-xs font-medium text-amber-600 hover:bg-amber-50 dark:text-amber-400 dark:hover:bg-amber-900/20">
+                <Icon name="x" size="sm" />
+                <span>{{ t('payment.orders.cancel') }}</span>
+              </button>
+              <button v-if="canRequestRefund(row)" @click="openRefundDialog(row)" class="inline-flex items-center gap-1 rounded-md px-2 py-1 text-xs font-medium text-purple-600 hover:bg-purple-50 dark:text-purple-400 dark:hover:bg-purple-900/20">
+                <Icon name="dollar" size="sm" />
+                <span>{{ t('payment.orders.requestRefund') }}</span>
+              </button>
+            </div>
+          </template>
+        </OrderTable>
+      </template>
 
       <!-- Pagination -->
-      <Pagination
-        v-if="pagination.total > 0"
-        :page="pagination.page"
-        :total="pagination.total"
-        :page-size="pagination.page_size"
-        @update:page="handlePageChange"
-        @update:pageSize="handlePageSizeChange"
-      />
-    </div>
+      <template #pagination>
+        <Pagination
+          v-if="pagination.total > 0"
+          :page="pagination.page"
+          :total="pagination.total"
+          :page-size="pagination.page_size"
+          @update:page="handlePageChange"
+          @update:pageSize="handlePageSizeChange"
+        />
+      </template>
+    </TablePageLayout>
 
     <!-- Cancel Confirm Dialog -->
     <BaseDialog :show="!!cancelTargetId" :title="t('payment.orders.cancel')" width="narrow" @close="cancelTargetId = null">
-      <p class="text-sm text-gray-600 dark:text-gray-300">{{ t('payment.confirmCancel') }}</p>
+      <p class="text-sm text-slate-600 dark:text-slate-300">{{ t('payment.confirmCancel') }}</p>
       <template #footer>
         <div class="flex justify-end gap-3">
           <button class="btn btn-secondary" @click="cancelTargetId = null">{{ t('common.cancel') }}</button>
@@ -55,14 +61,14 @@
     <!-- Refund Dialog -->
     <BaseDialog :show="!!refundTarget" :title="t('payment.orders.requestRefund')" @close="refundTarget = null">
       <div v-if="refundTarget" class="space-y-4">
-        <div class="rounded-xl bg-gray-50 p-4 dark:bg-dark-800">
+        <div class="rounded-2xl bg-slate-50 p-4 border border-slate-100 dark:bg-slate-800 dark:border-slate-700">
           <div class="flex justify-between text-sm">
-            <span class="text-gray-500 dark:text-gray-400">{{ t('payment.orders.orderId') }}</span>
-            <span class="font-mono text-gray-900 dark:text-white">#{{ refundTarget.id }}</span>
+            <span class="text-slate-400">{{ t('payment.orders.orderId') }}</span>
+            <span class="font-mono text-slate-900 dark:text-white">#{{ refundTarget.id }}</span>
           </div>
           <div class="mt-2 flex justify-between text-sm">
-            <span class="text-gray-500 dark:text-gray-400">{{ t('payment.orders.amount') }}</span>
-            <span class="text-gray-900 dark:text-white">${{ refundTarget.amount.toFixed(2) }}</span>
+            <span class="text-slate-400">{{ t('payment.orders.amount') }}</span>
+            <span class="font-semibold text-slate-900 dark:text-white">${{ refundTarget.amount.toFixed(2) }}</span>
           </div>
         </div>
         <div>
@@ -89,6 +95,7 @@ import { paymentAPI } from '@/api/payment'
 import { extractI18nErrorMessage } from '@/utils/apiError'
 import type { PaymentOrder } from '@/types/payment'
 import AppLayout from '@/components/layout/AppLayout.vue'
+import TablePageLayout from '@/components/layout/TablePageLayout.vue'
 import Pagination from '@/components/common/Pagination.vue'
 import BaseDialog from '@/components/common/BaseDialog.vue'
 import Select from '@/components/common/Select.vue'
@@ -182,7 +189,7 @@ async function loadRefundEligibility() {
   try {
     const res = await paymentAPI.getRefundEligibleProviders()
     refundEligibleProviders.value = new Set(res.data.provider_instance_ids || [])
-  } catch { /* ignore — default to hiding refund button */ }
+  } catch { /* ignore 鈥?default to hiding refund button */ }
 }
 
 onMounted(() => { fetchOrders(); loadRefundEligibility() })

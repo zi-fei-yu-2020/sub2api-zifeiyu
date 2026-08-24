@@ -1,11 +1,11 @@
 <template>
   <div>
     <!-- Tags display -->
-    <div class="flex flex-wrap gap-1.5 rounded-lg border border-gray-200 bg-white p-2 dark:border-dark-600 dark:bg-dark-800 min-h-[2.5rem]">
+    <div class="flex flex-wrap gap-1.5 rounded-xl border border-slate-200 bg-white p-2 dark:border-slate-700 dark:bg-slate-900 min-h-[2.5rem]">
       <span
         v-for="(model, idx) in models"
         :key="idx"
-        class="inline-flex items-center gap-1 rounded-md px-2 py-0.5 text-sm"
+        class="inline-flex items-center gap-1 rounded-xl px-2 py-0.5 text-sm"
         :class="getPlatformTagClass(props.platform || '')"
       >
         {{ model }}
@@ -21,7 +21,7 @@
         ref="inputRef"
         v-model="inputValue"
         type="text"
-        class="flex-1 min-w-[120px] border-none bg-transparent text-sm outline-none placeholder:text-gray-400 dark:text-white"
+        class="flex-1 min-w-[120px] border-none bg-transparent text-sm outline-none placeholder:text-slate-400 dark:text-white"
         :placeholder="models.length === 0 ? placeholder : ''"
         @keydown.enter.prevent="addModel"
         @keydown.tab.prevent="addModel"
@@ -30,7 +30,7 @@
         @blur="addModel"
       />
     </div>
-    <p class="mt-1 text-xs text-gray-400">
+    <p class="mt-1 text-xs text-slate-400">
       {{ t('admin.channels.form.modelInputHint', 'Press Enter to add, supports paste for batch import.') }}
     </p>
   </div>

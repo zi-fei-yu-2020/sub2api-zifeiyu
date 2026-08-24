@@ -157,6 +157,10 @@ export default {
 
   // Navigation
   nav: {
+    sectionOverview: 'Overview & Ops',
+    sectionResources: 'Resources & Users',
+    sectionCommerce: 'Commerce & Sales',
+    sectionSystem: 'Platform & System',
     dashboard: 'Dashboard',
     announcements: 'Announcements',
     apiKeys: 'API Keys',

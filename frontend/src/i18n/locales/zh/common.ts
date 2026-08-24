@@ -157,6 +157,10 @@ export default {
 
   // Navigation
   nav: {
+    sectionOverview: '系统概览',
+    sectionResources: '资源与用户',
+    sectionCommerce: '商业与营销',
+    sectionSystem: '平台与设置',
     dashboard: '仪表盘',
     announcements: '公告',
     apiKeys: 'API 密钥',
