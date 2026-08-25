@@ -23,6 +23,7 @@ const {
   getStreamTimeoutSettings,
   updateStreamTimeoutSettings,
   getRectifierSettings,
+  updateRectifierSettings,
   getBetaPolicySettings,
   getUpstreamBillingProbeSettings,
   updateUpstreamBillingProbeSettings,
@@ -59,6 +60,7 @@ const {
   getStreamTimeoutSettings: vi.fn(),
   updateStreamTimeoutSettings: vi.fn(),
   getRectifierSettings: vi.fn(),
+  updateRectifierSettings: vi.fn(),
   getBetaPolicySettings: vi.fn(),
   getUpstreamBillingProbeSettings: vi.fn().mockResolvedValue({
     enabled: true,
@@ -102,6 +104,7 @@ vi.mock("@/api", () => ({
       getStreamTimeoutSettings,
       updateStreamTimeoutSettings,
       getRectifierSettings,
+      updateRectifierSettings,
       getBetaPolicySettings,
     },
     accounts: {
@@ -645,6 +648,7 @@ describe("admin SettingsView payment visible method controls", () => {
     getStreamTimeoutSettings.mockReset();
     updateStreamTimeoutSettings.mockReset();
     getRectifierSettings.mockReset();
+    updateRectifierSettings.mockReset();
     getBetaPolicySettings.mockReset();
     getUpstreamBillingProbeSettings.mockReset();
     updateUpstreamBillingProbeSettings.mockReset();
@@ -704,6 +708,7 @@ describe("admin SettingsView payment visible method controls", () => {
       apikey_signature_enabled: false,
       apikey_signature_patterns: [],
     });
+    updateRectifierSettings.mockImplementation(async (payload) => payload);
     getBetaPolicySettings.mockResolvedValue({
       rules: [],
     });
@@ -838,6 +843,39 @@ describe("admin SettingsView payment visible method controls", () => {
       temp_unsched_minutes: 5,
       threshold_count: 4,
       threshold_window_minutes: 12,
+    });
+  });
+
+  it("keeps the extracted request rectifier panel wired to its existing save API", async () => {
+    const wrapper = mountView();
+    await flushPromises();
+    await openGatewayTab(wrapper);
+
+    const card = wrapper
+      .findAll(".card")
+      .find((item) => item.text().includes("admin.settings.rectifier.title"));
+    expect(card).toBeDefined();
+
+    const switches = card!.findAll(".toggle-stub");
+    expect(switches).toHaveLength(4);
+    await switches[3].setValue(true);
+    await flushPromises();
+
+    const addButton = card!
+      .findAll("button")
+      .find((button) => button.text().includes("admin.settings.rectifier.addPattern"));
+    expect(addButton).toBeDefined();
+    await addButton!.trigger("click");
+    await card!.get('input[type="text"]').setValue("x-custom-signature");
+    await card!.get("button.btn-primary").trigger("click");
+    await flushPromises();
+
+    expect(updateRectifierSettings).toHaveBeenCalledWith({
+      enabled: true,
+      thinking_signature_enabled: true,
+      thinking_budget_enabled: true,
+      apikey_signature_enabled: true,
+      apikey_signature_patterns: ["x-custom-signature"],
     });
   });
 
