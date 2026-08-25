@@ -252,6 +252,17 @@ sudo systemctl enable sub2api
 # http://YOUR_SERVER_IP:8080
 ```
 
+### Secure Remote Setup
+
+The first-run web Setup Wizard binds to `127.0.0.1` by default. To expose it remotely, explicitly configure both variables:
+
+```bash
+SETUP_ALLOW_REMOTE=true
+SETUP_TOKEN=$(openssl rand -hex 32)
+```
+
+Then open `http://SERVER:PORT/setup?setup_token=YOUR_TOKEN`. The browser stores the token in session storage, removes it from the address bar, and sends it as `X-Setup-Token` for setup mutations. Docker deployments using `AUTO_SETUP=true` are unaffected.
+
 The Setup Wizard will guide you through:
 - Database configuration
 - Redis configuration

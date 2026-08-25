@@ -128,6 +128,17 @@ docker compose -f docker-compose.local.yml logs -f sub2api
 
 **Recommendation:** Use `docker-compose.local.yml` (deployed by `docker-deploy.sh`) for easier data management and migration.
 
+### Protected Remote Setup Wizard
+
+The manual first-run wizard listens on `127.0.0.1` by default. Remote access requires explicit opt-in and a strong token:
+
+```bash
+export SETUP_ALLOW_REMOTE=true
+export SETUP_TOKEN="$(openssl rand -hex 32)"
+```
+
+Open `http://SERVER:PORT/setup?setup_token=YOUR_TOKEN`. Requests to `/setup/test-db`, `/setup/test-redis`, and `/setup/install` require the `X-Setup-Token` header. `AUTO_SETUP=true` bypasses the web wizard and is unchanged.
+
 ### How Auto-Setup Works
 
 When using Docker Compose with `AUTO_SETUP=true`:

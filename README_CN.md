@@ -320,6 +320,17 @@ docker compose logs -f sub2api
 - 创建数据目录（使用本地目录，便于备份和迁移）
 - 显示生成的凭证供你记录
 
+#### 安全的远程安装向导
+
+首次启动时，Web 安装向导默认只监听 `127.0.0.1`。如需远程访问，必须同时显式配置：
+
+```bash
+SETUP_ALLOW_REMOTE=true
+SETUP_TOKEN=$(openssl rand -hex 32)
+```
+
+然后访问 `http://服务器地址:端口/setup?setup_token=你的Token`。前端会把 Token 保存到当前标签页的 sessionStorage、从地址栏移除，并在安装修改请求中通过 `X-Setup-Token` 发送。使用 `AUTO_SETUP=true` 的 Docker 部署不受影响。
+
 #### 手动部署
 
 如果你希望手动配置：
