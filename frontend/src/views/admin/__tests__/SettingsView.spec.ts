@@ -1460,6 +1460,65 @@ describe("admin SettingsView payment visible method controls", () => {
     expect(summary.text()).not.toContain("透传");
   });
 
+  it("keeps the extracted OpenAI fast policy panel wired to the general settings save payload", async () => {
+    getSettings.mockResolvedValueOnce({
+      ...baseSettingsResponse,
+      openai_fast_policy_settings: {
+        rules: [
+          {
+            service_tier: "priority",
+            action: "filter",
+            scope: "all",
+            user_ids: [7],
+            model_whitelist: [],
+            fallback_action: "pass",
+          },
+        ],
+      },
+    });
+    const wrapper = mountView();
+
+    await flushPromises();
+    await openGatewayTab(wrapper);
+
+    const card = wrapper
+      .findAll(".card")
+      .find((item) => item.text().includes("admin.settings.openaiFastPolicy.title"));
+    expect(card).toBeDefined();
+
+    const addPatternButton = card!
+      .findAll("button")
+      .find((button) => button.text().includes("admin.settings.openaiFastPolicy.addModelPattern"));
+    expect(addPatternButton).toBeDefined();
+    await addPatternButton!.trigger("click");
+    await card!
+      .get(
+        '[role="group"][aria-labelledby="openai-fast-policy-models-label-0"] input[type="text"]',
+      )
+      .setValue("gpt-5.6-sol");
+    await wrapper.find("form").trigger("submit.prevent");
+    await flushPromises();
+
+    expect(updateSettings).toHaveBeenCalledWith(
+      expect.objectContaining({
+        openai_fast_policy_settings: {
+          rules: [
+            {
+              service_tier: "priority",
+              action: "filter",
+              scope: "all",
+              user_ids: [7],
+              error_message: undefined,
+              model_whitelist: ["gpt-5.6-sol"],
+              fallback_action: "pass",
+              fallback_error_message: undefined,
+            },
+          ],
+        },
+      }),
+    );
+  });
+
   it("loads and saves upstream billing probe settings from the gateway tab", async () => {
     getUpstreamBillingProbeSettings.mockResolvedValueOnce({
       enabled: false,
