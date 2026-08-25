@@ -15,7 +15,7 @@
 | A-02 Non-atomic refresh rotation | RESOLVED | Redis Lua rotation, bounded tombstones, replay grace, family revocation, and concurrency tests. |
 | A-03 pnpm frozen install | RESOLVED | pnpm 9.15.9 pinned across package, CI, and Docker; lockfile synchronized. |
 | A-04 Windows plugin install | RESOLVED | ZIP handle is closed before rename; Windows tests pass. |
-| A-05 Tokens in localStorage | OPEN | Cookie-backed refresh sessions remain the next major authentication hardening task. |
+| A-05 Tokens in localStorage | RESOLVED for browser refresh tokens | New browser sessions use an HttpOnly cookie; legacy localStorage sessions migrate on the next successful refresh; JSON remains for API-client compatibility. |
 | A-06 Unsanitized custom home HTML | RESOLVED | DOMPurify policy and executable-markup regression tests added. |
 | A-07 Affiliate registration field | RESOLVED | Optional affiliate code restored without duplicating mandatory invitations. |
 | A-08 permissive URL/SSRF defaults | OPEN | Requires a compatibility-preserving security-profile migration. |
@@ -28,7 +28,7 @@
 ### Current verification baseline
 
 - Backend: `go test ./...` passes.
-- Frontend: full suite passes (1,711 tests), ESLint passes, typecheck passes, and production build passes.
+- Frontend: full suite passes (1,712 tests), ESLint passes, typecheck passes, and production build passes.
 - Production dependency audit: **0 critical, 0 high, 8 moderate, 1 low**.
 - Remaining production advisories are transitive Mermaid advisories through the LobeHub icon/UI dependency chain.
 - No xlsx dependency, source reference, advisory, or xlsx exception remains.
@@ -195,7 +195,10 @@ Unix 通常允许重命名已打开文件，Windows 会因文件句柄占用拒�
 
 ---
 
-### A-05 [OPEN] [中/Medium] Access Token 与 Refresh Token 均长期存放在 localStorage
+### A-05 [RESOLVED-BROWSER] [中/Medium] Access Token 与 Refresh Token 均长期存放在 localStorage
+
+
+**Current status:** browser refresh sessions now use a rotating HttpOnly, SameSite=Lax cookie. The browser no longer persists newly issued refresh tokens; existing localStorage sessions migrate after their next successful refresh. JSON refresh tokens remain in responses and requests for non-browser client compatibility.
 
 **位置：**
 
