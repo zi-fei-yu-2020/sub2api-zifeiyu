@@ -552,10 +552,9 @@ default:
 Additional security-related options are available in `config.yaml`:
 
 - `cors.allowed_origins` for CORS allowlist
-- `security.url_allowlist` for upstream/pricing/CRS host allowlists
-- `security.url_allowlist.enabled` to disable URL validation (use with caution)
-- `security.url_allowlist.allow_insecure_http` to allow HTTP URLs when validation is disabled
-- `security.url_allowlist.allow_private_hosts` to allow private/local IP addresses
+- `security.url_policy.profile` selects `strict`, `private-network`, or `compatible`
+- `security.url_allowlist` contains upstream/pricing/CRS host or host:port allowlists
+- legacy `url_allowlist` booleans are retained only for upgrade compatibility
 - `security.response_headers.enabled` to enable configurable response header filtering (disabled uses default allowlist)
 - `security.csp` to control Content-Security-Policy headers
 - `billing.circuit_breaker` to fail closed on billing errors
@@ -571,40 +570,19 @@ SECURITY_FORWARDED_CLIENT_IP_HEADERS=True-Client-IP,X-CDN-Client-IP
 
 Header names are validated, canonicalized, and de-duplicated. The admin security settings can update the list without a restart; new installations persist YAML/environment defaults and existing installations backfill a missing database value. When legacy takeover is disabled, all custom and built-in raw forwarding headers are ignored and Gin uses only `server.trusted_proxies`. While takeover is enabled, firewall the origin to CDN/proxy addresses and make the edge overwrite every trusted client-IP header. See [`deploy/EDGE_SECURITY.md`](deploy/EDGE_SECURITY.md) for the complete migration and trust-boundary rules.
 
-**⚠️ Security Warning: HTTP URL Configuration**
+**Outbound URL / SSRF profiles**
 
-When `security.url_allowlist.enabled=false`, the system performs minimal URL validation and **allows HTTP URLs by default** (dev-friendly mode; Docker Compose deployments use the same default). For production, explicitly tighten this to HTTPS-only:
+New installations use the `strict` profile: host allowlists are enforced, only HTTPS is accepted, private/loopback targets are rejected, and request redirects are revalidated. Existing configuration files without a profile preserve their legacy switches until explicitly migrated.
 
 ```yaml
 security:
-  url_allowlist:
-    enabled: false                # Disable allowlist checks
-    allow_insecure_http: false    # HTTPS only (recommended for production)
+  url_policy:
+    profile: strict
 ```
 
-**Or via environment variable:**
+Use `private-network` only for explicitly allowlisted Ollama or internal gateways. It permits private HTTP targets such as `192.168.1.20:11434`, but cloud metadata and link-local targets remain blocked. `compatible` retains the old permissive behavior and emits a startup warning.
 
-```bash
-SECURITY_URL_ALLOWLIST_ENABLED=false
-SECURITY_URL_ALLOWLIST_ALLOW_INSECURE_HTTP=false
-```
-
-**Risks of allowing HTTP:**
-- API keys and data transmitted in **plaintext** (vulnerable to interception)
-- Susceptible to **man-in-the-middle (MITM) attacks**
-- **NOT suitable for production** environments
-
-**When to use HTTP:**
-- ✅ Development/testing with local servers (http://localhost)
-- ✅ Internal networks with trusted endpoints
-- ✅ Testing account connectivity before obtaining HTTPS
-- ❌ Production environments (use HTTPS only)
-
-**Example error for HTTP URLs when `allow_insecure_http: false` is set:**
-```
-Invalid base URL: invalid url scheme: http
-```
-
+See [`docs/URL_SECURITY_PROFILES.md`](docs/URL_SECURITY_PROFILES.md) for migration steps, Docker variables, allowlist syntax, and permanently blocked targets.
 If you disable URL validation or response header filtering, harden your network layer:
 - Enforce an egress allowlist for upstream domains/IPs
 - Block private/loopback/link-local ranges

@@ -18,7 +18,7 @@
 | A-05 Tokens in localStorage | RESOLVED for browser refresh tokens | New browser sessions use an HttpOnly cookie; legacy localStorage sessions migrate on the next successful refresh; JSON remains for API-client compatibility. |
 | A-06 Unsanitized custom home HTML | RESOLVED | DOMPurify policy and executable-markup regression tests added. |
 | A-07 Affiliate registration field | RESOLVED | Optional affiliate code restored without duplicating mandatory invitations. |
-| A-08 permissive URL/SSRF defaults | OPEN | Requires a compatibility-preserving security-profile migration. |
+| A-08 permissive URL/SSRF defaults | RESOLVED | Three compatibility-preserving profiles added; new installs use strict, old installs retain legacy behavior until migration. |
 | A-09 vulnerable xlsx dependency | RESOLVED | XLSX export replaced with formula-safe UTF-8 CSV; xlsx removed from source and lockfile. |
 | A-10 incomplete frontend CI gate | RESOLVED | Full frontend Vitest suite is required by CI. |
 | A-11 model plaza visibility | RESOLVED | Home entry honors `model_plaza_require_auth`. |
@@ -56,7 +56,7 @@
 
 The initial audit identified three release-blocking findings. All three are now resolved on `main`: protected first-run setup, atomic refresh-token rotation, and reproducible pnpm installs.
 
-The current release baseline has complete backend/frontend test coverage passing and no critical/high production dependency advisories. Remaining open work is limited to cookie-backed browser refresh sessions, compatibility-preserving URL security profiles, and frontend bundle/component decomposition.
+The current release baseline has complete backend/frontend test coverage passing and no critical/high production dependency advisories. Remaining open work is limited to the transitive Mermaid dependency chain and frontend bundle/component decomposition.
 
 ## 3. 发现清单
 
@@ -261,7 +261,10 @@ access token 和 refresh token 均可被同源 JavaScript 直接读取。任何�
 
 ---
 
-### A-08 [OPEN] [中/Medium] 示例和默认配置关闭 SSRF allowlist，并允许私网与 HTTP
+### A-08 [RESOLVED] [中/Medium] 示例和默认配置关闭 SSRF allowlist，并允许私网与 HTTP
+
+**Current status:** Added `strict`, `private-network`, and `compatible` outbound URL profiles. New installations and generated setup configs use `strict`; existing config files without a profile preserve their legacy switches. Private HTTP targets require an explicit host or host:port allowlist entry, redirects are revalidated, and cloud metadata/link-local targets remain blocked in every enforced profile. Migration guidance is documented in `docs/URL_SECURITY_PROFILES.md`.
+
 
 **位置：**
 
@@ -432,7 +435,7 @@ access token 和 refresh token 均可被同源 JavaScript 直接读取。任何�
 4. A-04 修复 Windows 插件安装。
 5. A-05/A-06 调整 Token 存储与自定义 HTML 信任边界。
 6. A-07 恢复 Affiliate 注册字段。
-7. A-08 收紧生产 URL/SSRF 默认值。
+7. A-08 URL/SSRF production defaults. (RESOLVED: profiles, compatibility migration, redirect checks, and metadata blocking.)
 8. A-09 升级/替换依赖。
 
 ### P2：工程治理
