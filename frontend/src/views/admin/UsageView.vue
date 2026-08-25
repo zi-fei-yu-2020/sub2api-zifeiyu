@@ -189,6 +189,7 @@ import { useRoute } from 'vue-router'
 import { useAppStore } from '@/stores/app'; import { adminAPI } from '@/api/admin'; import { adminUsageAPI } from '@/api/admin/usage'
 import { getPersistedPageSize } from '@/composables/usePersistedPageSize'
 import { formatReasoningEffort } from '@/utils/format'
+import { createCsvBlob, serializeCsvRow } from '@/utils/csv'
 import { resolveUsageRequestType, requestTypeToLegacyStream } from '@/utils/usageRequestType'
 import AppLayout from '@/components/layout/AppLayout.vue'; import Pagination from '@/components/common/Pagination.vue'; import Select from '@/components/common/Select.vue'; import DateRangePicker from '@/components/common/DateRangePicker.vue'
 import UsageStatsCards from '@/components/admin/usage/UsageStatsCards.vue'; import UsageFilters from '@/components/admin/usage/UsageFilters.vue'
@@ -572,7 +573,6 @@ const exportToExcel = async () => {
   const c = new AbortController(); exportAbortController = c
   try {
     let p = 1; let total = pagination.total; let exportedCount = 0
-    const XLSX = await import('xlsx')
     const headers = [
       t('usage.time'), t('admin.usage.user'), t('usage.apiKeyFilter'),
       t('admin.usage.account'), t('usage.requestedModel'), t('usage.sentUpstreamModel'), t('usage.upstreamResponseModel'), t('usage.upstreamModelMismatch'), t('usage.reasoningEffort'), t('admin.usage.group'),
@@ -586,7 +586,7 @@ const exportToExcel = async () => {
       t('usage.firstToken'), t('usage.duration'),
       t('admin.usage.requestId'), t('usage.userAgent'), t('admin.usage.ipAddress')
     ]
-    const ws = XLSX.utils.aoa_to_sheet([headers])
+    const csvLines = [serializeCsvRow(headers)]
     while (true) {
       const res = await adminUsageAPI.list(
         buildUsageListParams(p, 100, true),
@@ -606,7 +606,7 @@ const exportToExcel = async () => {
         log.request_id || '', log.user_agent || '', log.ip_address || ''
       ])
       if (rows.length) {
-        XLSX.utils.sheet_add_aoa(ws, rows, { origin: -1 })
+        csvLines.push(...rows.map((row) => serializeCsvRow(row)))
       }
       exportedCount += rows.length
       exportProgress.current = exportedCount
@@ -614,9 +614,7 @@ const exportToExcel = async () => {
       if (exportedCount >= total || res.items.length < 100) break; p++
     }
     if(!c.signal.aborted) {
-      const wb = XLSX.utils.book_new()
-      XLSX.utils.book_append_sheet(wb, ws, 'Usage')
-      saveAs(new Blob([XLSX.write(wb, { bookType: 'xlsx', type: 'array' })], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' }), `usage_${filters.value.start_date}_to_${filters.value.end_date}.xlsx`)
+      saveAs(createCsvBlob(csvLines), `usage_${filters.value.start_date}_to_${filters.value.end_date}.csv`)
       appStore.showSuccess(t('usage.exportSuccess'))
     }
   } catch (error) { console.error('Failed to export:', error); appStore.showError('Export Failed') }
