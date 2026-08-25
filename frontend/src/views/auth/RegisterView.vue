@@ -110,6 +110,37 @@
           </div>
         </div>
 
+        <!-- Affiliate referral code (optional when mandatory invitations are disabled) -->
+        <div
+          v-else-if="affiliateEnabled"
+          data-testid="affiliate-invitation-field"
+        >
+          <label for="affiliate_code" class="input-label">
+            {{ t('auth.affiliateCodeLabel') }}
+            <span class="ml-1 text-xs font-normal text-slate-400 dark:text-dark-500">
+              ({{ t('common.optional') }})
+            </span>
+          </label>
+          <div class="relative">
+            <div
+              v-if="!formData.aff_code"
+              class="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3.5 transition-opacity duration-150"
+            >
+              <Icon name="link" size="md" class="text-slate-400 dark:text-dark-500" />
+            </div>
+            <input
+              id="affiliate_code"
+              v-model="formData.aff_code"
+              type="text"
+              autocomplete="off"
+              :disabled="registrationActionDisabled"
+              class="input transition-all duration-150"
+              :class="formData.aff_code ? 'px-3.5' : 'pl-11'"
+              :placeholder="t('auth.affiliateCodePlaceholder')"
+            />
+          </div>
+        </div>
+
         <!-- Promo Code Input (Optional) -->
         <div v-if="promoCodeEnabled">
           <label for="promo_code" class="input-label">

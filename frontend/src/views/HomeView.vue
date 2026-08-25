@@ -93,6 +93,7 @@
   <!-- Ultimate Blue-White SaaS Landing Page -->
   <div
     v-else
+    data-testid="default-home"
     class="relative flex min-h-screen flex-col overflow-hidden bg-slate-50 text-slate-900 dark:bg-slate-950 dark:text-slate-100"
   >
     <!-- Background Decor (Pure Blue-White Light & Subtle Radial Gradients) -->
@@ -471,10 +472,10 @@ const { t } = useI18n()
 const appStore = useAppStore()
 const authStore = useAuthStore()
 
-const siteName = computed(() => appStore.siteName || 'Sub2API')
-const siteLogo = computed(() => sanitizeUrl(appStore.siteLogo || '', { allowRelative: true, allowDataUrl: true }))
+const siteName = computed(() => appStore.cachedPublicSettings?.site_name || appStore.siteName || 'Sub2API')
+const siteLogo = computed(() => sanitizeUrl(appStore.cachedPublicSettings?.site_logo || appStore.siteLogo || '', { allowRelative: true, allowDataUrl: true }))
 const siteSubtitle = computed(() => appStore.cachedPublicSettings?.site_subtitle || '')
-const docUrl = computed(() => sanitizeUrl(appStore.docUrl))
+const docUrl = computed(() => sanitizeUrl(appStore.cachedPublicSettings?.doc_url || appStore.docUrl))
 
 const displayApiBaseUrl = computed(() => {
   const customUrl = appStore.cachedPublicSettings?.api_base_url || appStore.apiBaseUrl
@@ -490,7 +491,11 @@ const isDark = ref(document.documentElement.classList.contains('dark'))
 const currentYear = computed(() => new Date().getFullYear())
 
 const registrationEnabled = computed(() => appStore.cachedPublicSettings?.registration_enabled ?? true)
-const showModelPlazaEntry = computed(() => isFeatureFlagEnabled(FeatureFlags.modelPlaza))
+const showModelPlazaEntry = computed(() => {
+  if (!isFeatureFlagEnabled(FeatureFlags.modelPlaza)) return false
+  const requiresAuth = appStore.cachedPublicSettings?.model_plaza_require_auth === true
+  return !requiresAuth || authStore.isAuthenticated
+})
 
 const compactHomeEnabled = computed(() => Boolean(appStore.cachedPublicSettings?.compact_home_enabled))
 const homeContent = computed(() => appStore.cachedPublicSettings?.home_content || '')
@@ -501,7 +506,7 @@ const isHomeContentUrl = computed(() => {
 })
 
 const dashboardPath = computed(() => {
-  return authStore.user?.role === 'admin' ? '/admin/dashboard' : '/dashboard'
+  return authStore.isAdmin ? '/admin/dashboard' : '/dashboard'
 })
 
 function toggleTheme() {
@@ -511,6 +516,8 @@ function toggleTheme() {
 }
 
 onMounted(() => {
-  appStore.fetchPublicSettings()
+  if (!appStore.publicSettingsLoaded) {
+    void appStore.fetchPublicSettings()
+  }
 })
 </script>
