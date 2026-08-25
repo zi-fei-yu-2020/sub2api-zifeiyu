@@ -110,7 +110,10 @@ func runSetupServer() {
 
 	// Get server address from config.yaml or environment variables (SERVER_HOST, SERVER_PORT)
 	// This allows users to run setup on a different address if needed
-	addr := config.GetServerAddress()
+	addr, err := setup.WebSetupServerAddress(config.GetServerAddress())
+	if err != nil {
+		log.Fatalf("Invalid web setup configuration: %v", err)
+	}
 	log.Printf("Setup wizard available at http://%s", addr)
 	log.Println("Complete the setup wizard to configure Sub2API")
 
