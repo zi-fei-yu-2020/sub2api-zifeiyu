@@ -1889,6 +1889,124 @@ describe("admin SettingsView wechat connect controls", () => {
     expect(link.attributes("rel")).toContain("noopener");
   });
 
+  it("saves LinuxDo fields from the extracted panel", async () => {
+    getSettings.mockResolvedValueOnce({
+      ...baseSettingsResponse,
+      linuxdo_connect_enabled: true,
+      linuxdo_connect_client_id: "old-linuxdo-id",
+      linuxdo_connect_redirect_url: "https://old.example/linuxdo",
+    });
+    const wrapper = mountView();
+    await flushPromises();
+    await openSecurityTab(wrapper);
+
+    const card = wrapper
+      .findAll(".card")
+      .find((node) => node.text().includes("admin.settings.linuxdo.title"));
+    expect(card).toBeDefined();
+    const inputs = card!
+      .findAll("input")
+      .filter((input) => input.attributes("type") !== "checkbox");
+    await inputs[0].setValue("linuxdo-client-id");
+    await inputs[1].setValue("linuxdo-secret");
+    await inputs[2].setValue("https://example.com/api/v1/auth/oauth/linuxdo/callback");
+    await wrapper.find("form").trigger("submit.prevent");
+    await flushPromises();
+
+    expect(updateSettings).toHaveBeenCalledWith(
+      expect.objectContaining({
+        linuxdo_connect_enabled: true,
+        linuxdo_connect_client_id: "linuxdo-client-id",
+        linuxdo_connect_client_secret: "linuxdo-secret",
+        linuxdo_connect_redirect_url:
+          "https://example.com/api/v1/auth/oauth/linuxdo/callback",
+      }),
+    );
+  });
+
+  it("saves GitHub and Google fields from their extracted panels", async () => {
+    getSettings.mockResolvedValueOnce({
+      ...baseSettingsResponse,
+      github_oauth_enabled: true,
+      google_oauth_enabled: true,
+    });
+    const wrapper = mountView();
+    await flushPromises();
+    await openSecurityTab(wrapper);
+
+    const githubCard = wrapper
+      .findAll(".rounded-xl.border")
+      .find((node) => node.text().includes("GitHub"));
+    expect(githubCard).toBeDefined();
+    const githubInputs = githubCard!
+      .findAll("input")
+      .filter((input) => input.attributes("type") !== "checkbox");
+    await githubInputs[0].setValue("github-id");
+    await githubInputs[1].setValue("github-secret");
+    await githubInputs[2].setValue("https://example.com/github/callback");
+    await githubInputs[3].setValue("/auth/github/callback");
+
+    const googleCard = wrapper
+      .findAll(".rounded-xl.border")
+      .find((node) => node.text().includes("Google"));
+    expect(googleCard).toBeDefined();
+    const googleInputs = googleCard!
+      .findAll("input")
+      .filter((input) => input.attributes("type") !== "checkbox");
+    await googleInputs[0].setValue("google-id");
+    await googleInputs[1].setValue("google-secret");
+    await googleInputs[2].setValue("https://example.com/google/callback");
+    await googleInputs[3].setValue("/auth/google/callback");
+
+    await wrapper.find("form").trigger("submit.prevent");
+    await flushPromises();
+    expect(updateSettings).toHaveBeenCalledWith(
+      expect.objectContaining({
+        github_oauth_enabled: true,
+        github_oauth_client_id: "github-id",
+        github_oauth_client_secret: "github-secret",
+        github_oauth_redirect_url: "https://example.com/github/callback",
+        github_oauth_frontend_redirect_url: "/auth/github/callback",
+        google_oauth_enabled: true,
+        google_oauth_client_id: "google-id",
+        google_oauth_client_secret: "google-secret",
+        google_oauth_redirect_url: "https://example.com/google/callback",
+        google_oauth_frontend_redirect_url: "/auth/google/callback",
+      }),
+    );
+  });
+
+  it("saves DingTalk fields from the extracted panel", async () => {
+    getSettings.mockResolvedValueOnce({
+      ...baseSettingsResponse,
+      dingtalk_connect_enabled: true,
+      dingtalk_connect_corp_restriction_policy: "internal_only",
+    });
+    const wrapper = mountView();
+    await flushPromises();
+    await openSecurityTab(wrapper);
+
+    const card = wrapper
+      .findAll(".card")
+      .find((node) => node.text().includes("admin.settings.dingtalk.title"));
+    expect(card).toBeDefined();
+    await card!.findAll('input[type="text"]')[0].setValue("dingtalk-client-id");
+    await card!.get('input[type="password"]').setValue("dingtalk-secret");
+    await card!.get('input[type="url"]').setValue("https://example.com/dingtalk/callback");
+    await wrapper.find("form").trigger("submit.prevent");
+    await flushPromises();
+
+    expect(updateSettings).toHaveBeenCalledWith(
+      expect.objectContaining({
+        dingtalk_connect_enabled: true,
+        dingtalk_connect_client_id: "dingtalk-client-id",
+        dingtalk_connect_client_secret: "dingtalk-secret",
+        dingtalk_connect_redirect_url: "https://example.com/dingtalk/callback",
+        dingtalk_connect_corp_restriction_policy: "internal_only",
+      }),
+    );
+  });
+
   it("saves WeChat Connect fields using the backend contract and clears the secret after save", async () => {
     const wrapper = mountView();
 
