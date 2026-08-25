@@ -4,6 +4,21 @@
 import axios from 'axios'
 import { buildGatewayUrl } from './url'
 
+const SETUP_TOKEN_STORAGE_KEY = 'sub2api_setup_token'
+const SETUP_TOKEN_HEADER = 'X-Setup-Token'
+
+function captureSetupTokenFromURL(): void {
+  if (typeof window === 'undefined') return
+  const url = new URL(window.location.href)
+  const token = url.searchParams.get('setup_token')?.trim()
+  if (!token) return
+  sessionStorage.setItem(SETUP_TOKEN_STORAGE_KEY, token)
+  url.searchParams.delete('setup_token')
+  window.history.replaceState(window.history.state, '', `${url.pathname}${url.search}${url.hash}`)
+}
+
+captureSetupTokenFromURL()
+
 // Create a separate client for setup endpoints (not under /api/v1)
 const setupClient = axios.create({
   baseURL: buildGatewayUrl('/').replace(/\/+$/, ''),
@@ -13,9 +28,18 @@ const setupClient = axios.create({
   }
 })
 
+setupClient.interceptors.request.use((config) => {
+  const token = sessionStorage.getItem(SETUP_TOKEN_STORAGE_KEY)
+  if (token && config.headers) {
+    config.headers[SETUP_TOKEN_HEADER] = token
+  }
+  return config
+})
+
 export interface SetupStatus {
   needs_setup: boolean
   step: string
+  requires_token?: boolean
 }
 
 export interface DatabaseConfig {

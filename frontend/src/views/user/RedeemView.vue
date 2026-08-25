@@ -1,22 +1,20 @@
 <template>
   <AppLayout>
     <div class="mx-auto max-w-2xl space-y-6">
-      <!-- Current Balance Card -->
-      <div class="card overflow-hidden">
-        <div class="bg-gradient-to-br from-primary-500 to-primary-600 px-6 py-8 text-center">
-          <div
-            class="mb-4 inline-flex h-16 w-16 items-center justify-center rounded-2xl bg-white/20 backdrop-blur-sm"
-          >
-            <Icon name="creditCard" size="xl" class="text-white" />
-          </div>
-          <p class="text-sm font-medium text-primary-100">{{ t('redeem.currentBalance') }}</p>
-          <p class="mt-2 text-4xl font-bold text-white">
-            ${{ user?.balance?.toFixed(2) || '0.00' }}
-          </p>
-          <p class="mt-2 text-sm text-primary-100">
-            {{ t('redeem.concurrency') }}: {{ user?.concurrency || 0 }} {{ t('redeem.requests') }}
-          </p>
+      <!-- Current Balance Card (Elegant Soft Blue Mesh & Card) -->
+      <div class="card-featured border border-blue-200/70 bg-gradient-to-b from-blue-50/80 via-blue-50/40 to-white px-6 py-8 text-center shadow-sm dark:border-slate-800 dark:from-slate-900 dark:to-slate-900">
+        <div
+          class="mb-3.5 inline-flex h-14 w-14 items-center justify-center rounded-2xl bg-blue-100/70 text-primary-600 border border-blue-200/60 dark:bg-blue-950/60 dark:text-blue-400 dark:border-blue-800/40"
+        >
+          <Icon name="creditCard" size="lg" />
         </div>
+        <p class="text-xs font-semibold uppercase tracking-wider text-slate-400 dark:text-slate-400">{{ t('redeem.currentBalance') }}</p>
+        <p class="mt-1 text-3xl sm:text-4xl font-black tracking-tight text-primary-600 dark:text-blue-400">
+          ${{ user?.balance?.toFixed(2) || '0.00' }}
+        </p>
+        <p class="mt-2 text-xs text-slate-500 dark:text-slate-400">
+          {{ t('redeem.concurrency') }}: <span class="font-semibold text-slate-700 dark:text-slate-300">{{ user?.concurrency || 0 }}</span> {{ t('redeem.requests') }}
+        </p>
       </div>
 
       <!-- Redeem Form -->
@@ -82,14 +80,14 @@
       <transition name="fade">
         <div
           v-if="redeemResult"
-          class="card border-emerald-200 bg-emerald-50 dark:border-emerald-800/50 dark:bg-emerald-900/20"
+          class="card border-blue-200 bg-emerald-50 dark:border-emerald-800/50 dark:bg-emerald-900/20"
         >
           <div class="p-6">
             <div class="flex items-start gap-4">
               <div
                 class="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-xl bg-emerald-100 dark:bg-emerald-900/30"
               >
-                <Icon name="checkCircle" size="md" class="text-emerald-600 dark:text-emerald-400" />
+                <Icon name="checkCircle" size="md" class="text-blue-600 dark:text-emerald-400" />
               </div>
               <div class="flex-1">
                 <h3 class="text-sm font-semibold text-emerald-800 dark:text-emerald-300">
@@ -200,8 +198,8 @@
 
       <!-- Recent Activity -->
       <div class="card">
-        <div class="border-b border-gray-100 px-6 py-4 dark:border-dark-700">
-          <h2 class="text-lg font-semibold text-gray-900 dark:text-white">
+        <div class="border-b border-slate-100 px-6 py-4 dark:border-dark-700">
+          <h2 class="text-lg font-semibold text-slate-900 dark:text-white">
             {{ t('redeem.recentActivity') }}
           </h2>
         </div>
@@ -230,7 +228,7 @@
             <div
               v-for="item in history"
               :key="item.id"
-              class="flex items-center justify-between rounded-xl bg-gray-50 p-4 dark:bg-dark-800"
+              class="flex items-center justify-between rounded-xl bg-slate-50 p-4 dark:bg-slate-900"
             >
               <div class="flex items-center gap-4">
                 <div
@@ -254,7 +252,7 @@
                     size="md"
                     :class="
                       item.value >= 0
-                        ? 'text-emerald-600 dark:text-emerald-400'
+                        ? 'text-blue-600 dark:text-emerald-400'
                         : 'text-red-600 dark:text-red-400'
                     "
                   />
@@ -278,10 +276,10 @@
                   />
                 </div>
                 <div>
-                  <p class="text-sm font-medium text-gray-900 dark:text-white">
+                  <p class="text-sm font-medium text-slate-900 dark:text-white">
                     {{ getHistoryItemTitle(item) }}
                   </p>
-                  <p class="text-xs text-gray-500 dark:text-dark-400">
+                  <p class="text-xs text-slate-400 dark:text-dark-400">
                     {{ formatDateTime(item.used_at) }}
                   </p>
                 </div>
@@ -292,7 +290,7 @@
                     'text-sm font-semibold',
                     isBalanceType(item.type)
                       ? item.value >= 0
-                        ? 'text-emerald-600 dark:text-emerald-400'
+                        ? 'text-blue-600 dark:text-emerald-400'
                         : 'text-red-600 dark:text-red-400'
                       : isSubscriptionType(item.type)
                         ? 'text-purple-600 dark:text-purple-400'
@@ -315,7 +313,7 @@
                 <!-- Display notes for admin adjustments -->
                 <p
                   v-if="item.notes"
-                  class="mt-1 text-xs text-gray-500 dark:text-dark-400 italic max-w-[200px] truncate"
+                  class="mt-1 text-xs text-slate-400 dark:text-dark-400 italic max-w-[200px] truncate"
                   :title="item.notes"
                 >
                   {{ item.notes }}
@@ -327,11 +325,11 @@
           <!-- Empty State -->
           <div v-else class="empty-state py-8">
             <div
-              class="mb-4 flex h-16 w-16 items-center justify-center rounded-2xl bg-gray-100 dark:bg-dark-800"
+              class="mb-4 flex h-16 w-16 items-center justify-center rounded-2xl bg-slate-100 dark:bg-slate-900"
             >
               <Icon name="clock" size="xl" class="text-gray-400 dark:text-dark-500" />
             </div>
-            <p class="text-sm text-gray-500 dark:text-dark-400">
+            <p class="text-sm text-slate-400 dark:text-dark-400">
               {{ t('redeem.historyWillAppear') }}
             </p>
           </div>

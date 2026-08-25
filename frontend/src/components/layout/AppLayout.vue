@@ -1,7 +1,7 @@
 <template>
-  <div class="min-h-screen bg-gray-50 dark:bg-dark-950">
-    <!-- Background Decoration -->
-    <div class="pointer-events-none fixed inset-0 bg-mesh-gradient"></div>
+  <div class="min-h-screen bg-[#f0f4f9] text-slate-900 dark:bg-[#0b0f19] dark:text-slate-100">
+    <!-- Blue-White Subtle Ambient Glow Mesh -->
+    <div class="pointer-events-none fixed inset-0 bg-mesh-gradient opacity-90"></div>
 
     <!-- Sidebar -->
     <AppSidebar />
@@ -15,7 +15,7 @@
       <AppHeader />
 
       <!-- Main Content -->
-      <main class="p-4 md:p-6 lg:p-8">
+      <main class="p-4 sm:p-6 lg:p-8 max-w-7xl mx-auto">
         <slot />
       </main>
     </div>

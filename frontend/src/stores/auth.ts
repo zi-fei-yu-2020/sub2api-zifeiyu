@@ -17,7 +17,8 @@ import type {
 const AUTH_TOKEN_KEY = 'auth_token'
 const AUTH_USER_KEY = 'auth_user'
 const REFRESH_TOKEN_KEY = 'refresh_token'
-const TOKEN_EXPIRES_AT_KEY = 'token_expires_at' // 存储过期时间戳而非有效期
+const TOKEN_EXPIRES_AT_KEY = 'token_expires_at'
+const REFRESH_COOKIE_KEY = 'refresh_cookie_enabled' // 存储过期时间戳而非有效期
 const PENDING_AUTH_SESSION_KEY = 'pending_auth_session'
 const AUTO_REFRESH_INTERVAL = 60 * 1000 // 60 seconds for user data refresh
 const TOKEN_REFRESH_BUFFER = 120 * 1000 // 120 seconds before expiry to refresh token
@@ -130,7 +131,7 @@ export const useAuthStore = defineStore('auth', () => {
 
         // Start proactive token refresh if we have refresh token and expiry info
         // Note: use !== null to handle case when tokenExpiresAt.value is 0 (expired)
-        if (savedRefreshToken && tokenExpiresAt.value !== null) {
+        if ((savedRefreshToken || localStorage.getItem(REFRESH_COOKIE_KEY) === '1') && tokenExpiresAt.value !== null) {
           scheduleTokenRefreshAt(tokenExpiresAt.value)
         }
       } catch (error) {
@@ -208,7 +209,7 @@ export const useAuthStore = defineStore('auth', () => {
    * Perform the actual token refresh
    */
   async function performTokenRefresh(): Promise<void> {
-    if (!refreshTokenValue.value) {
+    if (!refreshTokenValue.value && localStorage.getItem(REFRESH_COOKIE_KEY) !== '1') {
       return
     }
 
@@ -217,7 +218,13 @@ export const useAuthStore = defineStore('auth', () => {
 
       // Update state
       token.value = response.access_token
-      refreshTokenValue.value = response.refresh_token
+      if (response.refresh_cookie) {
+        refreshTokenValue.value = null
+        localStorage.removeItem(REFRESH_TOKEN_KEY)
+        localStorage.setItem(REFRESH_COOKIE_KEY, '1')
+      } else {
+        refreshTokenValue.value = response.refresh_token
+      }
 
       // Schedule next refresh (this also updates tokenExpiresAt and localStorage)
       scheduleTokenRefresh(response.expires_in)
@@ -300,10 +307,14 @@ export const useAuthStore = defineStore('auth', () => {
     // Store token and user
     token.value = response.access_token
 
-    // Store refresh token if present
-    if (response.refresh_token) {
+    if (response.refresh_cookie) {
+      refreshTokenValue.value = null
+      localStorage.removeItem(REFRESH_TOKEN_KEY)
+      localStorage.setItem(REFRESH_COOKIE_KEY, '1')
+    } else if (response.refresh_token) {
       refreshTokenValue.value = response.refresh_token
       localStorage.setItem(REFRESH_TOKEN_KEY, response.refresh_token)
+      localStorage.removeItem(REFRESH_COOKIE_KEY)
     }
 
     // Extract run_mode if present
@@ -323,7 +334,7 @@ export const useAuthStore = defineStore('auth', () => {
 
     // Start proactive token refresh if we have refresh token and expiry info
     // scheduleTokenRefresh will also store the expiry timestamp
-    if (response.refresh_token && response.expires_in) {
+    if ((response.refresh_cookie || response.refresh_token) && response.expires_in) {
       scheduleTokenRefresh(response.expires_in)
     }
   }
@@ -382,7 +393,7 @@ export const useAuthStore = defineStore('auth', () => {
 
       // Start proactive token refresh if we have refresh token and expiry info
       // Note: use !== null to handle case when tokenExpiresAt.value is 0 (expired)
-      if (savedRefreshToken && tokenExpiresAt.value !== null) {
+      if ((savedRefreshToken || localStorage.getItem(REFRESH_COOKIE_KEY) === '1') && tokenExpiresAt.value !== null) {
         scheduleTokenRefreshAt(tokenExpiresAt.value)
       }
 
@@ -476,6 +487,8 @@ export const useAuthStore = defineStore('auth', () => {
     localStorage.removeItem(AUTH_USER_KEY)
     localStorage.removeItem(REFRESH_TOKEN_KEY)
     localStorage.removeItem(TOKEN_EXPIRES_AT_KEY)
+    localStorage.removeItem('refresh_cookie_enabled')
+    localStorage.removeItem('refresh_generation')
 
     if (options?.preservePendingAuthSession) {
       pendingAuthSession.value = getPersistedPendingAuthSession()

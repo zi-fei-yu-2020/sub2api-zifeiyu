@@ -58,7 +58,7 @@ const detailParts = computed(() => {
 
 const stateClass = computed(() => {
   if (!props.state) return 'text-gray-900 dark:text-white'
-  if (props.state === 'healthy') return 'text-emerald-600 dark:text-emerald-400'
+  if (props.state === 'healthy') return 'text-blue-600 dark:text-emerald-400'
   if (props.state === 'warning') return 'text-amber-600 dark:text-amber-400'
   if (props.state === 'critical') return 'text-red-600 dark:text-red-400'
   return 'text-gray-500 dark:text-dark-400'

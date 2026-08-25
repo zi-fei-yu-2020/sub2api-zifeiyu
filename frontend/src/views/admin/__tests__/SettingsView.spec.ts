@@ -15,13 +15,17 @@ const {
   updateWebSearchEmulationConfig,
   getAdminApiKey,
   getOverloadCooldownSettings,
+  updateOverloadCooldownSettings,
   getRateLimit429CooldownSettings,
   updateRateLimit429CooldownSettings,
   getPanelRateLimitSettings,
   updatePanelRateLimitSettings,
   getStreamTimeoutSettings,
+  updateStreamTimeoutSettings,
   getRectifierSettings,
+  updateRectifierSettings,
   getBetaPolicySettings,
+  updateBetaPolicySettings,
   getUpstreamBillingProbeSettings,
   updateUpstreamBillingProbeSettings,
   getOllamaCloudUsageSettings,
@@ -43,6 +47,7 @@ const {
   updateWebSearchEmulationConfig: vi.fn(),
   getAdminApiKey: vi.fn(),
   getOverloadCooldownSettings: vi.fn(),
+  updateOverloadCooldownSettings: vi.fn(),
   getRateLimit429CooldownSettings: vi.fn(),
   updateRateLimit429CooldownSettings: vi.fn(),
   getPanelRateLimitSettings: vi.fn().mockResolvedValue({
@@ -54,8 +59,11 @@ const {
   }),
   updatePanelRateLimitSettings: vi.fn().mockImplementation(async (payload) => payload),
   getStreamTimeoutSettings: vi.fn(),
+  updateStreamTimeoutSettings: vi.fn(),
   getRectifierSettings: vi.fn(),
+  updateRectifierSettings: vi.fn(),
   getBetaPolicySettings: vi.fn(),
+  updateBetaPolicySettings: vi.fn(),
   getUpstreamBillingProbeSettings: vi.fn().mockResolvedValue({
     enabled: true,
     interval_minutes: 30,
@@ -90,13 +98,17 @@ vi.mock("@/api", () => ({
       updateWebSearchEmulationConfig,
       getAdminApiKey,
       getOverloadCooldownSettings,
+      updateOverloadCooldownSettings,
       getRateLimit429CooldownSettings,
       updateRateLimit429CooldownSettings,
       getPanelRateLimitSettings,
       updatePanelRateLimitSettings,
       getStreamTimeoutSettings,
+      updateStreamTimeoutSettings,
       getRectifierSettings,
+      updateRectifierSettings,
       getBetaPolicySettings,
+      updateBetaPolicySettings,
     },
     accounts: {
       getUpstreamBillingProbeSettings,
@@ -633,11 +645,15 @@ describe("admin SettingsView payment visible method controls", () => {
     updateWebSearchEmulationConfig.mockReset();
     getAdminApiKey.mockReset();
     getOverloadCooldownSettings.mockReset();
+    updateOverloadCooldownSettings.mockReset();
     getRateLimit429CooldownSettings.mockReset();
     updateRateLimit429CooldownSettings.mockReset();
     getStreamTimeoutSettings.mockReset();
+    updateStreamTimeoutSettings.mockReset();
     getRectifierSettings.mockReset();
+    updateRectifierSettings.mockReset();
     getBetaPolicySettings.mockReset();
+    updateBetaPolicySettings.mockReset();
     getUpstreamBillingProbeSettings.mockReset();
     updateUpstreamBillingProbeSettings.mockReset();
     getOllamaCloudUsageSettings.mockReset();
@@ -675,6 +691,7 @@ describe("admin SettingsView payment visible method controls", () => {
       enabled: true,
       cooldown_minutes: 10,
     });
+    updateOverloadCooldownSettings.mockImplementation(async (payload) => payload);
     getRateLimit429CooldownSettings.mockResolvedValue({
       enabled: true,
       cooldown_seconds: 5,
@@ -687,6 +704,7 @@ describe("admin SettingsView payment visible method controls", () => {
       threshold_count: 3,
       threshold_window_minutes: 10,
     });
+    updateStreamTimeoutSettings.mockImplementation(async (payload) => payload);
     getRectifierSettings.mockResolvedValue({
       enabled: true,
       thinking_signature_enabled: true,
@@ -694,9 +712,11 @@ describe("admin SettingsView payment visible method controls", () => {
       apikey_signature_enabled: false,
       apikey_signature_patterns: [],
     });
+    updateRectifierSettings.mockImplementation(async (payload) => payload);
     getBetaPolicySettings.mockResolvedValue({
       rules: [],
     });
+    updateBetaPolicySettings.mockImplementation(async (payload) => payload);
     getUpstreamBillingProbeSettings.mockResolvedValue({
       enabled: true,
       interval_minutes: 30,
@@ -771,6 +791,143 @@ describe("admin SettingsView payment visible method controls", () => {
       public_ip_rpm: 300,
     });
     expect(showSuccess).toHaveBeenCalled();
+  });
+
+  it("keeps the extracted gateway cooldown cards wired to their existing save APIs", async () => {
+    const wrapper = mountView();
+    await flushPromises();
+    await openGatewayTab(wrapper);
+
+    const cards = wrapper.findAll(".card");
+    const overloadCard = cards.find((card) =>
+      card.text().includes("admin.settings.overloadCooldown.title"),
+    );
+    const rateLimitCard = cards.find((card) =>
+      card.text().includes("admin.settings.rateLimit429Cooldown.title"),
+    );
+    expect(overloadCard).toBeDefined();
+    expect(rateLimitCard).toBeDefined();
+
+    await overloadCard!.get('input[type="number"]').setValue("15");
+    await overloadCard!.get("button.btn-primary").trigger("click");
+    await rateLimitCard!.get('input[type="number"]').setValue("45");
+    await rateLimitCard!.get("button.btn-primary").trigger("click");
+    await flushPromises();
+
+    expect(updateOverloadCooldownSettings).toHaveBeenCalledWith({
+      enabled: true,
+      cooldown_minutes: 15,
+    });
+    expect(updateRateLimit429CooldownSettings).toHaveBeenCalledWith({
+      enabled: true,
+      cooldown_seconds: 45,
+    });
+  });
+
+  it("keeps the extracted stream timeout panel wired to its existing save API", async () => {
+    const wrapper = mountView();
+    await flushPromises();
+    await openGatewayTab(wrapper);
+
+    const card = wrapper
+      .findAll(".card")
+      .find((item) => item.text().includes("admin.settings.streamTimeout.title"));
+    expect(card).toBeDefined();
+
+    await card!.get("select").setValue("error");
+    const inputs = card!.findAll('input[type="number"]');
+    expect(inputs).toHaveLength(2);
+    await inputs[0].setValue("4");
+    await inputs[1].setValue("12");
+    await card!.get("button.btn-primary").trigger("click");
+    await flushPromises();
+
+    expect(updateStreamTimeoutSettings).toHaveBeenCalledWith({
+      enabled: true,
+      action: "error",
+      temp_unsched_minutes: 5,
+      threshold_count: 4,
+      threshold_window_minutes: 12,
+    });
+  });
+
+  it("keeps the extracted request rectifier panel wired to its existing save API", async () => {
+    const wrapper = mountView();
+    await flushPromises();
+    await openGatewayTab(wrapper);
+
+    const card = wrapper
+      .findAll(".card")
+      .find((item) => item.text().includes("admin.settings.rectifier.title"));
+    expect(card).toBeDefined();
+
+    const switches = card!.findAll(".toggle-stub");
+    expect(switches).toHaveLength(4);
+    await switches[3].setValue(true);
+    await flushPromises();
+
+    const addButton = card!
+      .findAll("button")
+      .find((button) => button.text().includes("admin.settings.rectifier.addPattern"));
+    expect(addButton).toBeDefined();
+    await addButton!.trigger("click");
+    await card!.get('input[type="text"]').setValue("x-custom-signature");
+    await card!.get("button.btn-primary").trigger("click");
+    await flushPromises();
+
+    expect(updateRectifierSettings).toHaveBeenCalledWith({
+      enabled: true,
+      thinking_signature_enabled: true,
+      thinking_budget_enabled: true,
+      apikey_signature_enabled: true,
+      apikey_signature_patterns: ["x-custom-signature"],
+    });
+  });
+
+  it("keeps the extracted beta policy panel wired to its existing save API", async () => {
+    getBetaPolicySettings.mockResolvedValue({
+      rules: [
+        {
+          beta_token: "context-1m-2025-08-07",
+          action: "block",
+          scope: "all",
+          error_message: "blocked",
+          model_whitelist: [],
+          fallback_action: "pass",
+        },
+      ],
+    });
+
+    const wrapper = mountView();
+    await flushPromises();
+    await openGatewayTab(wrapper);
+
+    const card = wrapper
+      .findAll(".card")
+      .find((item) => item.text().includes("admin.settings.betaPolicy.title"));
+    expect(card).toBeDefined();
+
+    const presetButton = card!
+      .findAll("button")
+      .find((button) => button.text().includes("admin.settings.betaPolicy.presetOpusOnly"));
+    expect(presetButton).toBeDefined();
+    await presetButton!.trigger("click");
+    await card!.get("button.btn-primary").trigger("click");
+    await flushPromises();
+
+    expect(updateBetaPolicySettings).toHaveBeenCalledWith({
+      rules: [
+        {
+          beta_token: "context-1m-2025-08-07",
+          action: "pass",
+          scope: "all",
+          error_message: "blocked",
+          model_whitelist: ["claude-opus-4-6"],
+          fallback_action: "filter",
+          fallback_error_message: undefined,
+        },
+      ],
+    });
   });
 
   it("does not render legacy visible payment method controls", async () => {
@@ -1303,6 +1460,65 @@ describe("admin SettingsView payment visible method controls", () => {
     expect(summary.text()).not.toContain("透传");
   });
 
+  it("keeps the extracted OpenAI fast policy panel wired to the general settings save payload", async () => {
+    getSettings.mockResolvedValueOnce({
+      ...baseSettingsResponse,
+      openai_fast_policy_settings: {
+        rules: [
+          {
+            service_tier: "priority",
+            action: "filter",
+            scope: "all",
+            user_ids: [7],
+            model_whitelist: [],
+            fallback_action: "pass",
+          },
+        ],
+      },
+    });
+    const wrapper = mountView();
+
+    await flushPromises();
+    await openGatewayTab(wrapper);
+
+    const card = wrapper
+      .findAll(".card")
+      .find((item) => item.text().includes("admin.settings.openaiFastPolicy.title"));
+    expect(card).toBeDefined();
+
+    const addPatternButton = card!
+      .findAll("button")
+      .find((button) => button.text().includes("admin.settings.openaiFastPolicy.addModelPattern"));
+    expect(addPatternButton).toBeDefined();
+    await addPatternButton!.trigger("click");
+    await card!
+      .get(
+        '[role="group"][aria-labelledby="openai-fast-policy-models-label-0"] input[type="text"]',
+      )
+      .setValue("gpt-5.6-sol");
+    await wrapper.find("form").trigger("submit.prevent");
+    await flushPromises();
+
+    expect(updateSettings).toHaveBeenCalledWith(
+      expect.objectContaining({
+        openai_fast_policy_settings: {
+          rules: [
+            {
+              service_tier: "priority",
+              action: "filter",
+              scope: "all",
+              user_ids: [7],
+              error_message: undefined,
+              model_whitelist: ["gpt-5.6-sol"],
+              fallback_action: "pass",
+              fallback_error_message: undefined,
+            },
+          ],
+        },
+      }),
+    );
+  });
+
   it("loads and saves upstream billing probe settings from the gateway tab", async () => {
     getUpstreamBillingProbeSettings.mockResolvedValueOnce({
       enabled: false,
@@ -1671,6 +1887,124 @@ describe("admin SettingsView wechat connect controls", () => {
     expect(link.attributes("href")).toBe("https://github.com/settings/developers");
     expect(link.attributes("target")).toBe("_blank");
     expect(link.attributes("rel")).toContain("noopener");
+  });
+
+  it("saves LinuxDo fields from the extracted panel", async () => {
+    getSettings.mockResolvedValueOnce({
+      ...baseSettingsResponse,
+      linuxdo_connect_enabled: true,
+      linuxdo_connect_client_id: "old-linuxdo-id",
+      linuxdo_connect_redirect_url: "https://old.example/linuxdo",
+    });
+    const wrapper = mountView();
+    await flushPromises();
+    await openSecurityTab(wrapper);
+
+    const card = wrapper
+      .findAll(".card")
+      .find((node) => node.text().includes("admin.settings.linuxdo.title"));
+    expect(card).toBeDefined();
+    const inputs = card!
+      .findAll("input")
+      .filter((input) => input.attributes("type") !== "checkbox");
+    await inputs[0].setValue("linuxdo-client-id");
+    await inputs[1].setValue("linuxdo-secret");
+    await inputs[2].setValue("https://example.com/api/v1/auth/oauth/linuxdo/callback");
+    await wrapper.find("form").trigger("submit.prevent");
+    await flushPromises();
+
+    expect(updateSettings).toHaveBeenCalledWith(
+      expect.objectContaining({
+        linuxdo_connect_enabled: true,
+        linuxdo_connect_client_id: "linuxdo-client-id",
+        linuxdo_connect_client_secret: "linuxdo-secret",
+        linuxdo_connect_redirect_url:
+          "https://example.com/api/v1/auth/oauth/linuxdo/callback",
+      }),
+    );
+  });
+
+  it("saves GitHub and Google fields from their extracted panels", async () => {
+    getSettings.mockResolvedValueOnce({
+      ...baseSettingsResponse,
+      github_oauth_enabled: true,
+      google_oauth_enabled: true,
+    });
+    const wrapper = mountView();
+    await flushPromises();
+    await openSecurityTab(wrapper);
+
+    const githubCard = wrapper
+      .findAll(".rounded-xl.border")
+      .find((node) => node.text().includes("GitHub"));
+    expect(githubCard).toBeDefined();
+    const githubInputs = githubCard!
+      .findAll("input")
+      .filter((input) => input.attributes("type") !== "checkbox");
+    await githubInputs[0].setValue("github-id");
+    await githubInputs[1].setValue("github-secret");
+    await githubInputs[2].setValue("https://example.com/github/callback");
+    await githubInputs[3].setValue("/auth/github/callback");
+
+    const googleCard = wrapper
+      .findAll(".rounded-xl.border")
+      .find((node) => node.text().includes("Google"));
+    expect(googleCard).toBeDefined();
+    const googleInputs = googleCard!
+      .findAll("input")
+      .filter((input) => input.attributes("type") !== "checkbox");
+    await googleInputs[0].setValue("google-id");
+    await googleInputs[1].setValue("google-secret");
+    await googleInputs[2].setValue("https://example.com/google/callback");
+    await googleInputs[3].setValue("/auth/google/callback");
+
+    await wrapper.find("form").trigger("submit.prevent");
+    await flushPromises();
+    expect(updateSettings).toHaveBeenCalledWith(
+      expect.objectContaining({
+        github_oauth_enabled: true,
+        github_oauth_client_id: "github-id",
+        github_oauth_client_secret: "github-secret",
+        github_oauth_redirect_url: "https://example.com/github/callback",
+        github_oauth_frontend_redirect_url: "/auth/github/callback",
+        google_oauth_enabled: true,
+        google_oauth_client_id: "google-id",
+        google_oauth_client_secret: "google-secret",
+        google_oauth_redirect_url: "https://example.com/google/callback",
+        google_oauth_frontend_redirect_url: "/auth/google/callback",
+      }),
+    );
+  });
+
+  it("saves DingTalk fields from the extracted panel", async () => {
+    getSettings.mockResolvedValueOnce({
+      ...baseSettingsResponse,
+      dingtalk_connect_enabled: true,
+      dingtalk_connect_corp_restriction_policy: "internal_only",
+    });
+    const wrapper = mountView();
+    await flushPromises();
+    await openSecurityTab(wrapper);
+
+    const card = wrapper
+      .findAll(".card")
+      .find((node) => node.text().includes("admin.settings.dingtalk.title"));
+    expect(card).toBeDefined();
+    await card!.findAll('input[type="text"]')[0].setValue("dingtalk-client-id");
+    await card!.get('input[type="password"]').setValue("dingtalk-secret");
+    await card!.get('input[type="url"]').setValue("https://example.com/dingtalk/callback");
+    await wrapper.find("form").trigger("submit.prevent");
+    await flushPromises();
+
+    expect(updateSettings).toHaveBeenCalledWith(
+      expect.objectContaining({
+        dingtalk_connect_enabled: true,
+        dingtalk_connect_client_id: "dingtalk-client-id",
+        dingtalk_connect_client_secret: "dingtalk-secret",
+        dingtalk_connect_redirect_url: "https://example.com/dingtalk/callback",
+        dingtalk_connect_corp_restriction_policy: "internal_only",
+      }),
+    );
   });
 
   it("saves WeChat Connect fields using the backend contract and clears the secret after save", async () => {

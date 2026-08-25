@@ -1,24 +1,22 @@
 <template>
-  <div class="table-page-layout" :class="{ 'mobile-mode': isMobile }">
-    <!-- 固定区域：操作按钮 -->
-    <div v-if="$slots.actions" class="layout-section-fixed">
-      <slot name="actions" />
-    </div>
-
-    <!-- 固定区域：搜索和过滤器 -->
-    <div v-if="$slots.filters" class="layout-section-fixed">
-      <slot name="filters" />
-    </div>
-
-    <!-- 滚动区域：表格 -->
-    <div class="layout-section-scrollable">
-      <div class="card table-scroll-container">
-        <slot name="table" />
+  <div class="table-page-layout space-y-5" :class="{ 'mobile-mode': isMobile }">
+    <!-- 操作按钮与工具栏 -->
+    <div v-if="$slots.actions || $slots.filters" class="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+      <div v-if="$slots.filters" class="flex flex-1 flex-wrap items-center gap-3">
+        <slot name="filters" />
+      </div>
+      <div v-if="$slots.actions" class="flex shrink-0 items-center justify-end gap-3">
+        <slot name="actions" />
       </div>
     </div>
 
-    <!-- 固定区域：分页器 -->
-    <div v-if="$slots.pagination" class="layout-section-fixed">
+    <!-- 表格区域 (Blue-White SaaS Table Container) -->
+    <div class="table-scroll-container rounded-md border border-slate-200/90 bg-white shadow-sm shadow-slate-200/40 dark:border-slate-800 dark:bg-slate-900">
+      <slot name="table" />
+    </div>
+
+    <!-- 分页器 -->
+    <div v-if="$slots.pagination" class="flex justify-end pt-2">
       <slot name="pagination" />
     </div>
   </div>
@@ -44,65 +42,31 @@ onUnmounted(() => {
 </script>
 
 <style scoped>
-/* 桌面端：Flexbox 布局 */
-.table-page-layout {
-  @apply flex flex-col gap-6;
-  height: calc(100vh - 64px - 4rem); /* 减去 header + lg:p-8 的上下padding */
-}
-
-.layout-section-fixed {
-  @apply flex-shrink-0;
-}
-
-.layout-section-scrollable {
-  @apply flex-1 min-h-0 flex flex-col;
-}
-
-/* 表格滚动容器 - 增强版表体滚动方案 */
-.table-scroll-container {
-  @apply flex flex-col overflow-hidden h-full bg-white dark:bg-dark-800 rounded-2xl border border-gray-200 dark:border-dark-700 shadow-sm;
-}
-
 .table-scroll-container :deep(.table-wrapper) {
-  @apply flex-1 overflow-x-auto overflow-y-auto;
-  /* 确保横向滚动条显示在最底部 */
-  scrollbar-gutter: stable;
+  @apply overflow-x-auto;
 }
 
 .table-scroll-container :deep(table) {
-  @apply w-full;
-  min-width: max-content; /* 关键：确保表格宽度根据内容撑开，从而触发横向滚动 */
-  display: table; /* 使用标准 table 布局以支持 sticky 列 */
+  @apply w-full text-left text-sm;
 }
 
 .table-scroll-container :deep(thead) {
-  @apply bg-gray-50/80 dark:bg-dark-800/80 backdrop-blur-sm;
-}
-
-.table-scroll-container :deep(tbody) {
-  /* 保持默认 table-row-group 显示，不使用 block */
+  @apply bg-slate-50/80 dark:bg-slate-800/80;
 }
 
 .table-scroll-container :deep(th) {
-  @apply px-5 py-4 text-left text-sm font-medium text-gray-600 dark:text-dark-300 border-b border-gray-200 dark:border-dark-700;
+  @apply px-4 py-3 text-xs font-semibold text-slate-600 dark:text-slate-300 border-b border-slate-200/80 dark:border-slate-800;
 }
 
 .table-scroll-container :deep(td) {
-  @apply px-5 py-4 text-sm text-gray-700 dark:text-gray-300 border-b border-gray-100 dark:border-dark-800;
+  @apply px-4 py-3.5 text-slate-700 dark:text-slate-300 border-b border-slate-100 dark:border-slate-800/60;
 }
 
-/* 移动端：恢复正常滚动 */
-.table-page-layout.mobile-mode .table-scroll-container {
-  @apply h-auto overflow-visible border-none shadow-none bg-transparent;
+.table-scroll-container :deep(tbody tr:last-child td) {
+  @apply border-b-0;
 }
 
-.table-page-layout.mobile-mode .layout-section-scrollable {
-  @apply flex-none min-h-fit;
-}
-
-.table-page-layout.mobile-mode .table-scroll-container :deep(table) {
-  @apply flex-none;
-  display: table;
-  min-width: 100%;
+.table-scroll-container :deep(tbody tr) {
+  @apply transition-colors hover:bg-slate-50/60 dark:hover:bg-slate-800/50;
 }
 </style>

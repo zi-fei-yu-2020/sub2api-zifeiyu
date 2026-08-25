@@ -4,16 +4,30 @@
     <div class="card p-4">
       <div class="flex flex-wrap items-center gap-4">
         <div class="flex items-center gap-2">
-          <span class="text-sm font-medium text-gray-700 dark:text-gray-300">{{ t('dashboard.timeRange') }}:</span>
-          <DateRangePicker :start-date="startDate" :end-date="endDate" @update:startDate="$emit('update:startDate', $event)" @update:endDate="$emit('update:endDate', $event)" @change="$emit('dateRangeChange', $event)" />
+          <span class="text-sm font-medium text-slate-700 dark:text-slate-300">{{ t('dashboard.timeRange') }}:</span>
+          <DateRangePicker
+            :start-date="startDate"
+            :end-date="endDate"
+            @update:startDate="$emit('update:startDate', $event)"
+            @update:endDate="$emit('update:endDate', $event)"
+            @change="$emit('dateRangeChange', $event)"
+          />
         </div>
         <button @click="$emit('refresh')" :disabled="loading" class="btn btn-secondary">
           {{ t('common.refresh') }}
         </button>
         <div class="ml-auto flex items-center gap-2">
-          <span class="text-sm font-medium text-gray-700 dark:text-gray-300">{{ t('dashboard.granularity') }}:</span>
+          <span class="text-sm font-medium text-slate-700 dark:text-slate-300">{{ t('dashboard.granularity') }}:</span>
           <div class="w-28">
-            <Select :model-value="granularity" :options="[{value:'day', label:t('dashboard.day')}, {value:'hour', label:t('dashboard.hour')}]" @update:model-value="$emit('update:granularity', $event)" @change="$emit('granularityChange')" />
+            <Select
+              :model-value="granularity"
+              :options="[
+                { value: 'day', label: t('dashboard.day') },
+                { value: 'hour', label: t('dashboard.hour') }
+              ]"
+              @update:model-value="$emit('update:granularity', $event)"
+              @change="$emit('granularityChange')"
+            />
           </div>
         </div>
       </div>
@@ -22,38 +36,52 @@
     <!-- Charts Grid -->
     <div class="grid grid-cols-1 gap-6 lg:grid-cols-2">
       <!-- Model Distribution Chart -->
-      <div class="card relative overflow-hidden p-4">
-        <div v-if="loading" class="absolute inset-0 z-10 flex items-center justify-center bg-white/50 backdrop-blur-sm dark:bg-dark-800/50">
+      <div class="card relative flex flex-col justify-between overflow-hidden p-5">
+        <div v-if="loading" class="absolute inset-0 z-10 flex items-center justify-center bg-white/60 backdrop-blur-sm dark:bg-slate-900/60">
           <LoadingSpinner size="md" />
         </div>
-        <h3 class="mb-4 text-sm font-semibold text-gray-900 dark:text-white">{{ t('dashboard.modelDistribution') }}</h3>
-        <div class="flex flex-col items-center gap-4 sm:flex-row sm:gap-6">
+        <div class="mb-4 flex items-center justify-between">
+          <h3 class="text-sm font-semibold text-slate-900 dark:text-white">{{ t('dashboard.modelDistribution') }}</h3>
+        </div>
+
+        <!-- Have Data -->
+        <div v-if="models && models.length > 0 && modelData" class="flex flex-col items-center gap-4 sm:flex-row sm:gap-6">
           <div class="h-48 w-48 shrink-0">
-            <Doughnut v-if="modelData" :data="modelData" :options="doughnutOptions" />
-            <div v-else class="flex h-full items-center justify-center text-sm text-gray-500 dark:text-gray-400">{{ t('dashboard.noDataAvailable') }}</div>
+            <Doughnut :data="modelData" :options="doughnutOptions" />
           </div>
           <div class="max-h-48 w-full min-w-0 flex-1 overflow-auto">
             <table class="w-full text-xs">
               <thead>
-                <tr class="text-gray-500 dark:text-gray-400">
-                  <th class="pb-2 text-left">{{ t('dashboard.model') }}</th>
-                  <th class="pb-2 text-right">{{ t('dashboard.requests') }}</th>
-                  <th class="pb-2 text-right">{{ t('dashboard.tokens') }}</th>
-                  <th class="pb-2 text-right">{{ t('dashboard.actual') }}</th>
-                  <th class="pb-2 text-right">{{ t('dashboard.standard') }}</th>
+                <tr class="text-slate-400 dark:text-slate-400">
+                  <th class="pb-2 text-left font-medium">{{ t('dashboard.model') }}</th>
+                  <th class="pb-2 text-right font-medium">{{ t('dashboard.requests') }}</th>
+                  <th class="pb-2 text-right font-medium">{{ t('dashboard.tokens') }}</th>
+                  <th class="pb-2 text-right font-medium">{{ t('dashboard.actual') }}</th>
+                  <th class="pb-2 text-right font-medium">{{ t('dashboard.standard') }}</th>
                 </tr>
               </thead>
               <tbody>
-                <tr v-for="model in models" :key="model.model" class="border-t border-gray-100 dark:border-dark-700">
-                  <td class="max-w-[100px] truncate py-1.5 font-medium text-gray-900 dark:text-white" :title="model.model">{{ model.model }}</td>
-                  <td class="py-1.5 text-right text-gray-600 dark:text-gray-400">{{ formatNumber(model.requests) }}</td>
-                  <td class="py-1.5 text-right text-gray-600 dark:text-gray-400">{{ formatTokens(model.total_tokens) }}</td>
-                  <td class="py-1.5 text-right text-green-600 dark:text-green-400">${{ formatCost(model.actual_cost) }}</td>
-                  <td class="py-1.5 text-right text-gray-400 dark:text-gray-500">${{ formatCost(model.cost) }}</td>
+                <tr v-for="model in models" :key="model.model" class="border-t border-slate-100 dark:border-slate-800">
+                  <td class="max-w-[100px] truncate py-1.5 font-medium text-slate-900 dark:text-white" :title="model.model">{{ model.model }}</td>
+                  <td class="py-1.5 text-right text-slate-600 dark:text-slate-400">{{ formatNumber(model.requests) }}</td>
+                  <td class="py-1.5 text-right text-slate-600 dark:text-slate-400">{{ formatTokens(model.total_tokens) }}</td>
+                  <td class="py-1.5 text-right font-medium text-blue-600 dark:text-emerald-400">${formatCost(model.actual_cost)}</td>
+                  <td class="py-1.5 text-right text-slate-400 dark:text-slate-500">${formatCost(model.cost)}</td>
                 </tr>
               </tbody>
             </table>
           </div>
+        </div>
+
+        <!-- Empty State -->
+        <div v-else class="flex h-52 flex-col items-center justify-center text-center">
+          <div class="mb-2 flex h-10 w-10 items-center justify-center rounded-full bg-slate-100 dark:bg-slate-800 text-slate-400">
+            <svg class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M10.5 6a7.5 7.5 0 107.5 7.5h-7.5V6z" />
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M13.5 10.5H21A7.5 7.5 0 0013.5 3v7.5z" />
+            </svg>
+          </div>
+          <p class="text-xs font-medium text-slate-400 dark:text-slate-400">{{ t('dashboard.noDataAvailable') }}</p>
         </div>
       </div>
 
@@ -72,7 +100,7 @@ import Select from '@/components/common/Select.vue'
 import { Doughnut } from 'vue-chartjs'
 import TokenUsageTrend from '@/components/charts/TokenUsageTrend.vue'
 import type { TrendDataPoint, ModelStat } from '@/types'
-import { formatCostFixed as formatCost, formatNumberLocaleString as formatNumber, formatTokensK as formatTokens } from '@/utils/format'
+import { formatNumberLocaleString as formatNumber, formatTokensK as formatTokens } from '@/utils/format'
 import { Chart as ChartJS, CategoryScale, LinearScale, PointElement, LineElement, ArcElement, Title, Tooltip, Legend, Filler } from 'chart.js'
 ChartJS.register(CategoryScale, LinearScale, PointElement, LineElement, ArcElement, Title, Tooltip, Legend, Filler)
 

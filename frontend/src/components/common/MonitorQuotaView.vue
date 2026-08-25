@@ -136,7 +136,7 @@ const utilizationColor = (pct: number) => {
 const utilizationTextColor = (pct: number) => {
   if (pct >= 90) return 'text-red-600 dark:text-red-400'
   if (pct >= 75) return 'text-amber-600 dark:text-amber-400'
-  return 'text-emerald-600 dark:text-emerald-400'
+  return 'text-blue-600 dark:text-emerald-400'
 }
 
 // 重置时间相对/绝对简短显示（与账号页一致）。

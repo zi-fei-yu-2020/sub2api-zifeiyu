@@ -91,6 +91,16 @@ export function setTokenExpiresAt(expiresIn: number): void {
   localStorage.setItem('token_expires_at', String(expiresAt))
 }
 
+
+function persistRefreshTransport(tokens: { refresh_token?: string; refresh_cookie?: boolean }): void {
+  if (tokens.refresh_cookie) {
+    localStorage.removeItem('refresh_token')
+    localStorage.setItem('refresh_cookie_enabled', '1')
+    return
+  }
+  localStorage.removeItem('refresh_cookie_enabled')
+  if (tokens.refresh_token) setRefreshToken(tokens.refresh_token)
+}
 /**
  * Get authentication token from localStorage
  */
@@ -121,6 +131,8 @@ export function clearAuthToken(): void {
   localStorage.removeItem('refresh_token')
   localStorage.removeItem('auth_user')
   localStorage.removeItem('token_expires_at')
+  localStorage.removeItem('refresh_cookie_enabled')
+  localStorage.removeItem('refresh_generation')
 }
 
 /**
@@ -134,9 +146,7 @@ export async function login(credentials: LoginRequest): Promise<LoginResponse> {
   // Only store token if 2FA is not required
   if (!isTotp2FARequired(data)) {
     setAuthToken(data.access_token)
-    if (data.refresh_token) {
-      setRefreshToken(data.refresh_token)
-    }
+    persistRefreshTransport(data)
     if (data.expires_in) {
       setTokenExpiresAt(data.expires_in)
     }
@@ -156,9 +166,7 @@ export async function login2FA(request: TotpLogin2FARequest): Promise<AuthRespon
 
   // Store token and user data
   setAuthToken(data.access_token)
-  if (data.refresh_token) {
-    setRefreshToken(data.refresh_token)
-  }
+  persistRefreshTransport(data)
   if (data.expires_in) {
     setTokenExpiresAt(data.expires_in)
   }
@@ -177,9 +185,7 @@ export async function register(userData: RegisterRequest): Promise<AuthResponse>
 
   // Store token and user data
   setAuthToken(data.access_token)
-  if (data.refresh_token) {
-    setRefreshToken(data.refresh_token)
-  }
+  persistRefreshTransport(data)
   if (data.expires_in) {
     setTokenExpiresAt(data.expires_in)
   }
@@ -204,13 +210,11 @@ export async function getCurrentUser() {
 export async function logout(): Promise<void> {
   const refreshToken = getRefreshToken()
 
-  // Try to revoke the refresh token on the server
-  if (refreshToken) {
-    try {
-      await apiClient.post('/auth/logout', { refresh_token: refreshToken })
-    } catch {
-      // Ignore errors - we still want to clear local state
-    }
+  // Cookie-backed sessions send an empty body; legacy clients still send the token explicitly.
+  try {
+    await apiClient.post('/auth/logout', refreshToken ? { refresh_token: refreshToken } : {})
+  } catch {
+    // Ignore errors - we still want to clear local state
   }
 
   clearAuthToken()
@@ -222,6 +226,7 @@ export async function logout(): Promise<void> {
 export interface OAuthTokenResponse {
   access_token: string
   refresh_token?: string
+  refresh_cookie?: boolean
   expires_in?: number
   token_type?: string
 }
@@ -306,9 +311,7 @@ export function hasPendingOAuthSuggestedProfile(
 }
 
 export function persistOAuthTokenContext(tokens: Partial<OAuthTokenResponse>): void {
-  if (tokens.refresh_token) {
-    setRefreshToken(tokens.refresh_token)
-  }
+  persistRefreshTransport(tokens)
   if (tokens.expires_in) {
     setTokenExpiresAt(tokens.expires_in)
   }

@@ -157,6 +157,14 @@ export default {
 
   // Navigation
   nav: {
+    sectionOverview: '系统概览',
+    sectionUserOverview: '概览与调用',
+    sectionUserChannels: '渠道与模型',
+    sectionUserBilling: '订阅与财务',
+    sectionUserSettings: '账户设置',
+    sectionResources: '资源与用户',
+    sectionCommerce: '商业与营销',
+    sectionSystem: '平台与设置',
     dashboard: '仪表盘',
     announcements: '公告',
     apiKeys: 'API 密钥',
@@ -287,6 +295,8 @@ export default {
     promoCodeAlreadyUsed: '您已使用过此优惠码',
     promoCodeValidating: '优惠码正在验证中，请稍候',
     promoCodeInvalidCannotRegister: '优惠码无效，请检查后重试或清空优惠码',
+    affiliateCodeLabel: '推荐码',
+    affiliateCodePlaceholder: '请输入推荐码（可选）',
     invitationCodeLabel: '邀请码',
     invitationCodePlaceholder: '请输入邀请码',
     invitationCodeRequired: '请输入邀请码',

@@ -281,7 +281,8 @@ export interface PublicSettings {
 
 export interface AuthResponse {
   access_token: string
-  refresh_token?: string  // New: Refresh Token for token renewal
+  refresh_token?: string
+  refresh_cookie?: boolean
   expires_in?: number     // New: Access Token expiry time in seconds
   token_type: string
   user: User & { run_mode?: 'standard' | 'simple' }
@@ -1133,17 +1134,6 @@ export interface Account {
     codex_reset_credit_snapshot?: {
       available_count?: number
       credits?: { expires_at?: string }[]
-    }
-    auto_reset_credit_enabled?: boolean
-    auto_reset_credit_5h_threshold?: number
-    auto_reset_credit_7d_threshold?: number
-    codex_auto_reset_credit_state?: {
-      status?: 'checking' | 'available' | 'resetting' | 'success' | 'no_credit' | 'failed'
-      trigger_window?: string
-      available_count?: number
-      checked_at?: string
-      last_result_at?: string
-      error_code?: string
     }
   } & Record<string, unknown>)
   proxy_id: number | null

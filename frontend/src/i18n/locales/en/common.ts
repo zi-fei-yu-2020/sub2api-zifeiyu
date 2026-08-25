@@ -157,6 +157,14 @@ export default {
 
   // Navigation
   nav: {
+    sectionOverview: 'Overview & Ops',
+    sectionUserOverview: 'Overview & Calls',
+    sectionUserChannels: 'Channels & Models',
+    sectionUserBilling: 'Billing & Subscriptions',
+    sectionUserSettings: 'Account Settings',
+    sectionResources: 'Resources & Users',
+    sectionCommerce: 'Commerce & Sales',
+    sectionSystem: 'Platform & System',
     dashboard: 'Dashboard',
     announcements: 'Announcements',
     apiKeys: 'API Keys',
@@ -288,6 +296,8 @@ export default {
     promoCodeAlreadyUsed: 'You have already used this promo code',
     promoCodeValidating: 'Promo code is being validated, please wait',
     promoCodeInvalidCannotRegister: 'Invalid promo code. Please check and try again or clear the promo code field',
+    affiliateCodeLabel: 'Affiliate code',
+    affiliateCodePlaceholder: 'Enter affiliate code (optional)',
     invitationCodeLabel: 'Invitation Code',
     invitationCodePlaceholder: 'Enter invitation code',
     invitationCodeRequired: 'Invitation code is required',
