@@ -578,13 +578,7 @@ func (s *httpUpstreamService) getClientEntryWithTLS(proxyURL string, accountID i
 }
 
 func (s *httpUpstreamService) shouldValidateResolvedIP() bool {
-	if s.cfg == nil {
-		return false
-	}
-	if !s.cfg.Security.URLAllowlist.Enabled {
-		return false
-	}
-	return !s.cfg.Security.URLAllowlist.AllowPrivateHosts
+	return s.cfg != nil && s.cfg.Security.URLAllowlist.Enabled
 }
 
 func (s *httpUpstreamService) validateRequestHost(req *http.Request) error {
@@ -598,7 +592,15 @@ func (s *httpUpstreamService) validateRequestHost(req *http.Request) error {
 	if host == "" {
 		return errors.New("request host is empty")
 	}
-	if err := urlvalidator.ValidateResolvedIP(host); err != nil {
+	policy := s.cfg.Security.URLAllowlist
+	if _, err := urlvalidator.ValidateHTTPURL(req.URL.String(), policy.AllowInsecureHTTP, urlvalidator.ValidationOptions{
+		AllowedHosts:     policy.UpstreamHosts,
+		RequireAllowlist: true,
+		AllowPrivate:     policy.AllowPrivateHosts,
+	}); err != nil {
+		return err
+	}
+	if err := urlvalidator.ValidateResolvedIPWithOptions(host, policy.AllowPrivateHosts); err != nil {
 		return err
 	}
 	return nil

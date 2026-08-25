@@ -203,6 +203,21 @@ func TestWriteConfigFileKeepsDefaultUserConcurrency(t *testing.T) {
 	}
 }
 
+func TestWriteConfigFileUsesStrictURLPolicyForNewInstall(t *testing.T) {
+	t.Setenv("DATA_DIR", t.TempDir())
+
+	if err := writeConfigFile(&SetupConfig{}); err != nil {
+		t.Fatalf("writeConfigFile() error = %v", err)
+	}
+	data, err := os.ReadFile(GetConfigFilePath())
+	if err != nil {
+		t.Fatalf("ReadFile() error = %v", err)
+	}
+	if !strings.Contains(string(data), "url_policy:\n        profile: strict") {
+		t.Fatalf("config missing strict URL policy, got:\n%s", string(data))
+	}
+}
+
 func TestWriteConfigFileIncludesRedisUsername(t *testing.T) {
 	t.Setenv("DATA_DIR", t.TempDir())
 

@@ -485,6 +485,11 @@ func writeConfigFile(cfg *SetupConfig) error {
 			RequestsPerMinute int `yaml:"requests_per_minute"`
 			BurstSize         int `yaml:"burst_size"`
 		} `yaml:"rate_limit"`
+		Security struct {
+			URLPolicy struct {
+				Profile string `yaml:"profile"`
+			} `yaml:"url_policy"`
+		} `yaml:"security"`
 		Timezone string `yaml:"timezone"`
 	}{
 		Server:   cfg.Server,
@@ -514,6 +519,15 @@ func writeConfigFile(cfg *SetupConfig) error {
 		}{
 			RequestsPerMinute: 60,
 			BurstSize:         10,
+		},
+		Security: struct {
+			URLPolicy struct {
+				Profile string `yaml:"profile"`
+			} `yaml:"url_policy"`
+		}{
+			URLPolicy: struct {
+				Profile string `yaml:"profile"`
+			}{Profile: config.URLPolicyProfileStrict},
 		},
 		Timezone: tz,
 	}

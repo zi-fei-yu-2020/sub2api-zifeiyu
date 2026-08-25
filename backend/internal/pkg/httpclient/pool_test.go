@@ -23,7 +23,8 @@ func TestValidatedTransport_CacheHostValidation(t *testing.T) {
 	defer func() { validateResolvedIP = originalValidate }()
 
 	var validateCalls int32
-	validateResolvedIP = func(host string) error {
+	validateResolvedIP = func(host string, allowPrivate bool) error {
+		require.False(t, allowPrivate)
 		atomic.AddInt32(&validateCalls, 1)
 		require.Equal(t, "api.openai.com", host)
 		return nil
@@ -40,7 +41,7 @@ func TestValidatedTransport_CacheHostValidation(t *testing.T) {
 	})
 
 	now := time.Unix(1730000000, 0)
-	transport := newValidatedTransport(base)
+	transport := newValidatedTransport(base, Options{ValidateResolvedIP: true})
 	transport.now = func() time.Time { return now }
 
 	req, err := http.NewRequest(http.MethodGet, "https://api.openai.com/v1/responses", nil)
@@ -60,7 +61,7 @@ func TestValidatedTransport_ExpiredCacheTriggersRevalidation(t *testing.T) {
 	defer func() { validateResolvedIP = originalValidate }()
 
 	var validateCalls int32
-	validateResolvedIP = func(_ string) error {
+	validateResolvedIP = func(_ string, _ bool) error {
 		atomic.AddInt32(&validateCalls, 1)
 		return nil
 	}
@@ -74,7 +75,7 @@ func TestValidatedTransport_ExpiredCacheTriggersRevalidation(t *testing.T) {
 	})
 
 	now := time.Unix(1730001000, 0)
-	transport := newValidatedTransport(base)
+	transport := newValidatedTransport(base, Options{ValidateResolvedIP: true})
 	transport.now = func() time.Time { return now }
 
 	req, err := http.NewRequest(http.MethodGet, "https://api.openai.com/v1/responses", nil)
@@ -95,7 +96,7 @@ func TestValidatedTransport_ValidationErrorStopsRoundTrip(t *testing.T) {
 	defer func() { validateResolvedIP = originalValidate }()
 
 	expectedErr := errors.New("dns rebinding rejected")
-	validateResolvedIP = func(_ string) error {
+	validateResolvedIP = func(_ string, _ bool) error {
 		return expectedErr
 	}
 
@@ -105,11 +106,50 @@ func TestValidatedTransport_ValidationErrorStopsRoundTrip(t *testing.T) {
 		return &http.Response{StatusCode: http.StatusOK, Body: io.NopCloser(strings.NewReader(`{}`))}, nil
 	})
 
-	transport := newValidatedTransport(base)
+	transport := newValidatedTransport(base, Options{ValidateResolvedIP: true})
 	req, err := http.NewRequest(http.MethodGet, "https://api.openai.com/v1/responses", nil)
 	require.NoError(t, err)
 
 	_, err = transport.RoundTrip(req)
 	require.ErrorIs(t, err, expectedErr)
+	require.Equal(t, int32(0), atomic.LoadInt32(&baseCalls))
+}
+
+func TestValidatedTransport_PrivateModeStillRejectsMetadata(t *testing.T) {
+	var baseCalls int32
+	base := roundTripFunc(func(_ *http.Request) (*http.Response, error) {
+		atomic.AddInt32(&baseCalls, 1)
+		return &http.Response{StatusCode: http.StatusOK, Body: io.NopCloser(strings.NewReader(`{}`))}, nil
+	})
+	transport := newValidatedTransport(base, Options{
+		ValidateResolvedIP: true,
+		AllowPrivateHosts:  true,
+		AllowedHosts:       []string{"169.254.169.254"},
+		RequireAllowlist:   true,
+		AllowInsecureHTTP:  true,
+	})
+	req, err := http.NewRequest(http.MethodGet, "http://169.254.169.254/latest/meta-data", nil)
+	require.NoError(t, err)
+
+	_, err = transport.RoundTrip(req)
+	require.Error(t, err)
+	require.Equal(t, int32(0), atomic.LoadInt32(&baseCalls))
+}
+
+func TestValidatedTransport_RejectsRedirectTargetOutsideAllowlist(t *testing.T) {
+	var baseCalls int32
+	base := roundTripFunc(func(_ *http.Request) (*http.Response, error) {
+		atomic.AddInt32(&baseCalls, 1)
+		return &http.Response{StatusCode: http.StatusOK, Body: io.NopCloser(strings.NewReader(`{}`))}, nil
+	})
+	transport := newValidatedTransport(base, Options{
+		AllowedHosts:     []string{"api.example.com"},
+		RequireAllowlist: true,
+	})
+	req, err := http.NewRequest(http.MethodGet, "https://redirected.example.net/v1", nil)
+	require.NoError(t, err)
+
+	_, err = transport.RoundTrip(req)
+	require.Error(t, err)
 	require.Equal(t, int32(0), atomic.LoadInt32(&baseCalls))
 }

@@ -9,6 +9,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/Wei-Shaw/sub2api/internal/config"
 	"github.com/Wei-Shaw/sub2api/internal/pkg/httpclient"
 	"github.com/Wei-Shaw/sub2api/internal/service"
 )
@@ -37,18 +38,35 @@ func (c *pricingRemoteClientError) FetchHashText(_ context.Context, _ string) (s
 //   - false（默认）：返回错误占位客户端，禁止回退到直连
 //   - true：回退到直连（仅限管理员显式开启）
 func NewPricingRemoteClient(proxyURL string, allowDirectOnProxyError bool) service.PricingRemoteClient {
-	// 安全说明：httpclient.GetClient 的错误链（url.Parse / proxyutil）不含明文代理凭据，
-	// 但仍通过 slog 仅在服务端日志记录，不会暴露给 HTTP 响应。
-	sharedClient, err := httpclient.GetClient(httpclient.Options{
-		Timeout:  30 * time.Second,
-		ProxyURL: proxyURL,
+	return newPricingRemoteClient(proxyURL, allowDirectOnProxyError, httpclient.Options{})
+}
+
+func NewPricingRemoteClientWithURLPolicy(proxyURL string, allowDirectOnProxyError bool, policy config.URLAllowlistConfig) service.PricingRemoteClient {
+	return newPricingRemoteClient(proxyURL, allowDirectOnProxyError, httpclient.Options{
+		ValidateResolvedIP: policy.Enabled,
+		AllowPrivateHosts:  policy.AllowPrivateHosts,
+		AllowedHosts:       policy.PricingHosts,
+		RequireAllowlist:   policy.Enabled,
+		AllowInsecureHTTP:  policy.AllowInsecureHTTP,
 	})
+}
+
+func newPricingRemoteClient(proxyURL string, allowDirectOnProxyError bool, opts httpclient.Options) service.PricingRemoteClient {
+	// httpclient.GetClient errors do not include plaintext proxy credentials.
+	// Initialization failures are logged server-side and are not exposed as HTTP responses.
+	opts.Timeout = 30 * time.Second
+	opts.ProxyURL = proxyURL
+	sharedClient, err := httpclient.GetClient(opts)
 	if err != nil {
 		if strings.TrimSpace(proxyURL) != "" && !allowDirectOnProxyError {
 			slog.Warn("proxy client init failed, all requests will fail", "service", "pricing", "error", err)
 			return &pricingRemoteClientError{err: fmt.Errorf("proxy client init failed and direct fallback is disabled; set security.proxy_fallback.allow_direct_on_error=true to allow fallback: %w", err)}
 		}
-		sharedClient = &http.Client{Timeout: 30 * time.Second}
+		opts.ProxyURL = ""
+		sharedClient, err = httpclient.GetClient(opts)
+		if err != nil {
+			return &pricingRemoteClientError{err: fmt.Errorf("direct client init failed: %w", err)}
+		}
 	}
 	return &pricingRemoteClient{
 		httpClient: sharedClient,

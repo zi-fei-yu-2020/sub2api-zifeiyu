@@ -4,6 +4,7 @@ package config
 import (
 	"crypto/rand"
 	"encoding/hex"
+	"errors"
 	"fmt"
 	"log/slog"
 	"math"
@@ -717,6 +718,7 @@ type ForwardedClientIPSettings struct {
 }
 
 type SecurityConfig struct {
+	URLPolicy       URLPolicyConfig      `mapstructure:"url_policy"`
 	URLAllowlist    URLAllowlistConfig   `mapstructure:"url_allowlist"`
 	ResponseHeaders ResponseHeaderConfig `mapstructure:"response_headers"`
 	CSP             CSPConfig            `mapstructure:"csp"`
@@ -808,14 +810,76 @@ func (c *Config) SetTrustForwardedIPForAPIKeyACL(enabled bool) {
 	c.SetForwardedClientIPSettings(enabled, c.ForwardedClientIPSettings().Headers)
 }
 
+const (
+	URLPolicyProfileStrict         = "strict"
+	URLPolicyProfilePrivateNetwork = "private-network"
+	URLPolicyProfileCompatible     = "compatible"
+)
+
+type URLPolicyConfig struct {
+	// Profile selects the outbound URL security baseline. The legacy URLAllowlist
+	// fields remain the effective runtime values so existing call sites and old
+	// configuration files continue to work during migration.
+	Profile string `mapstructure:"profile"`
+
+	// LegacyCompatibility is true when an existing config without url_policy.profile
+	// is loaded. In that case the legacy booleans are preserved exactly.
+	LegacyCompatibility bool `mapstructure:"-" json:"-" yaml:"-"`
+}
+
 type URLAllowlistConfig struct {
 	Enabled           bool     `mapstructure:"enabled"`
 	UpstreamHosts     []string `mapstructure:"upstream_hosts"`
 	PricingHosts      []string `mapstructure:"pricing_hosts"`
 	CRSHosts          []string `mapstructure:"crs_hosts"`
 	AllowPrivateHosts bool     `mapstructure:"allow_private_hosts"`
-	// 关闭 URL 白名单校验时，是否允许 http URL（默认只允许 https）
+	// AllowInsecureHTTP controls whether allowlisted HTTP targets are accepted.
+	// It also keeps its legacy meaning while URL allowlist enforcement is disabled.
 	AllowInsecureHTTP bool `mapstructure:"allow_insecure_http"`
+}
+
+func normalizeURLPolicyProfile(value string) string {
+	return strings.ToLower(strings.TrimSpace(value))
+}
+
+func applyURLPolicyProfile(cfg *Config, profileConfigured, legacyConfigured, existingConfig bool) error {
+	if cfg == nil {
+		return errors.New("config is nil")
+	}
+
+	// Existing installations that predate url_policy.profile must not change
+	// behavior merely by upgrading. Preserve their legacy switches exactly and
+	// expose the migration state as compatible mode.
+	if !profileConfigured && (legacyConfigured || existingConfig) {
+		cfg.Security.URLPolicy.Profile = URLPolicyProfileCompatible
+		cfg.Security.URLPolicy.LegacyCompatibility = true
+		return nil
+	}
+
+	profile := normalizeURLPolicyProfile(cfg.Security.URLPolicy.Profile)
+	if profile == "" {
+		profile = URLPolicyProfileStrict
+	}
+	cfg.Security.URLPolicy.Profile = profile
+	cfg.Security.URLPolicy.LegacyCompatibility = false
+
+	switch profile {
+	case URLPolicyProfileStrict:
+		cfg.Security.URLAllowlist.Enabled = true
+		cfg.Security.URLAllowlist.AllowPrivateHosts = false
+		cfg.Security.URLAllowlist.AllowInsecureHTTP = false
+	case URLPolicyProfilePrivateNetwork:
+		cfg.Security.URLAllowlist.Enabled = true
+		cfg.Security.URLAllowlist.AllowPrivateHosts = true
+		cfg.Security.URLAllowlist.AllowInsecureHTTP = true
+	case URLPolicyProfileCompatible:
+		cfg.Security.URLAllowlist.Enabled = false
+		cfg.Security.URLAllowlist.AllowPrivateHosts = true
+		cfg.Security.URLAllowlist.AllowInsecureHTTP = true
+	default:
+		return fmt.Errorf("security.url_policy.profile must be one of: %s/%s/%s", URLPolicyProfileStrict, URLPolicyProfilePrivateNetwork, URLPolicyProfileCompatible)
+	}
+	return nil
 }
 
 type ResponseHeaderConfig struct {
@@ -1762,6 +1826,17 @@ func NormalizeRunMode(value string) string {
 }
 
 // Load 读取并校验完整配置（要求 jwt.secret 已显式提供）。
+func nonEmptyEnv(name string) (string, bool) {
+	value, ok := os.LookupEnv(name)
+	value = strings.TrimSpace(value)
+	return value, ok && value != ""
+}
+
+func configOrNonEmptyEnv(configKey, envKey string) bool {
+	_, envConfigured := nonEmptyEnv(envKey)
+	return viper.InConfig(configKey) || envConfigured
+}
+
 func Load() (*Config, error) {
 	return load(false)
 }
@@ -1798,6 +1873,15 @@ func load(allowMissingJWTSecret bool) (*Config, error) {
 		}
 		// 配置文件不存在时使用默认值
 	}
+	_, urlPolicyProfileEnvConfigured := nonEmptyEnv("SECURITY_URL_POLICY_PROFILE")
+	urlPolicyProfileConfigured := viper.InConfig("security.url_policy.profile") || urlPolicyProfileEnvConfigured
+	legacyURLPolicyConfigured := configOrNonEmptyEnv("security.url_allowlist.enabled", "SECURITY_URL_ALLOWLIST_ENABLED") ||
+		configOrNonEmptyEnv("security.url_allowlist.allow_private_hosts", "SECURITY_URL_ALLOWLIST_ALLOW_PRIVATE_HOSTS") ||
+		configOrNonEmptyEnv("security.url_allowlist.allow_insecure_http", "SECURITY_URL_ALLOWLIST_ALLOW_INSECURE_HTTP") ||
+		configOrNonEmptyEnv("security.url_allowlist.upstream_hosts", "SECURITY_URL_ALLOWLIST_UPSTREAM_HOSTS") ||
+		configOrNonEmptyEnv("security.url_allowlist.pricing_hosts", "SECURITY_URL_ALLOWLIST_PRICING_HOSTS") ||
+		configOrNonEmptyEnv("security.url_allowlist.crs_hosts", "SECURITY_URL_ALLOWLIST_CRS_HOSTS")
+	existingConfig := strings.TrimSpace(viper.ConfigFileUsed()) != ""
 	trustedProxiesEnv, trustedProxiesEnvConfigured := os.LookupEnv("SERVER_TRUSTED_PROXIES")
 	forwardedClientIPHeadersEnv, forwardedClientIPHeadersEnvConfigured := os.LookupEnv("SECURITY_FORWARDED_CLIENT_IP_HEADERS")
 	trustedProxiesConfigured := viper.InConfig("server.trusted_proxies") ||
@@ -1806,6 +1890,9 @@ func load(allowMissingJWTSecret bool) (*Config, error) {
 	var cfg Config
 	if err := viper.Unmarshal(&cfg); err != nil {
 		return nil, fmt.Errorf("unmarshal config error: %w", err)
+	}
+	if err := applyURLPolicyProfile(&cfg, urlPolicyProfileConfigured, legacyURLPolicyConfigured, existingConfig); err != nil {
+		return nil, err
 	}
 	if trustedProxiesEnvConfigured {
 		cfg.Server.TrustedProxies = normalizeStringSlice(strings.Split(trustedProxiesEnv, ","))
@@ -1942,6 +2029,18 @@ func load(allowMissingJWTSecret bool) (*Config, error) {
 		cfg.JWT.Secret = ""
 	}
 
+	if cfg.Security.URLPolicy.LegacyCompatibility {
+		slog.Warn("legacy outbound URL security configuration detected; preserving existing behavior. Set security.url_policy.profile to strict, private-network, or compatible to complete migration.",
+			"effective_profile", cfg.Security.URLPolicy.Profile,
+			"allowlist_enabled", cfg.Security.URLAllowlist.Enabled,
+			"allow_private_hosts", cfg.Security.URLAllowlist.AllowPrivateHosts,
+			"allow_insecure_http", cfg.Security.URLAllowlist.AllowInsecureHTTP,
+		)
+	} else if cfg.Security.URLPolicy.Profile == URLPolicyProfileCompatible {
+		slog.Warn("security.url_policy.profile=compatible; allowlist/SSRF protections are reduced for backward compatibility.")
+	} else if cfg.Security.URLPolicy.Profile == URLPolicyProfilePrivateNetwork {
+		slog.Warn("security.url_policy.profile=private-network; only explicitly allowlisted private/HTTP upstreams should be configured.")
+	}
 	if !cfg.Security.URLAllowlist.Enabled {
 		slog.Warn("security.url_allowlist.enabled=false; allowlist/SSRF checks disabled (minimal format validation only).")
 	}
@@ -2030,6 +2129,9 @@ func setDefaults() {
 	viper.SetDefault("webauthn.rp_origins", []string{})
 
 	// Security
+	viper.SetDefault("security.url_policy.profile", URLPolicyProfileStrict)
+	// Legacy defaults are intentionally retained for existing config files that
+	// do not yet declare security.url_policy.profile.
 	viper.SetDefault("security.url_allowlist.enabled", false)
 	viper.SetDefault("security.url_allowlist.upstream_hosts", []string{
 		"api.openai.com",
