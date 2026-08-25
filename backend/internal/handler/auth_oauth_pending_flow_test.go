@@ -2869,6 +2869,16 @@ func (s *oauthPendingFlowRefreshTokenCacheStub) GetRefreshToken(context.Context,
 	return nil, service.ErrRefreshTokenNotFound
 }
 
+func (s *oauthPendingFlowRefreshTokenCacheStub) GetConsumedRefreshToken(context.Context, string) (*service.ConsumedRefreshTokenData, error) {
+	return nil, service.ErrRefreshTokenNotFound
+}
+
+func (s *oauthPendingFlowRefreshTokenCacheStub) RotateRefreshToken(
+	context.Context, string, string, *service.RefreshTokenData, time.Duration, time.Time,
+) (*service.RefreshTokenRotationResult, error) {
+	return &service.RefreshTokenRotationResult{Status: service.RefreshTokenRotationNotFound}, nil
+}
+
 func (s *oauthPendingFlowRefreshTokenCacheStub) DeleteRefreshToken(context.Context, string) error {
 	return nil
 }

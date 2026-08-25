@@ -20,11 +20,33 @@ type RefreshTokenData struct {
 	ExpiresAt    time.Time `json:"expires_at"`
 }
 
+// ConsumedRefreshTokenData records when an old refresh token was atomically rotated.
+type ConsumedRefreshTokenData struct {
+	Data       *RefreshTokenData
+	ConsumedAt time.Time
+}
+
+// RefreshTokenRotationStatus describes the result of an atomic refresh-token rotation.
+type RefreshTokenRotationStatus int
+
+const (
+	RefreshTokenRotationNotFound RefreshTokenRotationStatus = iota
+	RefreshTokenRotationSucceeded
+	RefreshTokenRotationReused
+)
+
+// RefreshTokenRotationResult is returned by RotateRefreshToken.
+type RefreshTokenRotationResult struct {
+	Status   RefreshTokenRotationStatus
+	Consumed *ConsumedRefreshTokenData
+}
+
 // RefreshTokenCache 管理Refresh Token的Redis缓存
 // 用于JWT Token刷新机制，支持Token轮转和防重放攻击
 //
 // Key 格式:
-//   - refresh_token:{token_hash}     -> RefreshTokenData (JSON)
+//   - refresh_token:{token_hash}          -> RefreshTokenData (JSON)
+//   - consumed_refresh_token:{token_hash} -> consumed-token tombstone (bounded TTL)
 //   - user_refresh_tokens:{user_id}  -> Set<token_hash>
 //   - token_family:{family_id}       -> Set<token_hash>
 type RefreshTokenCache interface {
@@ -39,6 +61,20 @@ type RefreshTokenCache interface {
 	// 返回 (nil, ErrRefreshTokenNotFound) 如果Token不存在
 	// 返回 (nil, err) 如果发生其他错误
 	GetRefreshToken(ctx context.Context, tokenHash string) (*RefreshTokenData, error)
+
+	// GetConsumedRefreshToken returns the tombstone for an already-rotated token.
+	GetConsumedRefreshToken(ctx context.Context, tokenHash string) (*ConsumedRefreshTokenData, error)
+
+	// RotateRefreshToken atomically consumes oldTokenHash, stores a tombstone,
+	// persists the successor token, and updates the user/family token sets.
+	RotateRefreshToken(
+		ctx context.Context,
+		oldTokenHash string,
+		newTokenHash string,
+		newData *RefreshTokenData,
+		newTTL time.Duration,
+		consumedAt time.Time,
+	) (*RefreshTokenRotationResult, error)
 
 	// DeleteRefreshToken 删除单个Refresh Token
 	// 用于Token轮转时使旧Token失效

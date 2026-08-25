@@ -766,6 +766,16 @@ func (s *emailBindRefreshTokenCacheStub) GetRefreshToken(_ context.Context, toke
 	return &cloned, nil
 }
 
+func (s *emailBindRefreshTokenCacheStub) GetConsumedRefreshToken(context.Context, string) (*service.ConsumedRefreshTokenData, error) {
+	return nil, service.ErrRefreshTokenNotFound
+}
+
+func (s *emailBindRefreshTokenCacheStub) RotateRefreshToken(
+	context.Context, string, string, *service.RefreshTokenData, time.Duration, time.Time,
+) (*service.RefreshTokenRotationResult, error) {
+	return &service.RefreshTokenRotationResult{Status: service.RefreshTokenRotationNotFound}, nil
+}
+
 func (s *emailBindRefreshTokenCacheStub) DeleteRefreshToken(_ context.Context, tokenHash string) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()

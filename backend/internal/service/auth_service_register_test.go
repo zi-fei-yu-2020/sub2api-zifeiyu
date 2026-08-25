@@ -137,6 +137,16 @@ func (s *refreshTokenCacheStub) GetRefreshToken(context.Context, string) (*Refre
 	return nil, ErrRefreshTokenNotFound
 }
 
+func (s *refreshTokenCacheStub) GetConsumedRefreshToken(context.Context, string) (*ConsumedRefreshTokenData, error) {
+	return nil, ErrRefreshTokenNotFound
+}
+
+func (s *refreshTokenCacheStub) RotateRefreshToken(
+	context.Context, string, string, *RefreshTokenData, time.Duration, time.Time,
+) (*RefreshTokenRotationResult, error) {
+	return &RefreshTokenRotationResult{Status: RefreshTokenRotationNotFound}, nil
+}
+
 func (s *refreshTokenCacheStub) DeleteRefreshToken(context.Context, string) error {
 	return nil
 }
