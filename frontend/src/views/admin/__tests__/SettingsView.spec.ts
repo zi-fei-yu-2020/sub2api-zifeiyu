@@ -25,6 +25,7 @@ const {
   getRectifierSettings,
   updateRectifierSettings,
   getBetaPolicySettings,
+  updateBetaPolicySettings,
   getUpstreamBillingProbeSettings,
   updateUpstreamBillingProbeSettings,
   getOllamaCloudUsageSettings,
@@ -62,6 +63,7 @@ const {
   getRectifierSettings: vi.fn(),
   updateRectifierSettings: vi.fn(),
   getBetaPolicySettings: vi.fn(),
+  updateBetaPolicySettings: vi.fn(),
   getUpstreamBillingProbeSettings: vi.fn().mockResolvedValue({
     enabled: true,
     interval_minutes: 30,
@@ -106,6 +108,7 @@ vi.mock("@/api", () => ({
       getRectifierSettings,
       updateRectifierSettings,
       getBetaPolicySettings,
+      updateBetaPolicySettings,
     },
     accounts: {
       getUpstreamBillingProbeSettings,
@@ -650,6 +653,7 @@ describe("admin SettingsView payment visible method controls", () => {
     getRectifierSettings.mockReset();
     updateRectifierSettings.mockReset();
     getBetaPolicySettings.mockReset();
+    updateBetaPolicySettings.mockReset();
     getUpstreamBillingProbeSettings.mockReset();
     updateUpstreamBillingProbeSettings.mockReset();
     getOllamaCloudUsageSettings.mockReset();
@@ -712,6 +716,7 @@ describe("admin SettingsView payment visible method controls", () => {
     getBetaPolicySettings.mockResolvedValue({
       rules: [],
     });
+    updateBetaPolicySettings.mockImplementation(async (payload) => payload);
     getUpstreamBillingProbeSettings.mockResolvedValue({
       enabled: true,
       interval_minutes: 30,
@@ -876,6 +881,52 @@ describe("admin SettingsView payment visible method controls", () => {
       thinking_budget_enabled: true,
       apikey_signature_enabled: true,
       apikey_signature_patterns: ["x-custom-signature"],
+    });
+  });
+
+  it("keeps the extracted beta policy panel wired to its existing save API", async () => {
+    getBetaPolicySettings.mockResolvedValue({
+      rules: [
+        {
+          beta_token: "context-1m-2025-08-07",
+          action: "block",
+          scope: "all",
+          error_message: "blocked",
+          model_whitelist: [],
+          fallback_action: "pass",
+        },
+      ],
+    });
+
+    const wrapper = mountView();
+    await flushPromises();
+    await openGatewayTab(wrapper);
+
+    const card = wrapper
+      .findAll(".card")
+      .find((item) => item.text().includes("admin.settings.betaPolicy.title"));
+    expect(card).toBeDefined();
+
+    const presetButton = card!
+      .findAll("button")
+      .find((button) => button.text().includes("admin.settings.betaPolicy.presetOpusOnly"));
+    expect(presetButton).toBeDefined();
+    await presetButton!.trigger("click");
+    await card!.get("button.btn-primary").trigger("click");
+    await flushPromises();
+
+    expect(updateBetaPolicySettings).toHaveBeenCalledWith({
+      rules: [
+        {
+          beta_token: "context-1m-2025-08-07",
+          action: "pass",
+          scope: "all",
+          error_message: "blocked",
+          model_whitelist: ["claude-opus-4-6"],
+          fallback_action: "filter",
+          fallback_error_message: undefined,
+        },
+      ],
     });
   });
 
