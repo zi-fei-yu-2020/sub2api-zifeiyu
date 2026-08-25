@@ -9,7 +9,7 @@
       allowfullscreen
     ></iframe>
     <!-- HTML mode -->
-    <div v-else v-html="homeContent"></div>
+    <div v-else v-html="sanitizedHomeContent"></div>
   </div>
 
   <!-- Compact Home Page -->
@@ -465,6 +465,7 @@ import { useI18n } from 'vue-i18n'
 import { useAppStore, useAuthStore } from '@/stores'
 import LocaleSwitcher from '@/components/common/LocaleSwitcher.vue'
 import Icon from '@/components/icons/Icon.vue'
+import DOMPurify from 'dompurify'
 import { sanitizeUrl } from '@/utils/url'
 import { FeatureFlags, isFeatureFlagEnabled } from '@/utils/featureFlags'
 
@@ -500,6 +501,13 @@ const showModelPlazaEntry = computed(() => {
 const compactHomeEnabled = computed(() => Boolean(appStore.cachedPublicSettings?.compact_home_enabled))
 const homeContent = computed(() => appStore.cachedPublicSettings?.home_content || '')
 const hasHomeContent = computed(() => Boolean(homeContent.value.trim()))
+const sanitizedHomeContent = computed(() =>
+  DOMPurify.sanitize(homeContent.value, {
+    USE_PROFILES: { html: true },
+    FORBID_TAGS: ['script', 'iframe', 'object', 'embed', 'form'],
+    FORBID_ATTR: ['formaction'],
+  })
+)
 const isHomeContentUrl = computed(() => {
   const content = homeContent.value.trim()
   return content.startsWith('http://') || content.startsWith('https://')

@@ -87,6 +87,16 @@ describe('HomeView compact mode', () => {
     expect(wrapper.find('[data-testid="compact-home"]').exists()).toBe(false)
   })
 
+  it('sanitizes executable custom home markup', () => {
+    const wrapper = mountHome({
+      home_content: '<form><input formaction="https://evil.example"></form><img src="x" onerror="alert(1)"><script>alert(1)</script>',
+    })
+
+    expect(wrapper.find('script').exists()).toBe(false)
+    expect(wrapper.find('form').exists()).toBe(false)
+    expect(wrapper.get('img').attributes('onerror')).toBeUndefined()
+  })
+
   it('renders custom URL content ahead of compact mode', () => {
     const wrapper = mountHome({
       compact_home_enabled: true,
