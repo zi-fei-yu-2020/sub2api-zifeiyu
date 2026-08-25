@@ -158,6 +158,10 @@ export default {
   // Navigation
   nav: {
     sectionOverview: 'Overview & Ops',
+    sectionUserOverview: 'Overview & Calls',
+    sectionUserChannels: 'Channels & Models',
+    sectionUserBilling: 'Billing & Subscriptions',
+    sectionUserSettings: 'Account Settings',
     sectionResources: 'Resources & Users',
     sectionCommerce: 'Commerce & Sales',
     sectionSystem: 'Platform & System',

@@ -158,6 +158,10 @@ export default {
   // Navigation
   nav: {
     sectionOverview: '系统概览',
+    sectionUserOverview: '概览与调用',
+    sectionUserChannels: '渠道与模型',
+    sectionUserBilling: '订阅与财务',
+    sectionUserSettings: '账户设置',
     sectionResources: '资源与用户',
     sectionCommerce: '商业与营销',
     sectionSystem: '平台与设置',
