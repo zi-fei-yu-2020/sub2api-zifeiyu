@@ -814,11 +814,13 @@ func (h *AuthHandler) CompleteDingTalkOAuthRegistration(c *gin.Context) {
 	clearOAuthPendingSessionCookie(c, secureCookie)
 	clearOAuthPendingBrowserCookie(c, secureCookie)
 
+	setRefreshTokenCookie(c, tokenPair.RefreshToken, h.authService.GetRefreshTokenExpiresIn())
 	c.JSON(http.StatusOK, gin.H{
-		"access_token":  tokenPair.AccessToken,
-		"refresh_token": tokenPair.RefreshToken,
-		"expires_in":    tokenPair.ExpiresIn,
-		"token_type":    "Bearer",
+		"access_token":   tokenPair.AccessToken,
+		"refresh_token":  tokenPair.RefreshToken,
+		"refresh_cookie": true,
+		"expires_in":     tokenPair.ExpiresIn,
+		"token_type":     "Bearer",
 	})
 }
 

@@ -1611,12 +1611,14 @@ func (h *AuthHandler) transitionPendingOAuthAccountToChoiceState(
 	return session, nil
 }
 
-func writeOAuthTokenPairResponse(c *gin.Context, tokenPair *service.TokenPair) {
+func writeOAuthTokenPairResponse(c *gin.Context, authService *service.AuthService, tokenPair *service.TokenPair) {
+	setRefreshTokenCookie(c, tokenPair.RefreshToken, authService.GetRefreshTokenExpiresIn())
 	c.JSON(http.StatusOK, gin.H{
-		"access_token":  tokenPair.AccessToken,
-		"refresh_token": tokenPair.RefreshToken,
-		"expires_in":    tokenPair.ExpiresIn,
-		"token_type":    "Bearer",
+		"access_token":   tokenPair.AccessToken,
+		"refresh_token":  tokenPair.RefreshToken,
+		"refresh_cookie": true,
+		"expires_in":     tokenPair.ExpiresIn,
+		"token_type":     "Bearer",
 	})
 }
 
@@ -1695,7 +1697,7 @@ func (h *AuthHandler) bindPendingOAuthLogin(c *gin.Context, provider string) {
 	}
 
 	clearCookies()
-	writeOAuthTokenPairResponse(c, tokenPair)
+	writeOAuthTokenPairResponse(c, h.authService, tokenPair)
 }
 
 func respondPendingOAuthBindingApplyError(c *gin.Context, err error) {
@@ -1890,7 +1892,7 @@ func (h *AuthHandler) createPendingOAuthAccount(c *gin.Context, provider string)
 	// createPendingOAuthAccount = 注册新账户，需要把钉钉昵称同步到 users.username 作为初始值
 	h.maybeSyncDingTalkAfterRegistration(c.Request.Context(), session, user.ID)
 	clearCookies()
-	writeOAuthTokenPairResponse(c, tokenPair)
+	writeOAuthTokenPairResponse(c, h.authService, tokenPair)
 }
 
 // ExchangePendingOAuthCompletion redeems a pending OAuth browser session into a frontend-safe payload.
@@ -2055,8 +2057,10 @@ func (h *AuthHandler) ExchangePendingOAuthCompletion(c *gin.Context) {
 			return
 		}
 		h.authService.RecordSuccessfulLogin(c.Request.Context(), loginUser.ID)
+		setRefreshTokenCookie(c, tokenPair.RefreshToken, h.authService.GetRefreshTokenExpiresIn())
 		payload["access_token"] = tokenPair.AccessToken
 		payload["refresh_token"] = tokenPair.RefreshToken
+		payload["refresh_cookie"] = true
 		payload["expires_in"] = tokenPair.ExpiresIn
 		payload["token_type"] = "Bearer"
 	}

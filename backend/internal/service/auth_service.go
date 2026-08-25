@@ -1459,6 +1459,14 @@ func (s *AuthService) GetAccessTokenExpiresIn() int {
 	return s.cfg.JWT.ExpireHour * 3600
 }
 
+// GetRefreshTokenExpiresIn returns the configured refresh-token lifetime in seconds.
+func (s *AuthService) GetRefreshTokenExpiresIn() int {
+	if s == nil || s.cfg == nil || s.cfg.JWT.RefreshTokenExpireDays <= 0 {
+		return 0
+	}
+	return s.cfg.JWT.RefreshTokenExpireDays * 24 * 60 * 60
+}
+
 // HashPassword 使用bcrypt加密密码
 func (s *AuthService) HashPassword(password string) (string, error) {
 	hashedBytes, err := bcrypt.GenerateFromPassword([]byte(password), bcrypt.DefaultCost)

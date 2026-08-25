@@ -368,7 +368,7 @@ func (h *AuthHandler) LinuxDoOAuthCallback(c *gin.Context) {
 			h.authService.RecordSuccessfulLogin(c.Request.Context(), user.ID)
 			clearOAuthPendingSessionCookie(c, secureCookie)
 			clearOAuthPendingBrowserCookie(c, secureCookie)
-			redirectOAuthTokenPair(c, frontendCallback, tokenPair, redirectTo)
+			redirectOAuthTokenPair(c, h.authService, frontendCallback, tokenPair, redirectTo)
 			return
 		}
 		if !errors.Is(err, service.ErrOAuthInvitationRequired) {
@@ -608,11 +608,13 @@ func (h *AuthHandler) CompleteLinuxDoOAuthRegistration(c *gin.Context) {
 	clearOAuthPendingSessionCookie(c, secureCookie)
 	clearOAuthPendingBrowserCookie(c, secureCookie)
 
+	setRefreshTokenCookie(c, tokenPair.RefreshToken, h.authService.GetRefreshTokenExpiresIn())
 	c.JSON(http.StatusOK, gin.H{
-		"access_token":  tokenPair.AccessToken,
-		"refresh_token": tokenPair.RefreshToken,
-		"expires_in":    tokenPair.ExpiresIn,
-		"token_type":    "Bearer",
+		"access_token":   tokenPair.AccessToken,
+		"refresh_token":  tokenPair.RefreshToken,
+		"refresh_cookie": true,
+		"expires_in":     tokenPair.ExpiresIn,
+		"token_type":     "Bearer",
 	})
 }
 
@@ -819,11 +821,13 @@ func redirectOAuthError(c *gin.Context, frontendCallback string, code string, me
 	redirectWithFragment(c, frontendCallback, fragment)
 }
 
-func redirectOAuthTokenPair(c *gin.Context, frontendCallback string, tokenPair *service.TokenPair, redirectTo string) {
+func redirectOAuthTokenPair(c *gin.Context, authService *service.AuthService, frontendCallback string, tokenPair *service.TokenPair, redirectTo string) {
 	fragment := url.Values{}
 	if tokenPair != nil {
 		fragment.Set("access_token", truncateFragmentValue(tokenPair.AccessToken))
+		setRefreshTokenCookie(c, tokenPair.RefreshToken, authService.GetRefreshTokenExpiresIn())
 		fragment.Set("refresh_token", truncateFragmentValue(tokenPair.RefreshToken))
+		fragment.Set("refresh_cookie", "true")
 		fragment.Set("expires_in", strconv.Itoa(tokenPair.ExpiresIn))
 		fragment.Set("token_type", "Bearer")
 	}

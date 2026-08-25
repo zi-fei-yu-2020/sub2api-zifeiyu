@@ -281,7 +281,8 @@ export interface PublicSettings {
 
 export interface AuthResponse {
   access_token: string
-  refresh_token?: string  // New: Refresh Token for token renewal
+  refresh_token?: string
+  refresh_cookie?: boolean
   expires_in?: number     // New: Access Token expiry time in seconds
   token_type: string
   user: User & { run_mode?: 'standard' | 'simple' }

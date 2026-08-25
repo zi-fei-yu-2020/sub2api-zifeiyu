@@ -6,6 +6,8 @@ const AUTH_TOKEN_KEY = 'auth_token'
 const AUTH_USER_KEY = 'auth_user'
 const REFRESH_TOKEN_KEY = 'refresh_token'
 const TOKEN_EXPIRES_AT_KEY = 'token_expires_at'
+const REFRESH_COOKIE_KEY = 'refresh_cookie_enabled'
+const REFRESH_GENERATION_KEY = 'refresh_generation'
 const TOKEN_REFRESH_LOCK_NAME = 'sub2api-auth-token-refresh'
 const TOKEN_REFRESH_TIMEOUT_MS = 30_000
 const PEER_REFRESH_WAIT_MS = 1_000
@@ -15,6 +17,7 @@ const PEER_REFRESH_POLL_MS = 25
 export interface RefreshTokenResponse {
   access_token: string
   refresh_token: string
+  refresh_cookie?: boolean
   expires_in: number
   token_type: string
 }
@@ -26,7 +29,8 @@ export interface RefreshAuthTokensOptions {
 
 interface AuthSnapshot {
   accessToken: string | null
-  refreshToken: string
+  refreshToken: string | null
+  refreshGeneration: string | null
   expiresAt: number
   userID: number | null
 }
@@ -49,13 +53,14 @@ function getStoredUserID(): number | null {
 
 function readAuthSnapshot(): AuthSnapshot {
   const refreshToken = localStorage.getItem(REFRESH_TOKEN_KEY)
-  if (!refreshToken) {
-    throw new Error('No refresh token available')
+  if (!refreshToken && localStorage.getItem(REFRESH_COOKIE_KEY) !== '1') {
+    throw new Error('No refresh session available')
   }
 
   return {
     accessToken: localStorage.getItem(AUTH_TOKEN_KEY),
     refreshToken,
+    refreshGeneration: localStorage.getItem(REFRESH_GENERATION_KEY),
     expiresAt: Number(localStorage.getItem(TOKEN_EXPIRES_AT_KEY)),
     userID: getStoredUserID()
   }
@@ -68,7 +73,6 @@ function readStoredTokenPair(snapshot: AuthSnapshot): RefreshTokenResponse | nul
 
   if (
     !accessToken ||
-    !refreshToken ||
     !Number.isFinite(expiresAt) ||
     expiresAt <= Date.now() ||
     getStoredUserID() !== snapshot.userID
@@ -78,7 +82,7 @@ function readStoredTokenPair(snapshot: AuthSnapshot): RefreshTokenResponse | nul
 
   return {
     access_token: accessToken,
-    refresh_token: refreshToken,
+    refresh_token: refreshToken || '',
     expires_in: Math.max(1, Math.ceil((expiresAt - Date.now()) / 1000)),
     token_type: 'Bearer'
   }
@@ -93,9 +97,8 @@ function readPeerRefreshResult(
     return null
   }
 
-  if (storedPair.refresh_token !== snapshot.refreshToken) {
-    return storedPair
-  }
+  if (localStorage.getItem(REFRESH_GENERATION_KEY) !== snapshot.refreshGeneration) return storedPair
+  if (snapshot.refreshToken && storedPair.refresh_token !== snapshot.refreshToken) return storedPair
 
   if (
     failedAccessToken &&
@@ -127,8 +130,13 @@ async function waitForPeerRefresh(
 function persistTokenPair(tokens: RefreshTokenResponse): void {
   localStorage.setItem(AUTH_TOKEN_KEY, tokens.access_token)
   localStorage.setItem(TOKEN_EXPIRES_AT_KEY, String(Date.now() + tokens.expires_in * 1000))
-  // The rotating refresh token is written last so other tabs can treat its change as a commit marker.
-  localStorage.setItem(REFRESH_TOKEN_KEY, tokens.refresh_token)
+  if (tokens.refresh_cookie) {
+    localStorage.removeItem(REFRESH_TOKEN_KEY)
+    localStorage.setItem(REFRESH_COOKIE_KEY, '1')
+  } else if (tokens.refresh_token) {
+    localStorage.setItem(REFRESH_TOKEN_KEY, tokens.refresh_token)
+  }
+  localStorage.setItem(REFRESH_GENERATION_KEY, `${Date.now()}-${Math.random()}`)
 }
 
 async function requestTokenPair(
@@ -144,8 +152,8 @@ async function requestTokenPair(
   try {
     const response = await axios.post<ApiResponse<RefreshTokenResponse>>(
       `${getAPIBaseURL()}/auth/refresh`,
-      { refresh_token: snapshot.refreshToken },
-      { headers: { 'Content-Type': 'application/json' }, timeout: TOKEN_REFRESH_TIMEOUT_MS }
+      snapshot.refreshToken ? { refresh_token: snapshot.refreshToken } : {},
+      { headers: { 'Content-Type': 'application/json' }, timeout: TOKEN_REFRESH_TIMEOUT_MS, withCredentials: true }
     )
     const payload = response.data
     if (payload.code !== 0 || !payload.data) {
@@ -153,7 +161,8 @@ async function requestTokenPair(
     }
 
     if (
-      localStorage.getItem(REFRESH_TOKEN_KEY) !== snapshot.refreshToken ||
+      (snapshot.refreshToken && localStorage.getItem(REFRESH_TOKEN_KEY) !== snapshot.refreshToken) ||
+      localStorage.getItem(REFRESH_GENERATION_KEY) !== snapshot.refreshGeneration ||
       getStoredUserID() !== snapshot.userID
     ) {
       const peerResult = readPeerRefreshResult(snapshot, failedAccessToken)
