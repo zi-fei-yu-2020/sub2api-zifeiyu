@@ -21,6 +21,7 @@ const {
   getPanelRateLimitSettings,
   updatePanelRateLimitSettings,
   getStreamTimeoutSettings,
+  updateStreamTimeoutSettings,
   getRectifierSettings,
   getBetaPolicySettings,
   getUpstreamBillingProbeSettings,
@@ -56,6 +57,7 @@ const {
   }),
   updatePanelRateLimitSettings: vi.fn().mockImplementation(async (payload) => payload),
   getStreamTimeoutSettings: vi.fn(),
+  updateStreamTimeoutSettings: vi.fn(),
   getRectifierSettings: vi.fn(),
   getBetaPolicySettings: vi.fn(),
   getUpstreamBillingProbeSettings: vi.fn().mockResolvedValue({
@@ -98,6 +100,7 @@ vi.mock("@/api", () => ({
       getPanelRateLimitSettings,
       updatePanelRateLimitSettings,
       getStreamTimeoutSettings,
+      updateStreamTimeoutSettings,
       getRectifierSettings,
       getBetaPolicySettings,
     },
@@ -640,6 +643,7 @@ describe("admin SettingsView payment visible method controls", () => {
     getRateLimit429CooldownSettings.mockReset();
     updateRateLimit429CooldownSettings.mockReset();
     getStreamTimeoutSettings.mockReset();
+    updateStreamTimeoutSettings.mockReset();
     getRectifierSettings.mockReset();
     getBetaPolicySettings.mockReset();
     getUpstreamBillingProbeSettings.mockReset();
@@ -692,6 +696,7 @@ describe("admin SettingsView payment visible method controls", () => {
       threshold_count: 3,
       threshold_window_minutes: 10,
     });
+    updateStreamTimeoutSettings.mockImplementation(async (payload) => payload);
     getRectifierSettings.mockResolvedValue({
       enabled: true,
       thinking_signature_enabled: true,
@@ -806,6 +811,33 @@ describe("admin SettingsView payment visible method controls", () => {
     expect(updateRateLimit429CooldownSettings).toHaveBeenCalledWith({
       enabled: true,
       cooldown_seconds: 45,
+    });
+  });
+
+  it("keeps the extracted stream timeout panel wired to its existing save API", async () => {
+    const wrapper = mountView();
+    await flushPromises();
+    await openGatewayTab(wrapper);
+
+    const card = wrapper
+      .findAll(".card")
+      .find((item) => item.text().includes("admin.settings.streamTimeout.title"));
+    expect(card).toBeDefined();
+
+    await card!.get("select").setValue("error");
+    const inputs = card!.findAll('input[type="number"]');
+    expect(inputs).toHaveLength(2);
+    await inputs[0].setValue("4");
+    await inputs[1].setValue("12");
+    await card!.get("button.btn-primary").trigger("click");
+    await flushPromises();
+
+    expect(updateStreamTimeoutSettings).toHaveBeenCalledWith({
+      enabled: true,
+      action: "error",
+      temp_unsched_minutes: 5,
+      threshold_count: 4,
+      threshold_window_minutes: 12,
     });
   });
 
