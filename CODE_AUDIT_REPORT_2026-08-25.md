@@ -19,7 +19,7 @@
 | A-06 Unsanitized custom home HTML | RESOLVED | DOMPurify policy and executable-markup regression tests added. |
 | A-07 Affiliate registration field | RESOLVED | Optional affiliate code restored without duplicating mandatory invitations. |
 | A-08 permissive URL/SSRF defaults | RESOLVED | Three compatibility-preserving profiles added; new installs use strict, old installs retain legacy behavior until migration. |
-| A-09 vulnerable xlsx dependency | RESOLVED | XLSX export replaced with formula-safe UTF-8 CSV; xlsx removed from source and lockfile. |
+| A-09 vulnerable/unused frontend dependencies | RESOLVED | XLSX replaced with safe CSV; the unused LobeHub/React/Mermaid chain was removed; production audit is clean. |
 | A-10 incomplete frontend CI gate | RESOLVED | Full frontend Vitest suite is required by CI. |
 | A-11 model plaza visibility | RESOLVED | Home entry honors `model_plaza_require_auth`. |
 | A-12 nondeterministic moderation test | RESOLVED | Snapshot time is forced instead of relying on a 1ns wall-clock delta. |
@@ -29,8 +29,8 @@
 
 - Backend: `go test ./...` passes.
 - Frontend: full suite passes (1,712 tests), ESLint passes, typecheck passes, and production build passes.
-- Production dependency audit: **0 critical, 0 high, 8 moderate, 1 low**.
-- Remaining production advisories are transitive Mermaid advisories through the LobeHub icon/UI dependency chain.
+- Production dependency audit: **0 critical, 0 high, 0 moderate, 0 low**.
+- No production dependency advisories remain; the audited production tree contains 112 packages.
 - No xlsx dependency, source reference, advisory, or xlsx exception remains.
 
 ## 1. 审计范围
@@ -56,7 +56,7 @@
 
 The initial audit identified three release-blocking findings. All three are now resolved on `main`: protected first-run setup, atomic refresh-token rotation, and reproducible pnpm installs.
 
-The current release baseline has complete backend/frontend test coverage passing and no critical/high production dependency advisories. Remaining open work is limited to the transitive Mermaid dependency chain and frontend bundle/component decomposition.
+The current release baseline has complete backend/frontend test coverage passing and no critical/high production dependency advisories. Remaining open work is limited to frontend bundle/component decomposition.
 
 ## 3. 发现清单
 
@@ -287,9 +287,9 @@ access token 和 refresh token 均可被同源 JavaScript 直接读取。任何�
 
 ---
 
-### A-09 [RESOLVED-XLSX] [中/供应链] 前端存在已知漏洞依赖；生产主要为 xlsx，开发工具链另有高危项
+### A-09 [RESOLVED] [中/供应链] 前端存在已知漏洞依赖；生产主要为 xlsx，开发工具链另有高危项
 
-**Current status:** `xlsx` has been removed and Usage export now produces formula-safe UTF-8 CSV. The refreshed production audit contains 0 critical/high findings; the remaining 8 moderate and 1 low findings are transitive Mermaid advisories.
+**Current status:** `xlsx` has been removed and Usage export now produces formula-safe UTF-8 CSV. The unused `@lobehub/icons` dependency was also removed; this eliminated the transitive `@lobehub/ui`, React/Ant Design, and Mermaid chain. The refreshed production audit contains 0 critical, high, moderate, or low findings, and the production dependency count dropped from 667 to 112.
 
 **位置：**
 
@@ -436,7 +436,7 @@ access token 和 refresh token 均可被同源 JavaScript 直接读取。任何�
 5. A-05/A-06 调整 Token 存储与自定义 HTML 信任边界。
 6. A-07 恢复 Affiliate 注册字段。
 7. A-08 URL/SSRF production defaults. (RESOLVED: profiles, compatibility migration, redirect checks, and metadata blocking.)
-8. A-09 升级/替换依赖。
+8. A-09 dependency remediation. (RESOLVED: xlsx replaced and unused LobeHub/Mermaid chain removed.)
 
 ### P2：工程治理
 
