@@ -1,7 +1,7 @@
 ﻿# 前端重构与审计计划
 
 更新日期：2026-08-26  
-当前基线提交：`9abd418ef`
+当前基线提交：`d703a5651`
 
 ## 一、当前可验证基线
 
@@ -86,12 +86,13 @@
 
 `CodexSettingsPanel` 已完成，结构保持 52 个元素、9 个 input、6 个 button、11 个 v-model 完全等价；Settings chunk 为 414,906 字节，较上一步增加 1,070 字节。
 
+UpstreamBillingProbeSettingsPanel 已完成；Settings chunk 为 415,567 字节，较上一步增加 661 字节。
+
 剩余按独立职责拆分：
 
-1. `UpstreamBillingProbeSettingsPanel`
-2. `OllamaCloudUsageSettingsPanel`
-3. `GatewaySchedulingSettingsPanel`
-4. `UsageRecordsSettingsPanel`
+1. `OllamaCloudUsageSettingsPanel`
+2. `GatewaySchedulingSettingsPanel`
+3. `UsageRecordsSettingsPanel`
 
 ## 五、性能优化阶段
 
