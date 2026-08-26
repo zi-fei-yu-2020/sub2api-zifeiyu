@@ -1,15 +1,15 @@
 ﻿# 前端重构与审计计划
 
 更新日期：2026-08-26  
-当前基线提交：`2365b09b8`
+当前基线提交：`ea66b88d9`
 
 ## 一、当前可验证基线
 
-- `SettingsView.vue`：9,210 个物理行（8,743 个非空行）；本次从 9,619 行减少 409 行，项目最初约 12,449 行。
+- `SettingsView.vue`：8,610 个物理行（8,156 个非空行）；本轮从 9,210 行再减少 600 行，项目最初约 12,449 行。
 - `AccountsView.vue`：104,039 字节；当前生产 chunk 为 743,846 字节（约 726.4 KiB）。
 - `GroupsView.vue`：267,372 字节。
-- 前端测试文件：262 个。
-- 全量 Vitest：1,795 / 1,795 通过。
+- 前端测试文件：263 个。
+- 全量 Vitest：1,798 / 1,798 通过。
 - TypeScript typecheck：通过。
 - ESLint：通过。
 - 生产构建：通过。
@@ -40,6 +40,7 @@
 - `DingTalkConnectSettingsPanel`
 - `OIDCSettingsPanel`
 - `RegistrationSecuritySettingsPanel`
+- `DefaultUserSettingsPanel`
 
 每个已拆面板均完成：
 
@@ -49,7 +50,9 @@
 - `SettingsView` 父级保存 payload 契约测试
 - 全量 Vitest、TypeScript、ESLint 和生产构建
 - Registration 面板模板结构保持 83 个元素、10 个 Toggle、13 个 v-model 完全等价
-- Settings chunk 为 411,509 字节，较拆分前增加 994 字节（约 0.24%）
+- Registration 拆分后 Settings chunk 为 411,509 字节，较拆分前增加 994 字节（约 0.24%）
+- Default User 面板结构保持 137 个元素、13 个 input、18 个 v-model 完全等价
+- Default User 拆分后 Settings chunk 为 412,799 字节，较上一步增加 1,290 字节（约 0.31%）
 
 ### 2.2 构建与依赖安全基线
 
@@ -75,18 +78,9 @@
 
 ## 三、下一阶段：SettingsView 业务面板
 
-`RegistrationSecuritySettingsPanel` 已完成。后续按以下顺序拆分，每个面板使用独立提交和独立验收记录。
+`RegistrationSecuritySettingsPanel` 和 `DefaultUserSettingsPanel` 已完成。下一项为：
 
-### 3.1 `DefaultUserSettingsPanel`
-
-职责范围：
-
-- 默认余额、并发、RPM
-- 默认订阅和平台限额
-- 注册来源默认权益
-- Affiliate 和用户通知默认配置
-
-### 3.2 `SiteSettingsPanel`
+### 3.1 `SiteSettingsPanel`
 
 职责范围：
 
@@ -173,10 +167,9 @@
 
 ## 八、建议执行顺序
 
-1. `DefaultUserSettingsPanel`
-2. `SiteSettingsPanel`
-3. 六个 Gateway 面板
-4. AccountsView 按需加载
-5. GroupsView 拆分
-6. Settings Tab 异步加载
-7. 最终 A-13 审计报告
+1. `SiteSettingsPanel`
+2. 六个 Gateway 面板
+3. AccountsView 按需加载
+4. GroupsView 拆分
+5. Settings Tab 异步加载
+6. 最终 A-13 审计报告
