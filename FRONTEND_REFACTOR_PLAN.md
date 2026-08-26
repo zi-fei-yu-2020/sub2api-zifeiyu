@@ -1,15 +1,15 @@
 ﻿# 前端重构与审计计划
 
 更新日期：2026-08-26  
-当前基线提交：`6b5982b43`
+当前基线提交：`e603e0cdf`
 
 ## 一、当前可验证基线
 
-- `SettingsView.vue`：8,610 个物理行（8,156 个非空行）；本轮从 9,210 行再减少 600 行，项目最初约 12,449 行。
+- `SettingsView.vue`：7,991 个物理行（7,580 个非空行）；Claude Code 拆分从 8,039 行减少 48 行，项目最初约 12,449 行。
 - `AccountsView.vue`：104,039 字节；当前生产 chunk 为 743,846 字节（约 726.4 KiB）。
 - `GroupsView.vue`：267,372 字节。
-- 前端测试文件：263 个。
-- 全量 Vitest：1,798 / 1,798 通过。
+- 前端测试文件：266 个。
+- 全量 Vitest：1,807 / 1,807 通过。
 - TypeScript typecheck：通过。
 - ESLint：通过。
 - 生产构建：通过。
@@ -74,30 +74,23 @@
 - Accounts 优先级列默认可见和排序行为。
 - 代理批量导入的方括号 IPv6 支持。
 - 用户并发 `0 = 不限制`、负数拒绝的统一契约。
-- 全量测试从 12 个失败恢复，并在新增面板测试后达到 1,795 / 1,795 通过。
+- 全量测试从 12 个失败恢复，并在持续新增面板测试后达到 1,807 / 1,807 通过。
 
 ## 三、下一阶段：SettingsView 业务面板
 
 `RegistrationSecuritySettingsPanel`、`DefaultUserSettingsPanel` 和 `SiteSettingsPanel` 已完成。SettingsView 业务面板阶段结束。
 
-### 3.1 `SiteSettingsPanel`
-
-职责范围：
-
-- 站点名称、Logo 和品牌信息
-- API、文档和联系地址
-- 首页内容和自定义 HTML
-- 紧凑首页、分页和基础展示配置
 ## 四、后续阶段：Gateway 面板
 
-按独立职责拆分：
+`ClaudeCodeSettingsPanel` 已完成，结构保持 13 个元素、2 个 input、2 个 v-model 完全等价；Settings chunk 为 413,836 字节，较上一步增加 170 字节。
 
-1. `ClaudeCodeSettingsPanel`
-2. `CodexSettingsPanel`
-3. `UpstreamBillingProbeSettingsPanel`
-4. `OllamaCloudUsageSettingsPanel`
-5. `GatewaySchedulingSettingsPanel`
-6. `UsageRecordsSettingsPanel`
+剩余按独立职责拆分：
+
+1. `CodexSettingsPanel`
+2. `UpstreamBillingProbeSettingsPanel`
+3. `OllamaCloudUsageSettingsPanel`
+4. `GatewaySchedulingSettingsPanel`
+5. `UsageRecordsSettingsPanel`
 
 ## 五、性能优化阶段
 
