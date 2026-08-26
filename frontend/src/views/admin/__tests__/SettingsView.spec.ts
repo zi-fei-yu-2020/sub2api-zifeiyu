@@ -9,6 +9,7 @@ import zhSettings from "@/i18n/locales/zh/admin/settings";
 import SettingsView from "../SettingsView.vue";
 import RegistrationSecuritySettingsPanel from "../settings/RegistrationSecuritySettingsPanel.vue";
 import ClaudeCodeSettingsPanel from "../settings/ClaudeCodeSettingsPanel.vue";
+import CodexSettingsPanel from "../settings/CodexSettingsPanel.vue";
 
 const {
   getSettings,
@@ -841,6 +842,32 @@ describe("admin SettingsView payment visible method controls", () => {
     expect(updateSettings).toHaveBeenCalledWith(expect.objectContaining({
       min_claude_code_version: "1.8.0",
       max_claude_code_version: "2.4.0",
+    }));
+  });
+
+  it("keeps the extracted Codex panel wired to serialized hardening payloads", async () => {
+    getSettings.mockResolvedValueOnce({
+      ...baseSettingsResponse,
+      min_codex_version: "1.5.0",
+      max_codex_version: "2.5.0",
+      codex_cli_only_allow_app_server_clients: true,
+      codex_cli_only_engine_fingerprint_signals: JSON.stringify([{ type: "header_prefix", match: ["x-codex-"], required: true }]),
+      codex_cli_only_blacklist: JSON.stringify([{ originator: "bad-client", ua_contains: ["curl"] }]),
+      codex_cli_only_whitelist: JSON.stringify([{ originator: "trusted", ua_contains: ["codex"], skip_engine_fingerprint: true }]),
+    });
+    const wrapper = mountView();
+    await flushPromises();
+    await openGatewayTab(wrapper);
+    expect(wrapper.findComponent(CodexSettingsPanel).exists()).toBe(true);
+    await wrapper.find("form").trigger("submit.prevent");
+    await flushPromises();
+    expect(updateSettings).toHaveBeenCalledWith(expect.objectContaining({
+      min_codex_version: "1.5.0",
+      max_codex_version: "2.5.0",
+      codex_cli_only_allow_app_server_clients: true,
+      codex_cli_only_engine_fingerprint_signals: JSON.stringify([{ type: "header_prefix", match: ["x-codex-"], required: true }]),
+      codex_cli_only_blacklist: JSON.stringify([{ originator: "bad-client", ua_contains: ["curl"] }]),
+      codex_cli_only_whitelist: JSON.stringify([{ originator: "trusted", ua_contains: ["codex"], skip_engine_fingerprint: true }]),
     }));
   });
 
