@@ -13,7 +13,7 @@
           ${{ user?.balance?.toFixed(2) || '0.00' }}
         </p>
         <p class="mt-2 text-xs text-slate-500 dark:text-slate-400">
-          {{ t('redeem.concurrency') }}: <span class="font-semibold text-slate-700 dark:text-slate-300">{{ user?.concurrency || 0 }}</span> {{ t('redeem.requests') }}
+          {{ t('redeem.concurrency') }}: <span class="font-semibold text-slate-700 dark:text-slate-300">{{ formatConcurrency(user?.concurrency) }}</span>
         </p>
       </div>
 
@@ -119,7 +119,7 @@
                     <p v-if="redeemResult.new_concurrency !== undefined">
                       {{ t('redeem.newConcurrency') }}:
                       <span class="font-semibold"
-                        >{{ redeemResult.new_concurrency }} {{ t('redeem.requests') }}</span
+                        >{{ formatConcurrency(redeemResult.new_concurrency) }}</span
                       >
                     </p>
                   </div>
@@ -349,6 +349,7 @@ import { redeemAPI, authAPI, type RedeemHistoryItem } from '@/api'
 import AppLayout from '@/components/layout/AppLayout.vue'
 import Icon from '@/components/icons/Icon.vue'
 import { formatDateTime } from '@/utils/format'
+import { formatConcurrencyLimit } from '@/utils/concurrency'
 
 const { t } = useI18n()
 const authStore = useAuthStore()
@@ -356,6 +357,9 @@ const appStore = useAppStore()
 const subscriptionStore = useSubscriptionStore()
 
 const user = computed(() => authStore.user)
+
+const formatConcurrency = (value?: number | null) =>
+  formatConcurrencyLimit(value, t('common.unlimited'), t('redeem.requests'))
 
 const redeemCode = ref('')
 const submitting = ref(false)
