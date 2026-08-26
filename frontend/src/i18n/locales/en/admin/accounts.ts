@@ -164,6 +164,7 @@ export default {
       status: {
         active: 'Active',
         inactive: 'Inactive',
+        disabled: 'Disabled',
         expired: 'Expired',
         error: 'Error',
         cooldown: 'Cooldown',

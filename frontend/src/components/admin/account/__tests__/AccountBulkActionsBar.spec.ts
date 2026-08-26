@@ -47,4 +47,22 @@ describe('AccountBulkActionsBar', () => {
     await button!.trigger('click')
     expect(wrapper.emitted('probe-upstream-billing')).toHaveLength(1)
   })
+
+  it('integrates with the table shell and only highlights active selection state', async () => {
+    const wrapper = mount(AccountBulkActionsBar, {
+      props: {
+        selectedIds: [],
+        totalResults: 45,
+        selectingAll: false,
+        allResultsSelected: false
+      }
+    })
+
+    expect(wrapper.classes()).toEqual(expect.arrayContaining(['border-b', 'bg-slate-50/70']))
+    expect(wrapper.classes()).not.toContain('rounded-xl')
+
+    await wrapper.setProps({ selectedIds: [1] })
+    expect(wrapper.classes()).toContain('bg-primary-50/70')
+  })
+
 })

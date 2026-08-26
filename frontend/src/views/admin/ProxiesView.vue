@@ -2,9 +2,10 @@
   <AppLayout>
     <TablePageLayout>
       <template #filters>
-        <div class="flex flex-wrap items-center gap-3">
-          <!-- Left: Search + Filters -->
-          <div class="relative w-full sm:w-64">
+        <div class="flex w-full flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+          <div class="flex flex-1 flex-wrap items-center gap-3">
+            <!-- Left: Search + Filters -->
+            <div class="relative w-full sm:w-64">
             <Icon
               name="search"
               size="md"
@@ -36,8 +37,10 @@
             />
           </div>
 
-          <!-- Right: All action buttons -->
-          <div class="flex flex-1 flex-wrap items-center justify-end gap-2">
+          </div>
+
+          <!-- Right: Secondary actions + primary create action -->
+          <div class="flex flex-wrap items-center justify-end gap-2">
             <button
               @click="loadProxies"
               :disabled="loading"
@@ -67,7 +70,8 @@
             <button
               @click="openBatchDelete"
               :disabled="selectedCount === 0"
-              class="btn btn-danger"
+              class="btn"
+              :class="selectedCount > 0 ? 'btn-danger' : 'btn-secondary'"
               :title="t('admin.proxies.batchDeleteAction')"
             >
               <Icon name="trash" size="md" class="mr-2" />

@@ -23,4 +23,11 @@ describe('TablePageLayout responsive table scrolling', () => {
       true
     )
   })
+
+  it('clips every table page into one consistent four-corner rounded surface', () => {
+    expect(componentSource).toContain(
+      'table-scroll-container overflow-hidden rounded-2xl border'
+    )
+  })
+
 })

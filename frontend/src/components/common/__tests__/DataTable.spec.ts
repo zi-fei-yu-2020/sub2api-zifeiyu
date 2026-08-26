@@ -357,4 +357,27 @@ describe('DataTable', () => {
 
     expect(wrapper.emitted('update:selectedKeys')?.at(-1)?.[0]).toEqual([99, 1, 2])
   })
+
+  it('pins the built-in selection column and first data column together', () => {
+    const wrapper = mount(DataTable, {
+      props: {
+        columns: [
+          { key: 'email', label: 'User' },
+          { key: 'balance', label: 'Balance' }
+        ],
+        data: [{ id: 1, email: 'user@example.com', balance: 10 }],
+        rowKey: 'id',
+        selectable: true
+      }
+    })
+
+    const headers = wrapper.findAll('thead th')
+    const cells = wrapper.findAll('tbody tr').at(-1)!.findAll('td')
+
+    expect(headers[0].classes()).toEqual(expect.arrayContaining(['sticky-col', 'sticky-col-left-first']))
+    expect(headers[1].classes()).toEqual(expect.arrayContaining(['sticky-col', 'sticky-col-left-second']))
+    expect(cells[0].classes()).toEqual(expect.arrayContaining(['sticky-col', 'sticky-col-left-first']))
+    expect(cells[1].classes()).toEqual(expect.arrayContaining(['sticky-col', 'sticky-col-left-second']))
+  })
+
 })

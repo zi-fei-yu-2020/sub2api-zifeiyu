@@ -11,7 +11,7 @@
     </div>
 
     <!-- 表格区域 (Blue-White SaaS Table Container) -->
-    <div class="table-scroll-container rounded-md border border-slate-200/90 bg-white shadow-sm shadow-slate-200/40 dark:border-slate-800 dark:bg-slate-900">
+    <div class="table-scroll-container overflow-hidden rounded-2xl border border-slate-200/90 bg-white shadow-sm shadow-slate-200/40 dark:border-slate-800 dark:bg-slate-900">
       <slot name="table" />
     </div>
 

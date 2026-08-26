@@ -142,7 +142,7 @@
     <BaseDialog
       :show="showDialog"
       :title="editingChannel ? t('admin.channels.editChannel', 'Edit Channel') : t('admin.channels.createChannel', 'Create Channel')"
-      width="extra-wide"
+      width="wide"
       @close="closeDialog"
     >
       <div class="channel-dialog-body">
@@ -1672,8 +1672,8 @@ onUnmounted(() => {
 .channel-dialog-body {
   display: flex;
   flex-direction: column;
-  height: 70vh;
-  min-height: 400px;
+  height: min(68vh, 640px);
+  min-height: 360px;
 }
 
 .channel-tab {

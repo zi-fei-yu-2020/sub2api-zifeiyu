@@ -1,5 +1,8 @@
 <template>
-  <div class="mb-4 flex items-center justify-between rounded-xl bg-primary-50 p-3 dark:bg-primary-900/20">
+  <div
+    class="flex flex-col gap-3 border-b border-slate-200/80 px-3 py-2.5 sm:flex-row sm:items-center sm:justify-between dark:border-slate-800"
+    :class="selectedIds.length > 0 ? 'bg-primary-50/70 dark:bg-primary-900/15' : 'bg-slate-50/70 dark:bg-slate-900/70'"
+  >
     <div class="flex flex-wrap items-center gap-2">
       <span v-if="allResultsSelected" class="text-sm font-medium text-primary-900 dark:text-primary-100">
         {{ t('admin.accounts.bulkActions.selectedAll', { count: selectedIds.length }) }}
@@ -7,7 +10,7 @@
       <span v-else-if="selectedIds.length > 0" class="text-sm font-medium text-primary-900 dark:text-primary-100">
         {{ t('admin.accounts.bulkActions.selected', { count: selectedIds.length }) }}
       </span>
-      <span v-else class="text-sm font-medium text-primary-900 dark:text-primary-100">
+      <span v-else class="text-sm font-medium text-slate-700 dark:text-slate-200">
         {{ t('admin.accounts.bulkEdit.title') }}
       </span>
       <template v-if="selectedIds.length > 0">
@@ -42,7 +45,7 @@
         </button>
       </template>
     </div>
-    <div class="flex gap-2">
+    <div class="flex flex-wrap items-center justify-end gap-2">
       <template v-if="selectedIds.length > 0">
         <button @click="$emit('delete')" class="btn btn-danger btn-sm">{{ t('admin.accounts.bulkActions.delete') }}</button>
         <button @click="$emit('reset-status')" class="btn btn-secondary btn-sm">{{ t('admin.accounts.bulkActions.resetStatus') }}</button>

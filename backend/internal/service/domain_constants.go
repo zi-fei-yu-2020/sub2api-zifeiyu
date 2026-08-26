@@ -2,6 +2,7 @@ package service
 
 import (
 	"fmt"
+	"strings"
 
 	"github.com/Wei-Shaw/sub2api/internal/domain"
 )
@@ -140,6 +141,16 @@ const (
 	AccountTypeBedrock        = domain.AccountTypeBedrock        // AWS Bedrock 类型账号（通过 SigV4 签名或 API Key 连接 Bedrock，由 credentials.auth_mode 区分）
 	AccountTypeServiceAccount = domain.AccountTypeServiceAccount // Google Service Account 类型账号（用于 Vertex AI）
 )
+
+// NormalizeAccountType maps historical import aliases to the canonical runtime value.
+// new-api migration dumps used "api_key", while sub2api stores API-key accounts as "apikey".
+func NormalizeAccountType(value string) string {
+	trimmed := strings.TrimSpace(value)
+	if strings.EqualFold(trimmed, "api_key") {
+		return AccountTypeAPIKey
+	}
+	return trimmed
+}
 
 // Redeem type constants
 const (
