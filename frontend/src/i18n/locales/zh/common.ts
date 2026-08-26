@@ -31,6 +31,7 @@ export default {
     no: '否',
     all: '全部',
     none: '无',
+    unlimited: '无限制',
     selectAll: '全选',
     noData: '暂无数据',
     expand: '展开',
