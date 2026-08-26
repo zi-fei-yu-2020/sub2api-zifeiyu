@@ -1,15 +1,15 @@
 ﻿# 前端重构与审计计划
 
 更新日期：2026-08-26  
-当前基线提交：`e603e0cdf`
+当前基线提交：`9abd418ef`
 
 ## 一、当前可验证基线
 
-- `SettingsView.vue`：7,991 个物理行（7,580 个非空行）；Claude Code 拆分从 8,039 行减少 48 行，项目最初约 12,449 行。
+- `SettingsView.vue`：7,784 个物理行（7352 个非空行）；Codex 拆分从 8,016 行减少 232 行，项目最初约 12,449 行。
 - `AccountsView.vue`：104,039 字节；当前生产 chunk 为 743,846 字节（约 726.4 KiB）。
 - `GroupsView.vue`：267,372 字节。
-- 前端测试文件：266 个。
-- 全量 Vitest：1,807 / 1,807 通过。
+- 前端测试文件：267 个。
+- 全量 Vitest：1,811 / 1,811 通过。
 - TypeScript typecheck：通过。
 - ESLint：通过。
 - 生产构建：通过。
@@ -84,13 +84,14 @@
 
 `ClaudeCodeSettingsPanel` 已完成，结构保持 13 个元素、2 个 input、2 个 v-model 完全等价；Settings chunk 为 413,836 字节，较上一步增加 170 字节。
 
+`CodexSettingsPanel` 已完成，结构保持 52 个元素、9 个 input、6 个 button、11 个 v-model 完全等价；Settings chunk 为 414,906 字节，较上一步增加 1,070 字节。
+
 剩余按独立职责拆分：
 
-1. `CodexSettingsPanel`
-2. `UpstreamBillingProbeSettingsPanel`
-3. `OllamaCloudUsageSettingsPanel`
-4. `GatewaySchedulingSettingsPanel`
-5. `UsageRecordsSettingsPanel`
+1. `UpstreamBillingProbeSettingsPanel`
+2. `OllamaCloudUsageSettingsPanel`
+3. `GatewaySchedulingSettingsPanel`
+4. `UsageRecordsSettingsPanel`
 
 ## 五、性能优化阶段
 
