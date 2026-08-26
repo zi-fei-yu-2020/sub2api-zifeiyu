@@ -7,6 +7,7 @@ import enSettings from "@/i18n/locales/en/admin/settings";
 import zhCommon from "@/i18n/locales/zh/common";
 import zhSettings from "@/i18n/locales/zh/admin/settings";
 import SettingsView from "../SettingsView.vue";
+import RegistrationSecuritySettingsPanel from "../settings/RegistrationSecuritySettingsPanel.vue";
 
 const {
   getSettings,
@@ -1104,6 +1105,58 @@ describe("admin SettingsView payment visible method controls", () => {
         turnstile_enabled: false,
         tencent_captcha_enabled: false,
         aliyun_captcha_enabled: false,
+      }),
+    );
+  });
+
+  it("keeps the extracted registration security panel wired to the settings save payload", async () => {
+    getSettings.mockResolvedValueOnce({
+      ...baseSettingsResponse,
+      registration_enabled: false,
+      email_verify_enabled: true,
+      registration_email_suffix_whitelist: ["@Example.COM", "*.Corp.Test"],
+      registration_email_domain_quota_enabled: true,
+      promo_code_enabled: false,
+      invitation_code_enabled: true,
+      password_reset_enabled: true,
+      frontend_url: "https://panel.example.com",
+      totp_enabled: true,
+      totp_encryption_key_configured: true,
+      passkey_enabled: true,
+      passkey_configured: true,
+      passkey_rp_id: "panel.example.com",
+      passkey_rp_origins: ["https://panel.example.com"],
+      session_binding_enabled: true,
+      step_up_enabled: true,
+      audit_log_retention_days: 45,
+    });
+
+    const wrapper = mountView();
+    await flushPromises();
+    await openSecurityTab(wrapper);
+
+    const panel = wrapper.findComponent(RegistrationSecuritySettingsPanel);
+    expect(panel.exists()).toBe(true);
+    expect(panel.props("emailSuffixTags")).toEqual(["example.com", "*.corp.test"]);
+
+    await wrapper.find("form").trigger("submit.prevent");
+    await flushPromises();
+
+    expect(updateSettings).toHaveBeenCalledWith(
+      expect.objectContaining({
+        registration_enabled: false,
+        email_verify_enabled: true,
+        registration_email_suffix_whitelist: ["@example.com", "*.corp.test"],
+        registration_email_domain_quota_enabled: true,
+        promo_code_enabled: false,
+        invitation_code_enabled: true,
+        password_reset_enabled: true,
+        frontend_url: "https://panel.example.com",
+        totp_enabled: true,
+        passkey_enabled: true,
+        session_binding_enabled: true,
+        step_up_enabled: true,
+        audit_log_retention_days: 45,
       }),
     );
   });
