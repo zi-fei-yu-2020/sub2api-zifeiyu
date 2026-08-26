@@ -240,56 +240,7 @@
         <!-- Tab: Gateway — Claude Code, Scheduling -->
         <div v-show="activeTab === 'gateway'" class="space-y-6">
           <!-- Claude Code Settings -->
-          <div class="card">
-            <div
-              class="border-b border-slate-100 px-6 py-4 dark:border-slate-800"
-            >
-              <h2 class="text-lg font-semibold text-slate-900 dark:text-white">
-                {{ t("admin.settings.claudeCode.title") }}
-              </h2>
-              <p class="mt-1 text-sm text-slate-400 dark:text-slate-400">
-                {{ t("admin.settings.claudeCode.description") }}
-              </p>
-            </div>
-            <div class="p-6">
-              <div>
-                <label
-                  class="mb-2 block text-sm font-medium text-slate-700 dark:text-gray-300"
-                >
-                  {{ t("admin.settings.claudeCode.minVersion") }}
-                </label>
-                <input
-                  v-model="form.min_claude_code_version"
-                  type="text"
-                  class="input max-w-xs font-mono text-sm"
-                  :placeholder="
-                    t('admin.settings.claudeCode.minVersionPlaceholder')
-                  "
-                />
-                <p class="mt-1.5 text-xs text-slate-400 dark:text-slate-400">
-                  {{ t("admin.settings.claudeCode.minVersionHint") }}
-                </p>
-              </div>
-              <div class="mt-4">
-                <label
-                  class="mb-2 block text-sm font-medium text-slate-700 dark:text-gray-300"
-                >
-                  {{ t("admin.settings.claudeCode.maxVersion") }}
-                </label>
-                <input
-                  v-model="form.max_claude_code_version"
-                  type="text"
-                  class="input max-w-xs font-mono text-sm"
-                  :placeholder="
-                    t('admin.settings.claudeCode.maxVersionPlaceholder')
-                  "
-                />
-                <p class="mt-1.5 text-xs text-slate-400 dark:text-slate-400">
-                  {{ t("admin.settings.claudeCode.maxVersionHint") }}
-                </p>
-              </div>
-            </div>
-          </div>
+          <ClaudeCodeSettingsPanel :form="form" />
 
           <!-- Codex Settings -->
           <div class="card">
@@ -4047,6 +3998,7 @@ import OpenAIFastPolicySettingsPanel from "@/views/admin/settings/OpenAIFastPoli
 import RegistrationSecuritySettingsPanel from "@/views/admin/settings/RegistrationSecuritySettingsPanel.vue";
 import DefaultUserSettingsPanel from "@/views/admin/settings/DefaultUserSettingsPanel.vue";
 import SiteSettingsPanel from "@/views/admin/settings/SiteSettingsPanel.vue";
+import ClaudeCodeSettingsPanel from "@/views/admin/settings/ClaudeCodeSettingsPanel.vue";
 import ApiKeyAclSettingsPanel from "@/views/admin/settings/ApiKeyAclSettingsPanel.vue";
 import PanelRateLimitSettingsPanel from "@/views/admin/settings/PanelRateLimitSettingsPanel.vue";
 import CaptchaSettingsPanel from "@/views/admin/settings/CaptchaSettingsPanel.vue";

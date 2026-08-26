@@ -8,6 +8,7 @@ import zhCommon from "@/i18n/locales/zh/common";
 import zhSettings from "@/i18n/locales/zh/admin/settings";
 import SettingsView from "../SettingsView.vue";
 import RegistrationSecuritySettingsPanel from "../settings/RegistrationSecuritySettingsPanel.vue";
+import ClaudeCodeSettingsPanel from "../settings/ClaudeCodeSettingsPanel.vue";
 
 const {
   getSettings,
@@ -823,6 +824,24 @@ describe("admin SettingsView payment visible method controls", () => {
       enabled: true,
       cooldown_seconds: 45,
     });
+  });
+
+  it("keeps the extracted Claude Code panel wired to the general save payload", async () => {
+    getSettings.mockResolvedValueOnce({
+      ...baseSettingsResponse,
+      min_claude_code_version: "1.8.0",
+      max_claude_code_version: "2.4.0",
+    });
+    const wrapper = mountView();
+    await flushPromises();
+    await openGatewayTab(wrapper);
+    expect(wrapper.findComponent(ClaudeCodeSettingsPanel).exists()).toBe(true);
+    await wrapper.find("form").trigger("submit.prevent");
+    await flushPromises();
+    expect(updateSettings).toHaveBeenCalledWith(expect.objectContaining({
+      min_claude_code_version: "1.8.0",
+      max_claude_code_version: "2.4.0",
+    }));
   });
 
   it("keeps the extracted stream timeout panel wired to its existing save API", async () => {
