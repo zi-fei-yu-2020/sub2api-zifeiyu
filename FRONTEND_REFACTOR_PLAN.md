@@ -1,7 +1,7 @@
 ﻿# 前端重构与审计计划
 
 更新日期：2026-08-26  
-当前基线提交：`ea66b88d9`
+当前基线提交：`6b5982b43`
 
 ## 一、当前可验证基线
 
@@ -78,7 +78,7 @@
 
 ## 三、下一阶段：SettingsView 业务面板
 
-`RegistrationSecuritySettingsPanel` 和 `DefaultUserSettingsPanel` 已完成。下一项为：
+`RegistrationSecuritySettingsPanel`、`DefaultUserSettingsPanel` 和 `SiteSettingsPanel` 已完成。SettingsView 业务面板阶段结束。
 
 ### 3.1 `SiteSettingsPanel`
 
@@ -167,8 +167,7 @@
 
 ## 八、建议执行顺序
 
-1. `SiteSettingsPanel`
-2. 六个 Gateway 面板
+1. 六个 Gateway 面板
 3. AccountsView 按需加载
 4. GroupsView 拆分
 5. Settings Tab 异步加载
