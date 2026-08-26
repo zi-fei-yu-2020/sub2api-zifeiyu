@@ -1,7 +1,7 @@
 ﻿# 前端重构与审计计划
 
 更新日期：2026-08-26  
-当前基线提交：`d703a5651`
+当前基线提交：`90f540333`
 
 ## 一、当前可验证基线
 
@@ -90,9 +90,8 @@ UpstreamBillingProbeSettingsPanel 已完成；Settings chunk 为 415,567 字节�
 
 剩余按独立职责拆分：
 
-1. `OllamaCloudUsageSettingsPanel`
-2. `GatewaySchedulingSettingsPanel`
-3. `UsageRecordsSettingsPanel`
+1. `GatewaySchedulingSettingsPanel`
+2. `UsageRecordsSettingsPanel`
 
 ## 五、性能优化阶段
 
