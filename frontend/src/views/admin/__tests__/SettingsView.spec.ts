@@ -10,6 +10,7 @@ import SettingsView from "../SettingsView.vue";
 import RegistrationSecuritySettingsPanel from "../settings/RegistrationSecuritySettingsPanel.vue";
 import ClaudeCodeSettingsPanel from "../settings/ClaudeCodeSettingsPanel.vue";
 import CodexSettingsPanel from "../settings/CodexSettingsPanel.vue";
+import GatewaySchedulingSettingsPanel from "../settings/GatewaySchedulingSettingsPanel.vue";
 
 const {
   getSettings,
@@ -868,6 +869,52 @@ describe("admin SettingsView payment visible method controls", () => {
       codex_cli_only_engine_fingerprint_signals: JSON.stringify([{ type: "header_prefix", match: ["x-codex-"], required: true }]),
       codex_cli_only_blacklist: JSON.stringify([{ originator: "bad-client", ua_contains: ["curl"] }]),
       codex_cli_only_whitelist: JSON.stringify([{ originator: "trusted", ua_contains: ["codex"], skip_engine_fingerprint: true }]),
+    }));
+  });
+
+  it("keeps the extracted gateway scheduling panel wired to the general save payload", async () => {
+    getSettings.mockResolvedValueOnce({
+      ...baseSettingsResponse,
+      allow_ungrouped_key_scheduling: true,
+      account_scheduling_thresholds: {
+        openai: 71,
+        anthropic: 72,
+        grok: 73,
+        kimi: 74,
+        zhipu: 75,
+      },
+      openai_low_upstream_rate_priority_enabled: true,
+      openai_oauth_scheduling_rate_multiplier: 0.25,
+      openai_advanced_scheduler_enabled: true,
+      openai_advanced_scheduler_sticky_weighted_enabled: true,
+      openai_advanced_scheduler_subscription_priority_enabled: true,
+      openai_advanced_scheduler_lb_top_k: " 9 ",
+      openai_advanced_scheduler_weight_priority: " 1.2 ",
+    });
+    const wrapper = mountView();
+    await flushPromises();
+    await openGatewayTab(wrapper);
+
+    expect(wrapper.findComponent(GatewaySchedulingSettingsPanel).exists()).toBe(true);
+    await wrapper.find("form").trigger("submit.prevent");
+    await flushPromises();
+
+    expect(updateSettings).toHaveBeenCalledWith(expect.objectContaining({
+      allow_ungrouped_key_scheduling: true,
+      account_scheduling_thresholds: {
+        openai: 71,
+        anthropic: 72,
+        grok: 73,
+        kimi: 74,
+        zhipu: 75,
+      },
+      openai_low_upstream_rate_priority_enabled: true,
+      openai_oauth_scheduling_rate_multiplier: 0.25,
+      openai_advanced_scheduler_enabled: true,
+      openai_advanced_scheduler_sticky_weighted_enabled: true,
+      openai_advanced_scheduler_subscription_priority_enabled: true,
+      openai_advanced_scheduler_lb_top_k: "9",
+      openai_advanced_scheduler_weight_priority: "1.2",
     }));
   });
 

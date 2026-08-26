@@ -1,15 +1,15 @@
 ﻿# 前端重构与审计计划
 
 更新日期：2026-08-26  
-当前基线提交：`90f540333`
+本轮起点提交：`b9510aed9`
 
 ## 一、当前可验证基线
 
-- `SettingsView.vue`：7,784 个物理行（7352 个非空行）；Codex 拆分从 8,016 行减少 232 行，项目最初约 12,449 行。
+- `SettingsView.vue`：7,337 个物理行（6,942 个非空行）；Gateway Scheduling 拆分从 7,610 行减少 273 行，项目最初约 12,449 行。
 - `AccountsView.vue`：104,039 字节；当前生产 chunk 为 743,846 字节（约 726.4 KiB）。
 - `GroupsView.vue`：267,372 字节。
-- 前端测试文件：267 个。
-- 全量 Vitest：1,811 / 1,811 通过。
+- 前端测试文件：270 个。
+- 全量 Vitest：1,821 / 1,821 通过。
 - TypeScript typecheck：通过。
 - ESLint：通过。
 - 生产构建：通过。
@@ -88,10 +88,11 @@
 
 UpstreamBillingProbeSettingsPanel 已完成；Settings chunk 为 415,567 字节，较上一步增加 661 字节。
 
+`GatewaySchedulingSettingsPanel` 已完成：拆分前后模板结构均为 67 个元素、4 个 input、5 个 Toggle、9 个 v-model、11 个 label，DOM 顺序、class、关键属性和显示条件完全等价；`SettingsView.vue` 从 7,610 行减少至 7,337 行；Settings chunk 为 417,038 字节，较上一步增加 597 字节。组件测试、父级保存 payload 契约、frozen install、全量 Vitest、TypeScript、ESLint 和生产构建均通过。
+
 剩余按独立职责拆分：
 
-1. `GatewaySchedulingSettingsPanel`
-2. `UsageRecordsSettingsPanel`
+1. `UsageRecordsSettingsPanel`
 
 ## 五、性能优化阶段
 
