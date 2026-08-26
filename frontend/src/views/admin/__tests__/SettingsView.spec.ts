@@ -11,6 +11,7 @@ import RegistrationSecuritySettingsPanel from "../settings/RegistrationSecurityS
 import ClaudeCodeSettingsPanel from "../settings/ClaudeCodeSettingsPanel.vue";
 import CodexSettingsPanel from "../settings/CodexSettingsPanel.vue";
 import GatewaySchedulingSettingsPanel from "../settings/GatewaySchedulingSettingsPanel.vue";
+import UsageRecordsSettingsPanel from "../settings/UsageRecordsSettingsPanel.vue";
 
 const {
   getSettings,
@@ -915,6 +916,26 @@ describe("admin SettingsView payment visible method controls", () => {
       openai_advanced_scheduler_subscription_priority_enabled: true,
       openai_advanced_scheduler_lb_top_k: "9",
       openai_advanced_scheduler_weight_priority: "1.2",
+    }));
+  });
+
+  it("keeps the extracted usage records panel wired to the general save payload", async () => {
+    getSettings.mockResolvedValueOnce({
+      ...baseSettingsResponse,
+      allow_user_view_error_requests: true,
+    });
+    const wrapper = mountView();
+    await flushPromises();
+    await openGatewayTab(wrapper);
+
+    const panel = wrapper.findComponent(UsageRecordsSettingsPanel);
+    expect(panel.exists()).toBe(true);
+    expect((panel.get('input[type="checkbox"]').element as HTMLInputElement).checked).toBe(true);
+
+    await wrapper.find("form").trigger("submit.prevent");
+    await flushPromises();
+    expect(updateSettings).toHaveBeenCalledWith(expect.objectContaining({
+      allow_user_view_error_requests: true,
     }));
   });
 
