@@ -1,0 +1,191 @@
+﻿# 前端重构与审计计划
+
+更新日期：2026-08-26  
+当前基线提交：`18cc11782`
+
+## 一、当前可验证基线
+
+- `SettingsView.vue`：9,157 行，已从最初的 12,449 行下降约 26%。
+- `AccountsView.vue`：104,039 字节；当前生产 chunk 为 743,846 字节（约 726.4 KiB）。
+- `GroupsView.vue`：267,372 字节。
+- 前端测试文件：261 个。
+- 全量 Vitest：1,791 / 1,791 通过。
+- TypeScript typecheck：通过。
+- ESLint：通过。
+- 生产构建：通过。
+- `pnpm install --frozen-lockfile`：通过。
+- `pnpm audit --prod`：info / low / moderate / high / critical 均为 0。
+- 本地前端：`http://127.0.0.1:3000`，Vite watcher 显示 0 个类型错误。
+
+## 二、已经完成
+
+### 2.1 SettingsView 面板拆分
+
+已经提取并验证以下面板：
+
+- `AdminApiKeySettingsPanel`
+- `OverloadCooldownSettingsPanel`
+- `RateLimit429CooldownSettingsPanel`
+- `StreamTimeoutSettingsPanel`
+- `RequestRectifierSettingsPanel`
+- `BetaPolicySettingsPanel`
+- `OpenAIFastPolicySettingsPanel`
+- `ApiKeyAclSettingsPanel`
+- `PanelRateLimitSettingsPanel`
+- `CaptchaSettingsPanel`
+- `LinuxDoConnectSettingsPanel`
+- `GitHubOAuthSettingsPanel`
+- `GoogleOAuthSettingsPanel`
+- `WeChatConnectSettingsPanel`
+- `DingTalkConnectSettingsPanel`
+- `OIDCSettingsPanel`
+
+每个已拆面板均完成：
+
+- 拆分前后 DOM 顺序和元素数量核对
+- class、关键属性和显示条件等价检查
+- 独立组件测试
+- `SettingsView` 父级保存 payload 契约测试
+- 全量 Vitest、TypeScript、ESLint 和生产构建
+
+### 2.2 构建与依赖安全基线
+
+已经完成：
+
+- 修复 pnpm overrides 与锁文件不一致，恢复 frozen install。
+- 移除未使用的 `xlsx` 及其完整依赖闭包，改为保留现有 CSV 路径。
+- 移除未使用的 `@lobehub/icons → @lobehub/ui → Mermaid` 依赖链。
+- 清除由 LobeHub 链带入的 React、React DOM、Ant Design、Mermaid 等 531 个安装包。
+- 刷新 `frontend/audit.json`，当前依赖安全公告为 0。
+- 清空已失效或不再匹配公告的审计例外。
+
+### 2.3 远程同步后的回归修复
+
+已经恢复：
+
+- 登录、注册输入框图标安全间距。
+- 模型广场长上下文提示和高峰配置传递契约。
+- Accounts 优先级列默认可见和排序行为。
+- 代理批量导入的方括号 IPv6 支持。
+- 用户并发 `0 = 不限制`、负数拒绝的统一契约。
+- 全量测试从 12 个失败恢复到 1,791 / 1,791 通过。
+
+## 三、下一阶段：SettingsView 业务面板
+
+按以下顺序拆分，每个面板使用独立提交和独立验收记录。
+
+### 3.1 `RegistrationSecuritySettingsPanel`
+
+职责范围：
+
+- 注册开关、邮箱验证
+- 邮箱后缀白名单、域名注册额度
+- 优惠码、邀请码、密码重置
+- TOTP、Passkey、Step-up 2FA
+- 会话绑定和审计保留设置
+
+### 3.2 `DefaultUserSettingsPanel`
+
+职责范围：
+
+- 默认余额、并发、RPM
+- 默认订阅和平台限额
+- 注册来源默认权益
+- Affiliate 和用户通知默认配置
+
+### 3.3 `SiteSettingsPanel`
+
+职责范围：
+
+- 站点名称、Logo 和品牌信息
+- API、文档和联系地址
+- 首页内容和自定义 HTML
+- 紧凑首页、分页和基础展示配置
+
+## 四、后续阶段：Gateway 面板
+
+按独立职责拆分：
+
+1. `ClaudeCodeSettingsPanel`
+2. `CodexSettingsPanel`
+3. `UpstreamBillingProbeSettingsPanel`
+4. `OllamaCloudUsageSettingsPanel`
+5. `GatewaySchedulingSettingsPanel`
+6. `UsageRecordsSettingsPanel`
+
+## 五、性能优化阶段
+
+### 5.1 AccountsView 按需加载
+
+目标：将当前 743,846 字节的 Accounts 路由 chunk 降至 500 KiB 以下。
+
+优先拆分：
+
+- 非首屏弹窗
+- 平台专用创建和编辑表单
+- 测试、统计、重新认证、批量编辑等管理弹窗
+- 只在特定平台使用的配额组件
+
+验收：
+
+- 首屏功能和布局不变
+- 弹窗首次打开、关闭和再次打开行为正常
+- 异步加载失败有明确反馈
+- chunk 体积有构建前后对比
+
+### 5.2 Settings Tab 异步加载
+
+在业务面板拆分稳定后评估：
+
+- Tab 级动态导入
+- 使用 `KeepAlive` 保留未保存表单状态
+- 验证 Tab 切换、保存、错误恢复和首次加载时机
+- 禁止为了缩小 chunk 改变现有页面布局
+
+### 5.3 GroupsView 拆分
+
+拆分范围：
+
+- 分组列表
+- 创建和编辑表单
+- 模型定价
+- 模型映射
+- 组合组配置
+- 相关弹窗和辅助逻辑
+
+## 六、每项改造的强制验收门槛
+
+任何拆分或依赖调整都必须完成：
+
+1. 记录改造前后文件规模和构建 chunk。
+2. 对比 DOM 顺序、元素数量、class、关键属性和显示条件。
+3. 补充组件级回归测试。
+4. 补充父级事件、保存 payload 或路由契约测试。
+5. 执行 `pnpm install --frozen-lockfile`。
+6. 执行完整 Vitest。
+7. 执行 TypeScript typecheck。
+8. 执行完整 ESLint。
+9. 执行生产构建。
+10. 对主要页面进行浏览器冒烟检查。
+11. 保持现有蓝白 SaaS 风格和响应式布局不变。
+
+## 七、最终审计收尾
+
+全部重构完成后：
+
+- 恢复或重新生成 `CODE_AUDIT_REPORT_2026-08-25.md`。
+- 更新 A-13 大型前端组件风险状态。
+- 记录 Settings、Accounts、Groups 的拆分前后数据。
+- 记录最终依赖审计、测试、构建和浏览器冒烟结果。
+- 确认审计例外为空或每条例外均有有效期限和可验证缓解措施。
+
+## 八、建议执行顺序
+
+1. `RegistrationSecuritySettingsPanel`
+2. `DefaultUserSettingsPanel`
+3. `SiteSettingsPanel`
+4. 六个 Gateway 面板
+5. AccountsView 按需加载
+6. GroupsView 拆分
+7. Settings Tab 异步加载
+8. 最终 A-13 审计报告
