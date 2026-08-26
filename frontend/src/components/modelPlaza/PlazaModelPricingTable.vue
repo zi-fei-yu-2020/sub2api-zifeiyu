@@ -232,6 +232,8 @@ const props = defineProps<{
   /** 生图独立倍率:true 时图片计费模型的实付倍率取 imageRateMultiplier,不取分组/专属倍率。 */
   imageRateIndependent?: boolean
   imageRateMultiplier?: number | null
+  peakWindow?: string
+  peakRateMultiplier?: number | null
 }>()
 
 const { t } = useI18n()

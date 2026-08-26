@@ -42,6 +42,13 @@
         <Icon name="clock" size="xs" class="h-3 w-3" />
         {{ peakNote }}
       </p>
+      <p
+        v-if="longContextNote"
+        class="mt-1.5 flex items-center gap-1 text-xs text-gray-500 dark:text-dark-400"
+      >
+        <Icon name="infoCircle" size="xs" class="h-3 w-3" />
+        {{ longContextNote }}
+      </p>
     </header>
 
     <!-- 模型价格表:整行(含 hover 底色/分区底色)顶到卡片边缘,左右留白由表格首列/末列的 padding 提供 -->
@@ -54,6 +61,8 @@
         :user-rate-multiplier="group.user_rate_multiplier ?? null"
         :image-rate-independent="group.image_rate_independent"
         :image-rate-multiplier="group.image_rate_multiplier"
+        :peak-window="peakWindow"
+        :peak-rate-multiplier="group.peak_rate_multiplier"
       />
       <p v-else class="px-5 py-4 text-center text-sm text-gray-400 dark:text-dark-500">
         {{ t('modelPlaza.detail.noModels') }}
@@ -81,15 +90,27 @@ const props = defineProps<{
 const { t } = useI18n()
 const appStore = useAppStore()
 
-const peakNote = computed(() => {
+const peakWindow = computed(() => {
   if (!hasPeakRate(props.group)) return ''
-  const window = formatPeakRateWindow(
+  return formatPeakRateWindow(
     props.group,
     serverTimezoneLabel(appStore.cachedPublicSettings?.server_utc_offset)
   )
+})
+
+const peakNote = computed(() => {
+  if (!peakWindow.value) return ''
   return t('modelPlaza.detail.peakNote', {
-    window,
+    window: peakWindow.value,
     multiplier: props.group.peak_rate_multiplier
   })
+})
+
+const longContextNote = computed(() => {
+  if (props.group.long_context_pricing_enabled !== false) return ''
+  const hasOfficialLadder = props.group.models.some(
+    (model) => (model.official_pricing?.intervals?.length ?? 0) > 1
+  )
+  return hasOfficialLadder ? t('modelPlaza.detail.longContextDisabledNote') : ''
 })
 </script>
