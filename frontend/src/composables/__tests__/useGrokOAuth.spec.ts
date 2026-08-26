@@ -6,8 +6,11 @@ vi.mock('@/stores/app', () => ({
   })
 }))
 
-vi.mock('vue-i18n', () => ({
-  useI18n: () => ({
+vi.mock('vue-i18n', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('vue-i18n')>()
+  return {
+    ...actual,
+    useI18n: () => ({
     t: (key: string) => {
       const messages: Record<string, string> = {
         'admin.accounts.oauth.grok.failedToExchangeCode': 'Grok 授权码兑换失败',
@@ -17,7 +20,8 @@ vi.mock('vue-i18n', () => ({
       return messages[key] ?? key
     }
   })
-}))
+  }
+})
 
 vi.mock('@/api/admin', () => ({
   adminAPI: {

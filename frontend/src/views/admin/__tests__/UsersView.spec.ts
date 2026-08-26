@@ -77,10 +77,12 @@ const createAdminUser = (overrides: Partial<AdminUser> = {}): AdminUser => ({
 })
 
 const DataTableStub = {
-  props: ['columns', 'data', 'selectedKeys'],
+  props: ['columns', 'data', 'selectedKeys', 'loading'],
   emits: ['sort', 'update:selectedKeys'],
   template: `
     <div>
+      <div data-test="table-loading">{{ loading ? 'loading' : 'idle' }}</div>
+      <slot v-if="!loading && data.length === 0" name="empty" />
       <div data-test="columns">{{ columns.map(col => col.key).join(',') }}</div>
       <div data-test="row-order">{{ data.map(row => row.email).join(',') }}</div>
       <div data-test="selected-keys">{{ (selectedKeys || []).join(',') }}</div>
@@ -106,6 +108,18 @@ const DataTableStub = {
 const PaginationStub = {
   emits: ['update:page'],
   template: '<button data-test="next-page" @click="$emit(\'update:page\', 2)">next</button>'
+}
+
+const EmptyStateStub = {
+  props: ['title', 'description', 'actionText'],
+  emits: ['action'],
+  template: `
+    <div data-test="empty-state">
+      <span data-test="empty-title">{{ title }}</span>
+      <span data-test="empty-description">{{ description }}</span>
+      <button data-test="empty-action" @click="$emit('action')">{{ actionText }}</button>
+    </div>
+  `
 }
 
 const BulkEditUserModalStub = {
@@ -369,4 +383,99 @@ describe('admin UsersView', () => {
     expect(wrapper.find('[data-test="bulk-edit-limits"]').exists()).toBe(false)
     expect(wrapper.get('[data-test="selected-keys"]').text()).toBe('')
   })
+
+  it('starts the primary user request immediately while attribute metadata is still pending', async () => {
+    let resolveDefinitions!: (value: UserAttributeDefinition[]) => void
+    let resolveUsers!: (value: any) => void
+    listEnabledDefinitions.mockReturnValueOnce(
+      new Promise<UserAttributeDefinition[]>((resolve) => { resolveDefinitions = resolve })
+    )
+    listUsers.mockReturnValueOnce(new Promise((resolve) => { resolveUsers = resolve }))
+
+    const wrapper = mount(UsersView, {
+      global: {
+        stubs: {
+          AppLayout: { template: '<div><slot /></div>' },
+          TablePageLayout: { template: '<div><slot name="filters" /><slot name="table" /><slot name="pagination" /></div>' },
+          DataTable: DataTableStub,
+          Pagination: true,
+          ConfirmDialog: true,
+          EmptyState: EmptyStateStub,
+          GroupBadge: true,
+          Select: true,
+          UserAttributesConfigModal: true,
+          UserConcurrencyCell: true,
+          UserCreateModal: true,
+          UserEditModal: true,
+          BulkEditUserModal: BulkEditUserModalStub,
+          UserPlatformQuotaModal: true,
+          UserApiKeysModal: true,
+          UserAllowedGroupsModal: true,
+          UserBalanceModal: true,
+          UserBalanceHistoryModal: true,
+          GroupReplaceModal: true,
+          Icon: true,
+          Teleport: true
+        }
+      }
+    })
+
+    await flushPromises()
+    expect(listUsers).toHaveBeenCalledTimes(1)
+    expect(wrapper.get('[data-test="table-loading"]').text()).toBe('loading')
+    expect(wrapper.find('[data-test="empty-state"]').exists()).toBe(false)
+
+    resolveUsers({ items: [createAdminUser()], total: 1, page: 1, page_size: 20, pages: 1 })
+    resolveDefinitions([])
+    await flushPromises()
+
+    expect(wrapper.get('[data-test="table-loading"]').text()).toBe('idle')
+    expect(wrapper.get('[data-test="row-order"]').text()).toBe('scoped@example.com')
+  })
+
+  it('shows a retryable load error instead of pretending the database has no users', async () => {
+    listUsers.mockRejectedValueOnce(new Error('temporary network failure'))
+
+    const wrapper = mount(UsersView, {
+      global: {
+        stubs: {
+          AppLayout: { template: '<div><slot /></div>' },
+          TablePageLayout: { template: '<div><slot name="filters" /><slot name="table" /><slot name="pagination" /></div>' },
+          DataTable: DataTableStub,
+          Pagination: true,
+          ConfirmDialog: true,
+          EmptyState: EmptyStateStub,
+          GroupBadge: true,
+          Select: true,
+          UserAttributesConfigModal: true,
+          UserConcurrencyCell: true,
+          UserCreateModal: true,
+          UserEditModal: true,
+          BulkEditUserModal: BulkEditUserModalStub,
+          UserPlatformQuotaModal: true,
+          UserApiKeysModal: true,
+          UserAllowedGroupsModal: true,
+          UserBalanceModal: true,
+          UserBalanceHistoryModal: true,
+          GroupReplaceModal: true,
+          Icon: true,
+          Teleport: true
+        }
+      }
+    })
+
+    await flushPromises()
+    expect(wrapper.get('[data-test="empty-title"]').text()).toBe('admin.users.failedToLoad')
+    expect(wrapper.get('[data-test="empty-description"]').text()).toBe('temporary network failure')
+    expect(wrapper.get('[data-test="empty-action"]').text()).toBe('admin.users.retryLoad')
+
+    listUsers.mockResolvedValueOnce({
+      items: [createAdminUser()], total: 1, page: 1, page_size: 20, pages: 1
+    })
+    await wrapper.get('[data-test="empty-action"]').trigger('click')
+    await flushPromises()
+
+    expect(wrapper.get('[data-test="row-order"]').text()).toBe('scoped@example.com')
+  })
+
 })

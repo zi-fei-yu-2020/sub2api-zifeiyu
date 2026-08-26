@@ -551,6 +551,7 @@ export default {
       userEnabled: '用户已启用',
       userDisabled: '用户已禁用',
       failedToLoad: '加载用户列表失败',
+      retryLoad: '重新加载',
       failedToCreate: '创建用户失败',
       failedToUpdate: '更新用户失败',
       failedToDelete: '删除用户失败',

@@ -5,15 +5,19 @@ import { mount } from '@vue/test-utils'
 import PlanEditDialog from '../PlanEditDialog.vue'
 import type { AdminGroup } from '@/types'
 
-vi.mock('vue-i18n', () => ({
-  useI18n: () => ({
-    t: (key: string, params?: Record<string, unknown>) => {
-      if (key === 'payment.admin.subscriptionCnyPayPreview') return `preview ${params?.amount}`
-      if (key === 'payment.admin.subscriptionCnyPayPreviewWithFee') return `fee ${params?.feeRate} ${params?.total}`
-      return key
-    },
-  }),
-}))
+vi.mock('vue-i18n', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('vue-i18n')>()
+  return {
+    ...actual,
+    useI18n: () => ({
+      t: (key: string, params?: Record<string, unknown>) => {
+        if (key === 'payment.admin.subscriptionCnyPayPreview') return `preview ${params?.amount}`
+        if (key === 'payment.admin.subscriptionCnyPayPreviewWithFee') return `fee ${params?.feeRate} ${params?.total}`
+        return key
+      },
+    }),
+  }
+})
 
 vi.mock('@/stores/app', () => ({
   useAppStore: () => ({

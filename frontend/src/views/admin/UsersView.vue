@@ -640,6 +640,15 @@
 
           <template #empty>
             <EmptyState
+              v-if="loadError"
+              :title="t('admin.users.failedToLoad')"
+              :description="loadError"
+              :action-text="t('admin.users.retryLoad')"
+              :action-icon="false"
+              @action="loadUsers"
+            />
+            <EmptyState
+              v-else
               :title="t('admin.users.noUsersYet')"
               :description="t('admin.users.createFirstUser')"
               :action-text="t('admin.users.createUser')"
@@ -1020,7 +1029,8 @@ const columns = computed<Column[]>(() =>
 )
 
 const users = ref<AdminUser[]>([])
-const loading = ref(false)
+const loading = ref(true)
+const loadError = ref('')
 const searchQuery = ref('')
 const USER_SORT_STORAGE_KEY = 'admin-users-table-sort'
 const loadInitialSortState = (): { sort_by: string; sort_order: 'asc' | 'desc' } => {
@@ -1565,6 +1575,7 @@ const loadUsers = async () => {
   abortController = currentAbortController
   const { signal } = currentAbortController
   loading.value = true
+  loadError.value = ''
   try {
     // Build attribute filters from active filters
     const attrFilters: Record<number, string> = {}
@@ -1595,6 +1606,7 @@ const loadUsers = async () => {
       return
     }
     users.value = response.items
+    loadError.value = ''
     pagination.total = response.total
     pagination.pages = response.pages
     usageStats.value = {}
@@ -1616,6 +1628,7 @@ const loadUsers = async () => {
       return
     }
     const message = error.response?.data?.detail || error.message || t('admin.users.failedToLoad')
+    loadError.value = message
     appStore.showError(message)
     console.error('Error loading users:', error)
   } finally {
@@ -1831,16 +1844,23 @@ const handleScroll = () => {
   closeActionMenu()
 }
 
-onMounted(async () => {
-  await loadAttributeDefinitions()
+onMounted(() => {
   loadSavedFilters()
   loadSavedColumns()
-  loadUsers()
+
+  // The primary list must start immediately. Attribute definitions are optional
+  // metadata and must never block the first user request or create a false empty state.
+  void loadUsers()
+  void loadAttributeDefinitions().then(() => {
+    loadSavedColumns()
+    refreshCurrentPageSecondaryData()
+  })
+
   if (hasVisibleGroupsColumn.value || visibleFilters.has('group')) {
-    loadAllGroups()
+    void loadAllGroups()
   }
   if (visibleFilters.has('apiKeyGroup')) {
-    loadAllGroupsForApiKeyFilter()
+    void loadAllGroupsForApiKeyFilter()
   }
   document.addEventListener('click', handleClickOutside)
   window.addEventListener('scroll', handleScroll, true)

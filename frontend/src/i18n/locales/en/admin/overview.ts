@@ -573,6 +573,7 @@ export default {
       userEnabled: 'User enabled successfully',
       userDisabled: 'User disabled successfully',
       failedToLoad: 'Failed to load users',
+      retryLoad: 'Reload users',
       failedToCreate: 'Failed to create user',
       failedToUpdate: 'Failed to update user',
       failedToDelete: 'Failed to delete user',
