@@ -24,6 +24,10 @@
       <!-- Right: Announcements + Docs + Language + Subscriptions + Balance + User Dropdown -->
       <div class="flex min-w-0 items-center gap-1 sm:gap-3">
         <!-- Announcement Bell -->
+        <router-link to="/home" class="flex h-9 w-9 items-center justify-center rounded-lg text-gray-600 transition-all hover:bg-gray-100 hover:text-primary-600 dark:text-gray-400 dark:hover:bg-dark-800 dark:hover:text-primary-400" :title="t('nav.home') === 'nav.home' ? '返回首页' : t('nav.home')">
+          <Icon name="home" size="md" />
+        </router-link>
+
         <AnnouncementBell v-if="user" />
 
         <!-- Docs Link -->

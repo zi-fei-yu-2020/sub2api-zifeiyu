@@ -34,7 +34,7 @@
             {{ t('auth.emailLabel') }}
           </label>
           <div class="relative">
-            <div v-if="!formData.email" class="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3.5 transition-opacity duration-150">
+            <div  class="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3.5 transition-opacity duration-150">
               <Icon name="mail" size="md" class="text-slate-400 dark:text-dark-500" />
             </div>
             <input
@@ -58,7 +58,7 @@
             {{ t('auth.passwordLabel') }}
           </label>
           <div class="relative">
-            <div v-if="!formData.password" class="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3.5 transition-opacity duration-150">
+            <div  class="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3.5 transition-opacity duration-150">
               <Icon name="lock" size="md" class="text-slate-400 dark:text-dark-500" />
             </div>
             <input
@@ -93,7 +93,7 @@
             {{ t('auth.invitationCodeLabel') }}
           </label>
           <div class="relative">
-            <div v-if="!formData.invitation_code" class="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3.5 transition-opacity duration-150">
+            <div  class="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3.5 transition-opacity duration-150">
               <Icon name="key" size="md" :class="invitationValidation.valid ? `text-primary-600` : `text-slate-400 dark:text-dark-500`" />
             </div>
             <input
@@ -123,7 +123,7 @@
           </label>
           <div class="relative">
             <div
-              v-if="!formData.aff_code"
+              
               class="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3.5 transition-opacity duration-150"
             >
               <Icon name="link" size="md" class="text-slate-400 dark:text-dark-500" />
@@ -135,7 +135,7 @@
               autocomplete="off"
               :disabled="registrationActionDisabled"
               class="input transition-all duration-150"
-              :class="formData.aff_code ? 'px-3.5' : 'pl-11'"
+              :class="'pl-11'"
               :placeholder="t('auth.affiliateCodePlaceholder')"
             />
           </div>

@@ -105,6 +105,8 @@ func RegisterAuthRoutes(
 			h.Auth.LinuxDoOAuthStart(c)
 		})
 		auth.GET("/oauth/linuxdo/callback", h.Auth.LinuxDoOAuthCallback)
+		// 兼容 New-API 回调路由
+		v1.GET("/oauth/linuxdo", h.Auth.LinuxDoOAuthCallback)
 		auth.GET("/oauth/wechat/start", h.Auth.WeChatOAuthStart)
 		auth.POST("/oauth/wechat/start", rateLimiter.LimitWithOptions("oauth-wechat-start", 20, time.Minute, middleware.RateLimitOptions{
 			FailureMode: middleware.RateLimitFailClose,
