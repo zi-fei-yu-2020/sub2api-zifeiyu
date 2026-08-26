@@ -1,15 +1,15 @@
 ﻿# 前端重构与审计计划
 
 更新日期：2026-08-26  
-当前基线提交：`18cc11782`
+当前基线提交：`2365b09b8`
 
 ## 一、当前可验证基线
 
-- `SettingsView.vue`：9,157 行，已从最初的 12,449 行下降约 26%。
+- `SettingsView.vue`：9,210 个物理行（8,743 个非空行）；本次从 9,619 行减少 409 行，项目最初约 12,449 行。
 - `AccountsView.vue`：104,039 字节；当前生产 chunk 为 743,846 字节（约 726.4 KiB）。
 - `GroupsView.vue`：267,372 字节。
-- 前端测试文件：261 个。
-- 全量 Vitest：1,791 / 1,791 通过。
+- 前端测试文件：262 个。
+- 全量 Vitest：1,795 / 1,795 通过。
 - TypeScript typecheck：通过。
 - ESLint：通过。
 - 生产构建：通过。
@@ -39,6 +39,7 @@
 - `WeChatConnectSettingsPanel`
 - `DingTalkConnectSettingsPanel`
 - `OIDCSettingsPanel`
+- `RegistrationSecuritySettingsPanel`
 
 每个已拆面板均完成：
 
@@ -47,6 +48,8 @@
 - 独立组件测试
 - `SettingsView` 父级保存 payload 契约测试
 - 全量 Vitest、TypeScript、ESLint 和生产构建
+- Registration 面板模板结构保持 83 个元素、10 个 Toggle、13 个 v-model 完全等价
+- Settings chunk 为 411,509 字节，较拆分前增加 994 字节（约 0.24%）
 
 ### 2.2 构建与依赖安全基线
 
@@ -68,23 +71,13 @@
 - Accounts 优先级列默认可见和排序行为。
 - 代理批量导入的方括号 IPv6 支持。
 - 用户并发 `0 = 不限制`、负数拒绝的统一契约。
-- 全量测试从 12 个失败恢复到 1,791 / 1,791 通过。
+- 全量测试从 12 个失败恢复，并在新增面板测试后达到 1,795 / 1,795 通过。
 
 ## 三、下一阶段：SettingsView 业务面板
 
-按以下顺序拆分，每个面板使用独立提交和独立验收记录。
+`RegistrationSecuritySettingsPanel` 已完成。后续按以下顺序拆分，每个面板使用独立提交和独立验收记录。
 
-### 3.1 `RegistrationSecuritySettingsPanel`
-
-职责范围：
-
-- 注册开关、邮箱验证
-- 邮箱后缀白名单、域名注册额度
-- 优惠码、邀请码、密码重置
-- TOTP、Passkey、Step-up 2FA
-- 会话绑定和审计保留设置
-
-### 3.2 `DefaultUserSettingsPanel`
+### 3.1 `DefaultUserSettingsPanel`
 
 职责范围：
 
@@ -93,7 +86,7 @@
 - 注册来源默认权益
 - Affiliate 和用户通知默认配置
 
-### 3.3 `SiteSettingsPanel`
+### 3.2 `SiteSettingsPanel`
 
 职责范围：
 
@@ -101,7 +94,6 @@
 - API、文档和联系地址
 - 首页内容和自定义 HTML
 - 紧凑首页、分页和基础展示配置
-
 ## 四、后续阶段：Gateway 面板
 
 按独立职责拆分：
@@ -181,11 +173,10 @@
 
 ## 八、建议执行顺序
 
-1. `RegistrationSecuritySettingsPanel`
-2. `DefaultUserSettingsPanel`
-3. `SiteSettingsPanel`
-4. 六个 Gateway 面板
-5. AccountsView 按需加载
-6. GroupsView 拆分
-7. Settings Tab 异步加载
-8. 最终 A-13 审计报告
+1. `DefaultUserSettingsPanel`
+2. `SiteSettingsPanel`
+3. 六个 Gateway 面板
+4. AccountsView 按需加载
+5. GroupsView 拆分
+6. Settings Tab 异步加载
+7. 最终 A-13 审计报告
