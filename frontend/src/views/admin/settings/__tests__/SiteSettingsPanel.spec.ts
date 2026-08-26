@@ -1,0 +1,10 @@
+import { mount } from '@vue/test-utils'
+import { describe, expect, it, vi } from 'vitest'
+import SiteSettingsPanel from '../SiteSettingsPanel.vue'
+vi.mock('vue-i18n', () => ({ useI18n: () => ({ t: (key: string) => key }) }))
+function form(){return {backend_mode_enabled:false,site_name:'Sub2API',site_subtitle:'AI',api_base_url:'',table_default_page_size:20,custom_endpoints:[{name:'OpenAI',endpoint:'/v1',description:''}],contact_info:'',doc_url:'',site_logo:'',home_content:'hello',compact_home_enabled:false,hide_ccs_import_button:false,custom_menu_items:[{id:'docs',name:'Docs',url:'/docs',icon_svg:'',visibility:'user',sort_order:0}]}}
+function mountPanel(){return mount(SiteSettingsPanel,{props:{form:form() as never,pageSizeOptionsInput:'10, 20, 50'},global:{stubs:{ImageUpload:true}}})}
+describe('SiteSettingsPanel',()=>{
+ it('preserves the site card and core controls',()=>{const w=mountPanel();expect(w.find('.card').exists()).toBe(true);expect(w.text()).toContain('admin.settings.site.title');expect(w.findAll('input').length).toBeGreaterThan(8);expect(w.findAll('[role="switch"]').length).toBeGreaterThanOrEqual(3)})
+ it('forwards page-size, endpoint and menu lifecycle events',async()=>{const w=mountPanel();const page=w.findAll('input').find(i=>i.element.value==='10, 20, 50')!;await page.setValue('20, 50');const addEndpoint=w.findAll('button').find(b=>b.text().includes('admin.settings.site.customEndpoints.add'))!;await addEndpoint.trigger('click');await w.findAll('button.text-red-400')[0].trigger('click');const addMenu=w.findAll('button').find(b=>b.text().includes('admin.settings.customMenu.add'))!;await addMenu.trigger('click');await w.get('[title="admin.settings.customMenu.remove"]').trigger('click');expect(w.emitted('update:pageSizeOptionsInput')).toEqual([['20, 50']]);expect(w.emitted('addEndpoint')).toHaveLength(1);expect(w.emitted('removeEndpoint')).toEqual([[0]]);expect(w.emitted('addMenuItem')).toHaveLength(1);expect(w.emitted('removeMenuItem')).toEqual([[0]])})
+})
