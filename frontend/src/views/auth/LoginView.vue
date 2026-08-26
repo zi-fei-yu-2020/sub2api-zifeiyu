@@ -18,7 +18,7 @@
             {{ t('auth.emailLabel') }}
           </label>
           <div class="relative">
-            <div  class="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3.5 transition-opacity duration-150">
+            <div class="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3.5 transition-opacity duration-150">
               <Icon name="mail" size="md" class="text-slate-400 dark:text-dark-500" />
             </div>
             <input
@@ -29,8 +29,8 @@
               autofocus
               autocomplete="email"
               :disabled="authActionDisabled"
-              class="input transition-all duration-150"
-              :class="[formData.email ? `px-3.5` : `pl-11`, errors.email ? `input-error` : ``]"
+              class="input pl-11 transition-all duration-150"
+              :class="errors.email ? 'input-error' : ''"
               :placeholder="t('auth.emailPlaceholder')"
             />
           </div>
@@ -42,7 +42,7 @@
             {{ t('auth.passwordLabel') }}
           </label>
           <div class="relative">
-            <div  class="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3.5 transition-opacity duration-150">
+            <div class="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3.5 transition-opacity duration-150">
               <Icon name="lock" size="md" class="text-slate-400 dark:text-dark-500" />
             </div>
             <input
@@ -52,8 +52,8 @@
               required
               autocomplete="current-password"
               :disabled="authActionDisabled"
-              class="input pr-11 transition-all duration-150"
-              :class="[formData.password ? `px-3.5` : `pl-11`, errors.password ? `input-error` : ``]"
+              class="input pl-11 pr-11 transition-all duration-150"
+              :class="errors.password ? 'input-error' : ''"
               :placeholder="t('auth.passwordPlaceholder')"
             />
             <button

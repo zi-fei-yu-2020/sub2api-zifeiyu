@@ -95,7 +95,7 @@ function mountLogin() {
   })
 }
 
-describe('Tencent captcha action gate', () => {
+describe('LoginView', () => {
   beforeEach(() => {
     loginMock.mockReset()
     loginWithPasskeyMock.mockReset()
@@ -127,6 +127,22 @@ describe('Tencent captcha action gate', () => {
       configurable: true,
       value: locationState
     })
+  })
+
+  it('keeps icon-safe padding after credentials are entered', async () => {
+    const wrapper = mountLogin()
+    await flushPromises()
+
+    const emailInput = wrapper.get('#email')
+    const passwordInput = wrapper.get('#password')
+    await emailInput.setValue('user@example.com')
+    await passwordInput.setValue('secret-123')
+
+    expect(emailInput.classes()).toContain('pl-11')
+    expect(emailInput.classes()).not.toContain('px-3.5')
+    expect(passwordInput.classes()).toContain('pl-11')
+    expect(passwordInput.classes()).toContain('pr-11')
+    expect(passwordInput.classes()).not.toContain('px-3.5')
   })
 
   it('clicking login opens Tencent captcha before calling login', async () => {

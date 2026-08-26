@@ -81,13 +81,32 @@ function mountRegister() {
   })
 }
 
-describe('RegisterView invitation layout', () => {
+describe('RegisterView', () => {
   beforeEach(() => {
     getPublicSettingsMock.mockReset()
     registerMock.mockReset()
     showErrorMock.mockReset()
     getPublicSettingsMock.mockResolvedValue(publicSettings)
     registerMock.mockResolvedValue({})
+  })
+
+  it('keeps icon-safe padding after registration fields are entered', async () => {
+    const wrapper = mountRegister()
+    await flushPromises()
+
+    const emailInput = wrapper.get('#email')
+    const passwordInput = wrapper.get('#password')
+    const affiliateInput = wrapper.get('#affiliate_code')
+    await emailInput.setValue('user@example.com')
+    await passwordInput.setValue('secret-123')
+    await affiliateInput.setValue('affiliate-code')
+
+    expect(emailInput.classes()).toContain('pl-11')
+    expect(emailInput.classes()).not.toContain('px-3.5')
+    expect(passwordInput.classes()).toContain('pl-11')
+    expect(passwordInput.classes()).toContain('pr-11')
+    expect(passwordInput.classes()).not.toContain('px-3.5')
+    expect(affiliateInput.classes()).toContain('pl-11')
   })
 
   it('keeps the optional affiliate invitation field before Turnstile', async () => {
