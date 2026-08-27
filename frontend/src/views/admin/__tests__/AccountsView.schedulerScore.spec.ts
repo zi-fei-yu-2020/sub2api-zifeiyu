@@ -194,11 +194,12 @@ describe('admin AccountsView scheduler score column', () => {
   })
 
   it('falls back to the base score for ungrouped accounts instead of showing a dash', async () => {
+    localStorage.setItem('account-hidden-columns', JSON.stringify([]))
     const wrapper = mountView()
     await flushPromises()
 
     expect(listAccounts.mock.calls[0]?.[2]).toEqual(expect.objectContaining({
-      include_scheduler_score: '0'
+      include_scheduler_score: '1'
     }))
 
     const ungroupedCell = wrapper.find('[data-test="scheduler-score-1"]')
@@ -218,16 +219,16 @@ describe('admin AccountsView scheduler score column', () => {
     expect(groupedCell.text()).toContain('2')
   })
 
-  it('keeps scheduler score hidden for old saved column settings until the admin opts in again', async () => {
+  it('preserves old saved settings that keep scheduler score visible', async () => {
     localStorage.setItem('account-hidden-columns', JSON.stringify(['today_stats']))
 
     mountView()
     await flushPromises()
 
     expect(listAccounts.mock.calls[0]?.[2]).toEqual(expect.objectContaining({
-      include_scheduler_score: '0'
+      include_scheduler_score: '1'
     }))
-    expect(JSON.parse(localStorage.getItem('account-hidden-columns') || '[]')).toContain('scheduler_score')
+    expect(JSON.parse(localStorage.getItem('account-hidden-columns') || '[]')).toEqual(['today_stats'])
   })
 
   it('requests scheduler scores when the migrated column settings explicitly show the column', async () => {

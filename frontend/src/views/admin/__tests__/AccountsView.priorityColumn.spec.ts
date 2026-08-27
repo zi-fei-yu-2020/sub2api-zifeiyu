@@ -106,11 +106,36 @@ describe('admin AccountsView priority column preferences', () => {
     })
   })
 
-  it('shows priority as a sortable column for fresh preferences', async () => {
+  it('shows only the compact default columns for fresh preferences', async () => {
     const wrapper = mountView()
     await flushPromises()
 
-    expect(wrapper.get('[data-column="priority"]').text()).toBe('sortable')
+    const visibleColumns = wrapper.findAll('[data-column]').map(node => node.attributes('data-column'))
+    expect(visibleColumns).toEqual([
+      'select',
+      'name',
+      'id',
+      'platform_type',
+      'capacity',
+      'status',
+      'schedulable',
+      'groups',
+      'usage',
+      'priority',
+      'last_used_at',
+      'actions'
+    ])
+    expect(JSON.parse(localStorage.getItem('account-hidden-columns') || '[]')).toEqual([
+      'today_stats',
+      'proxy',
+      'scheduler_score',
+      'rate_multiplier',
+      'upstream_billing_rate',
+      'created_at',
+      'expires_at',
+      'notes'
+    ])
+    expect(localStorage.getItem('account-hidden-columns-version')).toBe('compact-default-columns-v1')
 
     await wrapper.get('[data-test="sort-priority"]').trigger('click')
     await flushPromises()
@@ -137,16 +162,15 @@ describe('admin AccountsView priority column preferences', () => {
     ])
   })
 
-  it('keeps priority visible while migrating older saved preferences', async () => {
+  it('preserves older saved preferences without forcing the new defaults', async () => {
     localStorage.setItem('account-hidden-columns', JSON.stringify(['today_stats']))
 
     const wrapper = mountView()
     await flushPromises()
 
     expect(wrapper.get('[data-column="priority"]').text()).toBe('sortable')
-    expect(JSON.parse(localStorage.getItem('account-hidden-columns') || '[]')).toEqual(
-      expect.arrayContaining(['today_stats', 'scheduler_score'])
-    )
-    expect(JSON.parse(localStorage.getItem('account-hidden-columns') || '[]')).not.toContain('priority')
+    expect(wrapper.get('[data-column="scheduler_score"]').exists()).toBe(true)
+    expect(JSON.parse(localStorage.getItem('account-hidden-columns') || '[]')).toEqual(['today_stats'])
+    expect(localStorage.getItem('account-hidden-columns-version')).toBe('compact-default-columns-v1')
   })
 })

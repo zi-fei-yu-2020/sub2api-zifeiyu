@@ -202,7 +202,8 @@ describe('admin AccountsView bulk edit scope', () => {
     expect(wrapper.get('[data-test="bulk-edit-modal"]').attributes('data-target-mode')).toBe('filtered')
   })
 
-  it('renders the created_at column by default', async () => {
+  it('renders the created_at column when saved preferences opt in', async () => {
+    localStorage.setItem('account-hidden-columns', JSON.stringify([]))
     listAccounts.mockResolvedValue({
       items: [
         {
