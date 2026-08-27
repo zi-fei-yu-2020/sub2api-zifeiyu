@@ -4,10 +4,10 @@
 //
 // Unit tests for TLS fingerprint dialer.
 // Integration tests that require external network are in dialer_integration_test.go
-// and require the 'integration' build tag.
+// and require the 'e2e' build tag.
 //
 // Run unit tests: go test -v ./internal/pkg/tlsfingerprint/...
-// Run integration tests: go test -v -tags=integration ./internal/pkg/tlsfingerprint/...
+// Run external E2E tests: go test -v -tags=e2e ./internal/pkg/tlsfingerprint/...
 package tlsfingerprint
 
 import (

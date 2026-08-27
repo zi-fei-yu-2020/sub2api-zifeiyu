@@ -1,11 +1,11 @@
-//go:build integration
+//go:build e2e
 
 // Package tlsfingerprint provides TLS fingerprint simulation for HTTP clients.
 //
 // Integration tests for verifying TLS fingerprint correctness.
 // These tests make actual network requests to external services and should be run manually.
 //
-// Run with: go test -v -tags=integration ./internal/pkg/tlsfingerprint/...
+// Run with: go test -v -tags=e2e ./internal/pkg/tlsfingerprint/...
 package tlsfingerprint
 
 import (
@@ -108,7 +108,7 @@ func TestJA3Fingerprint(t *testing.T) {
 }
 
 // TestAllProfiles tests multiple TLS fingerprint profiles against tls.peet.ws.
-// Run with: go test -v -tags=integration -run TestAllProfiles ./internal/pkg/tlsfingerprint/...
+// Run with: go test -v -tags=e2e -run TestAllProfiles ./internal/pkg/tlsfingerprint/...
 func TestAllProfiles(t *testing.T) {
 	if testing.Short() {
 		t.Skip("skipping integration test in short mode")
