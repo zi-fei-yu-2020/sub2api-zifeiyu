@@ -38,15 +38,17 @@ func RegisterRoutes(r *gin.Engine) {
 
 // SetupStatus represents the current setup state
 type SetupStatus struct {
-	NeedsSetup bool   `json:"needs_setup"`
-	Step       string `json:"step"`
+	NeedsSetup    bool   `json:"needs_setup"`
+	Step          string `json:"step"`
+	RequiresToken bool   `json:"requires_token"`
 }
 
 // getStatus returns the current setup status
 func getStatus(c *gin.Context) {
 	response.Success(c, SetupStatus{
-		NeedsSetup: NeedsSetup(),
-		Step:       "welcome",
+		NeedsSetup:    NeedsSetup(),
+		Step:          "welcome",
+		RequiresToken: RemoteWebSetupEnabled(),
 	})
 }
 
@@ -55,6 +57,17 @@ func setupGuard() gin.HandlerFunc {
 	return func(c *gin.Context) {
 		if !NeedsSetup() {
 			response.Error(c, http.StatusForbidden, "Setup is not allowed: system is already installed")
+			c.Abort()
+			return
+		}
+		if RemoteWebSetupEnabled() {
+			if !validWebSetupToken(c.GetHeader(SetupTokenHeader)) {
+				response.Error(c, http.StatusUnauthorized, "A valid setup token is required")
+				c.Abort()
+				return
+			}
+		} else if !isLoopbackSetupRequest(c.Request) {
+			response.Error(c, http.StatusForbidden, "Remote setup is disabled")
 			c.Abort()
 			return
 		}

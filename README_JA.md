@@ -254,9 +254,14 @@ sudo systemctl start sub2api
 # 2. 起動時の自動起動を有効化
 sudo systemctl enable sub2api
 
-# 3. ブラウザでセットアップウィザードを開く
-# http://YOUR_SERVER_IP:8080
+# 3. ワークステーションから SSH トンネルを作成
+ssh -L 8080:127.0.0.1:8080 user@YOUR_SERVER_IP
+
+# 4. ローカル側のセットアップウィザードを開く
+# http://127.0.0.1:8080/setup
 ```
+
+初回セットアップはデフォルトでループバックにのみバインドされます。リモートセットアップが必要な場合は明示的に有効化し、`X-Setup-Token` で保護してください。詳細は [First-run Web Setup Security](deploy/FIRST_RUN_SETUP_SECURITY.md) を参照してください。
 
 セットアップウィザードでは以下の設定を行います:
 - データベース設定

@@ -255,9 +255,14 @@ sudo systemctl start sub2api
 # 2. 设置开机自启
 sudo systemctl enable sub2api
 
-# 3. 在浏览器中打开设置向导
-# http://你的服务器IP:8080
+# 3. 从本机建立 SSH 隧道
+ssh -L 8080:127.0.0.1:8080 user@你的服务器IP
+
+# 4. 在本机浏览器中打开设置向导
+# http://127.0.0.1:8080/setup
 ```
+
+首次安装向导默认只监听回环地址。如确实需要远程安装，必须显式开启并使用 `X-Setup-Token` 保护，详见[首次安装 Web 安全说明](deploy/FIRST_RUN_SETUP_SECURITY.md)。
 
 设置向导将引导你完成：
 - 数据库配置

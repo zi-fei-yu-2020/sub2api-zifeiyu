@@ -253,9 +253,14 @@ sudo systemctl start sub2api
 # 2. Enable auto-start on boot
 sudo systemctl enable sub2api
 
-# 3. Open Setup Wizard in browser
-# http://YOUR_SERVER_IP:8080
+# 3. Create an SSH tunnel from your workstation
+ssh -L 8080:127.0.0.1:8080 user@YOUR_SERVER_IP
+
+# 4. Open the local end of the tunnel
+# http://127.0.0.1:8080/setup
 ```
+
+The first-run wizard is loopback-only by default. If remote setup is unavoidable, it must be explicitly enabled and protected with `X-Setup-Token`; see [First-run Web Setup Security](deploy/FIRST_RUN_SETUP_SECURITY.md).
 
 The Setup Wizard will guide you through:
 - Database configuration

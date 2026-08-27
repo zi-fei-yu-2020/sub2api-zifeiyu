@@ -10,9 +10,22 @@ const SETUP_TOKEN_HEADER = 'X-Setup-Token'
 function captureSetupTokenFromURL(): void {
   if (typeof window === 'undefined') return
   const url = new URL(window.location.href)
-  const token = url.searchParams.get('setup_token')?.trim()
+
+  // Prefer a URL fragment because fragments are not sent to the server or
+  // reverse-proxy access logs. Query-string support remains for compatibility.
+  const rawHash = url.hash.replace(/^#\??/, '')
+  const hashParams = new URLSearchParams(rawHash)
+  const hashToken = hashParams.get('setup_token')?.trim()
+  const queryToken = url.searchParams.get('setup_token')?.trim()
+  const token = hashToken || queryToken
   if (!token) return
+
   sessionStorage.setItem(SETUP_TOKEN_STORAGE_KEY, token)
+  if (hashToken) {
+    hashParams.delete('setup_token')
+    const remainingHash = hashParams.toString()
+    url.hash = remainingHash ? `#${remainingHash}` : ''
+  }
   url.searchParams.delete('setup_token')
   window.history.replaceState(window.history.state, '', `${url.pathname}${url.search}${url.hash}`)
 }
@@ -110,5 +123,6 @@ export async function testRedis(config: RedisConfig): Promise<void> {
  */
 export async function install(config: InstallRequest): Promise<InstallResponse> {
   const response = await setupClient.post('/setup/install', config)
+  sessionStorage.removeItem(SETUP_TOKEN_STORAGE_KEY)
   return response.data.data
 }

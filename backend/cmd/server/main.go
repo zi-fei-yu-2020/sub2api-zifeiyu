@@ -108,10 +108,17 @@ func runSetupServer() {
 		r.Use(web.ServeEmbeddedFrontend())
 	}
 
-	// Get server address from config.yaml or environment variables (SERVER_HOST, SERVER_PORT)
-	// This allows users to run setup on a different address if needed
-	addr := config.GetServerAddress()
+	// Keep first-run setup on loopback unless the operator explicitly enables
+	// remote setup and configures a separate setup token.
+	addr, err := setup.WebSetupServerAddress(config.GetServerAddress())
+	if err != nil {
+		log.Fatalf("Invalid web setup configuration: %v", err)
+	}
 	log.Printf("Setup wizard available at http://%s", addr)
+	if setup.RemoteWebSetupEnabled() {
+		// Never print the setup token. Operators already have it in their secret store.
+		log.Printf("Remote setup is enabled; mutation requests require the %s header", setup.SetupTokenHeader)
+	}
 	log.Println("Complete the setup wizard to configure Sub2API")
 
 	protocols := new(http.Protocols)

@@ -18,7 +18,19 @@ describe('setup API token transport', () => {
     window.history.replaceState(null, '', '/setup')
   })
 
-  it('captures setup_token and removes it from the address bar', async () => {
+  it('captures a setup token from the URL fragment and removes it from the address bar', async () => {
+    window.history.replaceState(null, '', '/setup?lang=zh#setup_token=remote-secret')
+    await import('@/api/setup')
+    expect(sessionStorage.getItem('sub2api_setup_token')).toBe('remote-secret')
+    expect(window.location.search).toBe('?lang=zh')
+    expect(window.location.hash).toBe('')
+    const interceptor = requestUse.mock.calls[0][0] as (config: { headers: Record<string, string> }) => unknown
+    const config = { headers: {} as Record<string, string> }
+    interceptor(config)
+    expect(config.headers['X-Setup-Token']).toBe('remote-secret')
+  })
+
+  it('supports a legacy query token while removing it from the address bar', async () => {
     window.history.replaceState(null, '', '/setup?setup_token=remote-secret&lang=zh')
     await import('@/api/setup')
     expect(sessionStorage.getItem('sub2api_setup_token')).toBe('remote-secret')
@@ -35,5 +47,17 @@ describe('setup API token transport', () => {
     const config = { headers: {} as Record<string, string> }
     interceptor(config)
     expect(config.headers['X-Setup-Token']).toBeUndefined()
+  })
+
+  it('clears the setup token after a successful installation', async () => {
+    const setupApi = await import('@/api/setup')
+    sessionStorage.setItem('sub2api_setup_token', 'remote-secret')
+    setupClient.post.mockResolvedValueOnce({
+      data: { data: { message: 'installed', restart: true } },
+    })
+
+    await setupApi.install({} as Parameters<typeof setupApi.install>[0])
+
+    expect(sessionStorage.getItem('sub2api_setup_token')).toBeNull()
   })
 })
