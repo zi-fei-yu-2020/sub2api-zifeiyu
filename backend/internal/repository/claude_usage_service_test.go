@@ -48,6 +48,7 @@ func (s *ClaudeUsageServiceSuite) TestFetchUsage_Success() {
 	s.fetcher = &claudeUsageService{
 		usageURL:          s.srv.URL,
 		allowPrivateHosts: true,
+		allowInsecureHTTP: true,
 	}
 
 	resp, err := s.fetcher.FetchUsage(context.Background(), "at", "")
@@ -70,6 +71,7 @@ func (s *ClaudeUsageServiceSuite) TestFetchUsage_NonOK() {
 	s.fetcher = &claudeUsageService{
 		usageURL:          s.srv.URL,
 		allowPrivateHosts: true,
+		allowInsecureHTTP: true,
 	}
 
 	_, err := s.fetcher.FetchUsage(context.Background(), "at", "")
@@ -87,6 +89,7 @@ func (s *ClaudeUsageServiceSuite) TestFetchUsage_BadJSON() {
 	s.fetcher = &claudeUsageService{
 		usageURL:          s.srv.URL,
 		allowPrivateHosts: true,
+		allowInsecureHTTP: true,
 	}
 
 	_, err := s.fetcher.FetchUsage(context.Background(), "at", "")
@@ -103,6 +106,7 @@ func (s *ClaudeUsageServiceSuite) TestFetchUsage_ContextCancel() {
 	s.fetcher = &claudeUsageService{
 		usageURL:          s.srv.URL,
 		allowPrivateHosts: true,
+		allowInsecureHTTP: true,
 	}
 
 	ctx, cancel := context.WithCancel(context.Background())

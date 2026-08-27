@@ -21,6 +21,7 @@ const defaultUsageUserAgent = "claude-code/2.1.7"
 type claudeUsageService struct {
 	usageURL          string
 	allowPrivateHosts bool
+	allowInsecureHTTP bool
 	httpUpstream      service.HTTPUpstream
 }
 
@@ -81,6 +82,7 @@ func (s *claudeUsageService) FetchUsageWithOptions(ctx context.Context, opts *se
 			Timeout:            30 * time.Second,
 			ValidateResolvedIP: true,
 			AllowPrivateHosts:  s.allowPrivateHosts,
+			AllowInsecureHTTP:  s.allowInsecureHTTP,
 		})
 		if err != nil {
 			return nil, fmt.Errorf("create http client failed: %w", err)
