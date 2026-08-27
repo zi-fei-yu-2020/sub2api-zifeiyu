@@ -1,4 +1,4 @@
-.PHONY: build build-backend build-frontend test test-backend test-frontend test-frontend-critical verify-frontend-lockfile
+.PHONY: build build-backend build-frontend test test-backend test-frontend test-frontend-critical verify-frontend-lockfile check-migrations
 
 FRONTEND_CRITICAL_VITEST := \
 	src/api/__tests__/client.spec.ts \
@@ -31,6 +31,9 @@ test: test-backend test-frontend
 
 test-backend:
 	@$(MAKE) -C backend test
+
+check-migrations:
+	@$(MAKE) -C backend check-migrations
 
 verify-frontend-lockfile:
 	@pnpm --dir frontend install --frozen-lockfile
