@@ -1459,6 +1459,14 @@ func (s *AuthService) GetAccessTokenExpiresIn() int {
 	return s.cfg.JWT.ExpireHour * 3600
 }
 
+// GetRefreshTokenExpiresIn returns the configured refresh-token lifetime in seconds.
+func (s *AuthService) GetRefreshTokenExpiresIn() int {
+	if s == nil || s.cfg == nil || s.cfg.JWT.RefreshTokenExpireDays <= 0 {
+		return 0
+	}
+	return s.cfg.JWT.RefreshTokenExpireDays * 24 * 60 * 60
+}
+
 // HashPassword 使用bcrypt加密密码
 func (s *AuthService) HashPassword(password string) (string, error) {
 	hashedBytes, err := bcrypt.GenerateFromPassword([]byte(password), bcrypt.DefaultCost)
@@ -1929,6 +1937,47 @@ func (s *AuthService) RevokeRefreshToken(ctx context.Context, refreshToken strin
 
 	tokenHash := hashToken(refreshToken)
 	return s.refreshTokenCache.DeleteRefreshToken(ctx, tokenHash)
+}
+
+// RevokeRefreshTokenFamily revokes the whole browser session represented by a refresh token.
+// Active-token metadata is preferred; a bounded consumed-token tombstone is used when logout
+// races with rotation, so the successor token cannot survive a successful logout.
+func (s *AuthService) RevokeRefreshTokenFamily(ctx context.Context, refreshToken string) error {
+	if s.refreshTokenCache == nil {
+		return nil
+	}
+	refreshToken = strings.TrimSpace(refreshToken)
+	if !strings.HasPrefix(refreshToken, refreshTokenPrefix) {
+		return ErrRefreshTokenInvalid
+	}
+
+	tokenHash := hashToken(refreshToken)
+	data, err := s.refreshTokenCache.GetRefreshToken(ctx, tokenHash)
+	if err == nil && data != nil {
+		if strings.TrimSpace(data.FamilyID) == "" {
+			return s.refreshTokenCache.DeleteRefreshToken(ctx, tokenHash)
+		}
+		return s.refreshTokenCache.DeleteTokenFamily(ctx, data.FamilyID)
+	}
+	if err != nil && !errors.Is(err, ErrRefreshTokenNotFound) {
+		return err
+	}
+
+	atomicCache, ok := s.refreshTokenCache.(AtomicRefreshTokenCache)
+	if !ok {
+		return nil
+	}
+	consumed, consumedErr := atomicCache.GetConsumedRefreshToken(ctx, tokenHash)
+	if consumedErr != nil {
+		if errors.Is(consumedErr, ErrRefreshTokenNotFound) {
+			return nil
+		}
+		return consumedErr
+	}
+	if consumed == nil || consumed.Data == nil || strings.TrimSpace(consumed.Data.FamilyID) == "" {
+		return nil
+	}
+	return s.refreshTokenCache.DeleteTokenFamily(ctx, consumed.Data.FamilyID)
 }
 
 // RevokeSessionFamily 撤销单个会话家族（该会话的所有 refresh token）。

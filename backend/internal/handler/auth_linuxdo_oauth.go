@@ -368,7 +368,7 @@ func (h *AuthHandler) LinuxDoOAuthCallback(c *gin.Context) {
 			h.authService.RecordSuccessfulLogin(c.Request.Context(), user.ID)
 			clearOAuthPendingSessionCookie(c, secureCookie)
 			clearOAuthPendingBrowserCookie(c, secureCookie)
-			redirectOAuthTokenPair(c, frontendCallback, tokenPair, redirectTo)
+			redirectOAuthTokenPair(c, h.authService, frontendCallback, tokenPair, redirectTo)
 			return
 		}
 		if !errors.Is(err, service.ErrOAuthInvitationRequired) {
@@ -608,12 +608,7 @@ func (h *AuthHandler) CompleteLinuxDoOAuthRegistration(c *gin.Context) {
 	clearOAuthPendingSessionCookie(c, secureCookie)
 	clearOAuthPendingBrowserCookie(c, secureCookie)
 
-	c.JSON(http.StatusOK, gin.H{
-		"access_token":  tokenPair.AccessToken,
-		"refresh_token": tokenPair.RefreshToken,
-		"expires_in":    tokenPair.ExpiresIn,
-		"token_type":    "Bearer",
-	})
+	writeOAuthTokenPairResponse(c, h.authService, tokenPair)
 }
 
 func (h *AuthHandler) getLinuxDoOAuthConfig(ctx context.Context) (config.LinuxDoConnectConfig, error) {
@@ -819,11 +814,16 @@ func redirectOAuthError(c *gin.Context, frontendCallback string, code string, me
 	redirectWithFragment(c, frontendCallback, fragment)
 }
 
-func redirectOAuthTokenPair(c *gin.Context, frontendCallback string, tokenPair *service.TokenPair, redirectTo string) {
+func redirectOAuthTokenPair(c *gin.Context, authService *service.AuthService, frontendCallback string, tokenPair *service.TokenPair, redirectTo string) {
 	fragment := url.Values{}
 	if tokenPair != nil {
 		fragment.Set("access_token", truncateFragmentValue(tokenPair.AccessToken))
-		fragment.Set("refresh_token", truncateFragmentValue(tokenPair.RefreshToken))
+		refreshToken, refreshCookie := issueRefreshToken(c, authService, tokenPair.RefreshToken, false)
+		if refreshCookie {
+			fragment.Set("refresh_cookie", "true")
+		} else if refreshToken != "" {
+			fragment.Set("refresh_token", truncateFragmentValue(refreshToken))
+		}
 		fragment.Set("expires_in", strconv.Itoa(tokenPair.ExpiresIn))
 		fragment.Set("token_type", "Bearer")
 	}

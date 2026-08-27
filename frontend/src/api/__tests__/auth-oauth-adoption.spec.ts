@@ -1,6 +1,9 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
 const post = vi.fn()
+const cookieTransportConfig = {
+  headers: { 'X-Requested-With': 'XMLHttpRequest' }
+}
 
 vi.mock('@/api/client', () => ({
   apiClient: {
@@ -27,7 +30,7 @@ describe('oauth adoption auth api', () => {
     expect(post).toHaveBeenCalledWith('/auth/oauth/pending/exchange', {
       adopt_display_name: false,
       adopt_avatar: true
-    })
+    }, cookieTransportConfig)
   })
 
   it('posts bind-login decisions when finalizing pending oauth bind flow', async () => {
@@ -41,7 +44,7 @@ describe('oauth adoption auth api', () => {
     expect(post).toHaveBeenCalledWith('/auth/oauth/pending/exchange', {
       adopt_display_name: true,
       adopt_avatar: false
-    })
+    }, cookieTransportConfig)
   })
 
   it('posts linuxdo invitation completion with adoption decisions', async () => {
@@ -56,7 +59,7 @@ describe('oauth adoption auth api', () => {
       invitation_code: 'invite-code',
       adopt_display_name: true,
       adopt_avatar: false
-    })
+    }, cookieTransportConfig)
   })
 
   it('posts linuxdo create-account completion with adoption decisions', async () => {
@@ -71,7 +74,7 @@ describe('oauth adoption auth api', () => {
       invitation_code: 'invite-code',
       adopt_display_name: false,
       adopt_avatar: true
-    })
+    }, cookieTransportConfig)
   })
 
   it('posts affiliate code when completing linuxdo oauth registration', async () => {
@@ -91,7 +94,7 @@ describe('oauth adoption auth api', () => {
       aff_code: 'AFF123',
       adopt_display_name: true,
       adopt_avatar: false
-    })
+    }, cookieTransportConfig)
   })
 
   it('posts oidc invitation completion with adoption decisions', async () => {
@@ -106,7 +109,7 @@ describe('oauth adoption auth api', () => {
       invitation_code: 'invite-code',
       adopt_display_name: false,
       adopt_avatar: true
-    })
+    }, cookieTransportConfig)
   })
 
   it('posts oidc create-account completion with adoption decisions', async () => {
@@ -121,7 +124,7 @@ describe('oauth adoption auth api', () => {
       invitation_code: 'invite-code',
       adopt_display_name: true,
       adopt_avatar: false
-    })
+    }, cookieTransportConfig)
   })
 
   it('posts wechat invitation completion with adoption decisions', async () => {
@@ -136,7 +139,7 @@ describe('oauth adoption auth api', () => {
       invitation_code: 'invite-code',
       adopt_display_name: true,
       adopt_avatar: true
-    })
+    }, cookieTransportConfig)
   })
 
   it('posts wechat create-account completion with adoption decisions', async () => {
@@ -151,7 +154,7 @@ describe('oauth adoption auth api', () => {
       invitation_code: 'invite-code',
       adopt_display_name: false,
       adopt_avatar: false
-    })
+    }, cookieTransportConfig)
   })
 
   it('posts affiliate code when creating pending wechat oauth account', async () => {
@@ -171,7 +174,7 @@ describe('oauth adoption auth api', () => {
       aff_code: 'WXAFF',
       adopt_display_name: false,
       adopt_avatar: true
-    })
+    }, cookieTransportConfig)
   })
 
   it('classifies oauth completion results as login or bind', async () => {

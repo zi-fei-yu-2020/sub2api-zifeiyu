@@ -711,12 +711,7 @@ func (h *AuthHandler) CompleteOIDCOAuthRegistration(c *gin.Context) {
 	clearOAuthPendingSessionCookie(c, secureCookie)
 	clearOAuthPendingBrowserCookie(c, secureCookie)
 
-	c.JSON(http.StatusOK, gin.H{
-		"access_token":  tokenPair.AccessToken,
-		"refresh_token": tokenPair.RefreshToken,
-		"expires_in":    tokenPair.ExpiresIn,
-		"token_type":    "Bearer",
-	})
+	writeOAuthTokenPairResponse(c, h.authService, tokenPair)
 }
 
 func (h *AuthHandler) getOIDCOAuthConfig(ctx context.Context) (config.OIDCConnectConfig, error) {
@@ -1285,7 +1280,12 @@ func (h *AuthHandler) tryOIDCVerifiedEmailFastPath(
 
 	fragment := url.Values{}
 	fragment.Set("access_token", tokenPair.AccessToken)
-	fragment.Set("refresh_token", tokenPair.RefreshToken)
+	refreshToken, refreshCookie := issueRefreshToken(c, h.authService, tokenPair.RefreshToken, false)
+	if refreshCookie {
+		fragment.Set("refresh_cookie", "true")
+	} else if refreshToken != "" {
+		fragment.Set("refresh_token", refreshToken)
+	}
 	fragment.Set("expires_in", fmt.Sprintf("%d", tokenPair.ExpiresIn))
 	fragment.Set("token_type", "Bearer")
 	fragment.Set("redirect", redirectTo)

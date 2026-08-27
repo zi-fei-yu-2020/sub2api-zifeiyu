@@ -92,11 +92,12 @@ func captchaProof(turnstileToken, tencentTicket, tencentRandstr string) service.
 
 // AuthResponse 认证响应格式（匹配前端期望）
 type AuthResponse struct {
-	AccessToken  string    `json:"access_token"`
-	RefreshToken string    `json:"refresh_token,omitempty"` // 新增：Refresh Token
-	ExpiresIn    int       `json:"expires_in,omitempty"`    // 新增：Access Token有效期（秒）
-	TokenType    string    `json:"token_type"`
-	User         *dto.User `json:"user"`
+	AccessToken   string    `json:"access_token"`
+	RefreshToken  string    `json:"refresh_token,omitempty"`
+	RefreshCookie bool      `json:"refresh_cookie,omitempty"`
+	ExpiresIn     int       `json:"expires_in,omitempty"`
+	TokenType     string    `json:"token_type"`
+	User          *dto.User `json:"user"`
 }
 
 func ensureLoginUserActive(user *service.User) error {
@@ -137,12 +138,14 @@ func respondWithTokenPair(c *gin.Context, authService *service.AuthService, user
 		})
 		return
 	}
+	refreshToken, refreshCookie := issueRefreshToken(c, authService, tokenPair.RefreshToken, false)
 	response.Success(c, AuthResponse{
-		AccessToken:  tokenPair.AccessToken,
-		RefreshToken: tokenPair.RefreshToken,
-		ExpiresIn:    tokenPair.ExpiresIn,
-		TokenType:    "Bearer",
-		User:         dto.UserFromService(user),
+		AccessToken:   tokenPair.AccessToken,
+		RefreshToken:  refreshToken,
+		RefreshCookie: refreshCookie,
+		ExpiresIn:     tokenPair.ExpiresIn,
+		TokenType:     "Bearer",
+		User:          dto.UserFromService(user),
 	})
 }
 
@@ -669,43 +672,48 @@ func (h *AuthHandler) ResetPassword(c *gin.Context) {
 
 // RefreshTokenRequest 刷新Token请求
 type RefreshTokenRequest struct {
-	RefreshToken string `json:"refresh_token" binding:"required"`
+	RefreshToken string `json:"refresh_token"`
 }
 
 // RefreshTokenResponse 刷新Token响应
 type RefreshTokenResponse struct {
-	AccessToken  string `json:"access_token"`
-	RefreshToken string `json:"refresh_token"`
-	ExpiresIn    int    `json:"expires_in"` // Access Token有效期（秒）
-	TokenType    string `json:"token_type"`
+	AccessToken   string `json:"access_token"`
+	RefreshToken  string `json:"refresh_token,omitempty"`
+	RefreshCookie bool   `json:"refresh_cookie,omitempty"`
+	ExpiresIn     int    `json:"expires_in"`
+	TokenType     string `json:"token_type"`
 }
 
 // RefreshToken 刷新Token
 // POST /api/v1/auth/refresh
 func (h *AuthHandler) RefreshToken(c *gin.Context) {
 	var req RefreshTokenRequest
-	if err := c.ShouldBindJSON(&req); err != nil {
-		response.BadRequest(c, "Invalid request: "+err.Error())
+	_ = c.ShouldBindJSON(&req)
+	refreshToken, cookieTransport := selectRefreshToken(c, req.RefreshToken)
+	if refreshToken == "" {
+		response.BadRequest(c, "refresh_token is required")
 		return
 	}
 
-	result, err := h.authService.RefreshTokenPair(c.Request.Context(), req.RefreshToken)
+	result, err := h.authService.RefreshTokenPair(c.Request.Context(), refreshToken)
 	if err != nil {
 		response.ErrorFrom(c, err)
 		return
 	}
 
 	// Backend mode: block non-admin token refresh
-	if h.settingSvc.IsBackendModeEnabled(c.Request.Context()) && result.UserRole != "admin" {
+	if h.isBackendModeEnabled(c.Request.Context()) && result.UserRole != "admin" {
 		response.Forbidden(c, "Backend mode is active. Only admin login is allowed.")
 		return
 	}
 
+	responseRefreshToken, refreshCookie := issueRefreshToken(c, h.authService, result.RefreshToken, cookieTransport)
 	response.Success(c, RefreshTokenResponse{
-		AccessToken:  result.AccessToken,
-		RefreshToken: result.RefreshToken,
-		ExpiresIn:    result.ExpiresIn,
-		TokenType:    "Bearer",
+		AccessToken:   result.AccessToken,
+		RefreshToken:  responseRefreshToken,
+		RefreshCookie: refreshCookie,
+		ExpiresIn:     result.ExpiresIn,
+		TokenType:     "Bearer",
 	})
 }
 
@@ -727,12 +735,13 @@ func (h *AuthHandler) Logout(c *gin.Context) {
 	_ = c.ShouldBindJSON(&req)
 
 	// 如果提供了Refresh Token，撤销它
-	if req.RefreshToken != "" {
-		if err := h.authService.RevokeRefreshToken(c.Request.Context(), req.RefreshToken); err != nil {
-			slog.Debug("failed to revoke refresh token", "error", err)
-			// 不影响登出流程
+	refreshToken, _ := selectRefreshToken(c, req.RefreshToken)
+	if refreshToken != "" {
+		if err := h.authService.RevokeRefreshTokenFamily(c.Request.Context(), refreshToken); err != nil {
+			slog.Debug("failed to revoke refresh token family", "error", err)
 		}
 	}
+	clearRefreshTokenCookie(c)
 	h.consumePendingOAuthSessionOnLogout(c)
 	clearOAuthLogoutCookies(c)
 
@@ -761,6 +770,7 @@ func (h *AuthHandler) RevokeAllSessions(c *gin.Context) {
 		return
 	}
 
+	clearRefreshTokenCookie(c)
 	response.Success(c, RevokeAllSessionsResponse{
 		Message: "All sessions have been revoked. Please log in again.",
 	})

@@ -16,7 +16,7 @@ const PEER_REFRESH_POLL_MS = 25
 
 export interface RefreshTokenResponse {
   access_token: string
-  refresh_token: string
+  refresh_token?: string
   refresh_cookie?: boolean
   expires_in: number
   token_type: string
@@ -82,7 +82,8 @@ function readStoredTokenPair(snapshot: AuthSnapshot): RefreshTokenResponse | nul
 
   return {
     access_token: accessToken,
-    refresh_token: refreshToken || '',
+    refresh_token: refreshToken || undefined,
+    refresh_cookie: localStorage.getItem(REFRESH_COOKIE_KEY) === '1' || undefined,
     expires_in: Math.max(1, Math.ceil((expiresAt - Date.now()) / 1000)),
     token_type: 'Bearer'
   }
@@ -135,6 +136,7 @@ function persistTokenPair(tokens: RefreshTokenResponse): void {
     localStorage.setItem(REFRESH_COOKIE_KEY, '1')
   } else if (tokens.refresh_token) {
     localStorage.setItem(REFRESH_TOKEN_KEY, tokens.refresh_token)
+    localStorage.removeItem(REFRESH_COOKIE_KEY)
   }
   localStorage.setItem(REFRESH_GENERATION_KEY, `${Date.now()}-${Math.random()}`)
 }
@@ -153,7 +155,14 @@ async function requestTokenPair(
     const response = await axios.post<ApiResponse<RefreshTokenResponse>>(
       `${getAPIBaseURL()}/auth/refresh`,
       snapshot.refreshToken ? { refresh_token: snapshot.refreshToken } : {},
-      { headers: { 'Content-Type': 'application/json' }, timeout: TOKEN_REFRESH_TIMEOUT_MS, withCredentials: true }
+      {
+        headers: {
+          'Content-Type': 'application/json',
+          'X-Requested-With': 'XMLHttpRequest'
+        },
+        timeout: TOKEN_REFRESH_TIMEOUT_MS,
+        withCredentials: true
+      }
     )
     const payload = response.data
     if (payload.code !== 0 || !payload.data) {

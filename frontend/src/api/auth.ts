@@ -19,6 +19,10 @@ import type {
   TotpLogin2FARequest
 } from '@/types'
 
+const BROWSER_REFRESH_TRANSPORT_CONFIG = {
+  headers: { 'X-Requested-With': 'XMLHttpRequest' }
+} as const
+
 /**
  * Login response type - can be either full auth or 2FA required
  */
@@ -98,8 +102,10 @@ function persistRefreshTransport(tokens: { refresh_token?: string; refresh_cooki
     localStorage.setItem('refresh_cookie_enabled', '1')
     return
   }
-  localStorage.removeItem('refresh_cookie_enabled')
-  if (tokens.refresh_token) setRefreshToken(tokens.refresh_token)
+  if (tokens.refresh_token) {
+    localStorage.removeItem('refresh_cookie_enabled')
+    setRefreshToken(tokens.refresh_token)
+  }
 }
 /**
  * Get authentication token from localStorage
@@ -141,7 +147,7 @@ export function clearAuthToken(): void {
  * @returns Authentication response with token and user data, or 2FA required response
  */
 export async function login(credentials: LoginRequest): Promise<LoginResponse> {
-  const { data } = await apiClient.post<LoginResponse>('/auth/login', credentials)
+  const { data } = await apiClient.post<LoginResponse>('/auth/login', credentials, BROWSER_REFRESH_TRANSPORT_CONFIG)
 
   // Only store token if 2FA is not required
   if (!isTotp2FARequired(data)) {
@@ -162,7 +168,7 @@ export async function login(credentials: LoginRequest): Promise<LoginResponse> {
  * @returns Authentication response with token and user data
  */
 export async function login2FA(request: TotpLogin2FARequest): Promise<AuthResponse> {
-  const { data } = await apiClient.post<AuthResponse>('/auth/login/2fa', request)
+  const { data } = await apiClient.post<AuthResponse>('/auth/login/2fa', request, BROWSER_REFRESH_TRANSPORT_CONFIG)
 
   // Store token and user data
   setAuthToken(data.access_token)
@@ -181,7 +187,7 @@ export async function login2FA(request: TotpLogin2FARequest): Promise<AuthRespon
  * @returns Authentication response with token and user data
  */
 export async function register(userData: RegisterRequest): Promise<AuthResponse> {
-  const { data } = await apiClient.post<AuthResponse>('/auth/register', userData)
+  const { data } = await apiClient.post<AuthResponse>('/auth/register', userData, BROWSER_REFRESH_TRANSPORT_CONFIG)
 
   // Store token and user data
   setAuthToken(data.access_token)
@@ -212,7 +218,11 @@ export async function logout(): Promise<void> {
 
   // Cookie-backed sessions send an empty body; legacy clients still send the token explicitly.
   try {
-    await apiClient.post('/auth/logout', refreshToken ? { refresh_token: refreshToken } : {})
+    await apiClient.post(
+      '/auth/logout',
+      refreshToken ? { refresh_token: refreshToken } : {},
+      BROWSER_REFRESH_TRANSPORT_CONFIG
+    )
   } catch {
     // Ignore errors - we still want to clear local state
   }
@@ -311,7 +321,12 @@ export function hasPendingOAuthSuggestedProfile(
 }
 
 export function persistOAuthTokenContext(tokens: Partial<OAuthTokenResponse>): void {
-  persistRefreshTransport(tokens)
+  // Browser OAuth redirects no longer expose refresh tokens in URL fragments. Older callback
+  // views may only parse the access token, so the absence of a JSON refresh token means the
+  // backend established the HttpOnly cookie transport.
+  persistRefreshTransport(
+    tokens.refresh_token || tokens.refresh_cookie ? tokens : { ...tokens, refresh_cookie: true }
+  )
   if (tokens.expires_in) {
     setTokenExpiresAt(tokens.expires_in)
   }
@@ -628,7 +643,8 @@ async function createPendingOAuthAccount(
       invitation_code: invitationCode,
       ...(normalizedAffiliateCode ? { aff_code: normalizedAffiliateCode } : {}),
       ...serializeOAuthAdoptionDecision(decision)
-    }
+    },
+    BROWSER_REFRESH_TRANSPORT_CONFIG
   )
   return data
 }
@@ -670,7 +686,8 @@ export async function completePendingOAuthBindLogin(
 ): Promise<PendingOAuthBindLoginResponse> {
   const { data } = await apiClient.post<PendingOAuthBindLoginResponse>(
     '/auth/oauth/pending/exchange',
-    serializeOAuthAdoptionDecision(decision)
+    serializeOAuthAdoptionDecision(decision),
+    BROWSER_REFRESH_TRANSPORT_CONFIG
   )
   return data
 }

@@ -212,7 +212,12 @@ func (h *AuthHandler) emailOAuthCallbackWithProfile(
 
 	fragment := url.Values{}
 	fragment.Set("access_token", tokenPair.AccessToken)
-	fragment.Set("refresh_token", tokenPair.RefreshToken)
+	refreshToken, refreshCookie := issueRefreshToken(c, h.authService, tokenPair.RefreshToken, false)
+	if refreshCookie {
+		fragment.Set("refresh_cookie", "true")
+	} else if refreshToken != "" {
+		fragment.Set("refresh_token", refreshToken)
+	}
 	fragment.Set("expires_in", fmt.Sprintf("%d", tokenPair.ExpiresIn))
 	fragment.Set("token_type", "Bearer")
 	fragment.Set("redirect", redirectTo)
@@ -441,7 +446,7 @@ func (h *AuthHandler) completeEmailOAuthRegistration(c *gin.Context, provider st
 	h.authService.ApplyOAuthSignupPromoCode(c.Request.Context(), user.ID, pendingOAuthPromoCode(session))
 	h.authService.RecordSuccessfulLogin(c.Request.Context(), user.ID)
 	clearCookies()
-	writeOAuthTokenPairResponse(c, tokenPair)
+	writeOAuthTokenPairResponse(c, h.authService, tokenPair)
 }
 
 func (h *AuthHandler) getEmailOAuthConfig(ctx context.Context, provider string) (config.EmailOAuthProviderConfig, error) {

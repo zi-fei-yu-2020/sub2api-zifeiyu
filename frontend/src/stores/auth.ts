@@ -222,7 +222,7 @@ export const useAuthStore = defineStore('auth', () => {
         refreshTokenValue.value = null
         localStorage.removeItem(REFRESH_TOKEN_KEY)
         localStorage.setItem(REFRESH_COOKIE_KEY, '1')
-      } else {
+      } else if (response.refresh_token) {
         refreshTokenValue.value = response.refresh_token
       }
 
