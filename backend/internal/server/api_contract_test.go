@@ -1407,6 +1407,17 @@ func TestAPIContracts(t *testing.T) {
 	}
 }
 
+func TestRemovedAdminPlaceholderRoutesReturnNotFound(t *testing.T) {
+	deps := newContractDeps(t)
+	for _, path := range []string{
+		"/api/v1/admin/dashboard/realtime",
+		"/api/v1/admin/proxies/4/stats",
+	} {
+		status, _ := doRequest(t, deps.router, http.MethodGet, path, "", nil)
+		require.Equal(t, http.StatusNotFound, status, "path=%s", path)
+	}
+}
+
 type contractDeps struct {
 	now         time.Time
 	router      http.Handler
