@@ -2,177 +2,31 @@
   <AppLayout>
     <TablePageLayout>
       <template #filters>
-        <div class="flex flex-wrap-reverse items-start justify-between gap-3">
-          <AccountTableFilters
-            v-model:searchQuery="params.search"
-            :filters="params"
-            :groups="groups"
-            @update:filters="(newFilters) => Object.assign(params, newFilters)"
-            @change="debouncedReload"
-            @update:searchQuery="debouncedReload"
-          />
-          <AccountTableActions
-            :loading="loading"
-            @refresh="handleManualRefresh"
-            @create="showCreate = true"
-          >
-            <template #after>
-              <!-- Auto Refresh Dropdown -->
-              <div class="relative" ref="autoRefreshDropdownRef">
-                <button
-                  @click="
-                    showAutoRefreshDropdown = !showAutoRefreshDropdown;
-                    showAccountToolsDropdown = false
-                  "
-                  class="btn btn-secondary px-2 md:px-3"
-                  :title="t('admin.accounts.autoRefresh')"
-                >
-                  <Icon name="refresh" size="sm" :class="[autoRefreshEnabled ? 'animate-spin' : '']" />
-                  <span class="hidden md:inline">
-                    {{
-                      autoRefreshEnabled
-                        ? t('admin.accounts.autoRefreshCountdown', { seconds: autoRefreshCountdown })
-                        : t('admin.accounts.autoRefresh')
-                    }}
-                  </span>
-                </button>
-                <div
-                  v-if="showAutoRefreshDropdown"
-                  class="absolute right-0 z-50 mt-2 w-56 origin-top-right rounded-xl border border-slate-200 bg-white shadow-lg dark:border-slate-800 dark:bg-slate-900"
-                >
-                  <div class="p-2">
-                    <button
-                      @click="setAutoRefreshEnabled(!autoRefreshEnabled)"
-                      class="flex w-full items-center justify-between rounded-xl px-3 py-2 text-sm text-slate-700 hover:bg-slate-100 dark:text-gray-200 dark:hover:bg-dark-700"
-                    >
-                      <span>{{ t('admin.accounts.enableAutoRefresh') }}</span>
-                      <Icon v-if="autoRefreshEnabled" name="check" size="sm" class="text-primary-500" />
-                    </button>
-                    <div class="my-1 border-t border-slate-100 dark:border-slate-800"></div>
-                    <button
-                      v-for="sec in autoRefreshIntervals"
-                      :key="sec"
-                      @click="setAutoRefreshInterval(sec)"
-                      class="flex w-full items-center justify-between rounded-xl px-3 py-2 text-sm text-slate-700 hover:bg-slate-100 dark:text-gray-200 dark:hover:bg-dark-700"
-                    >
-                      <span>{{ autoRefreshIntervalLabel(sec) }}</span>
-                      <Icon v-if="autoRefreshIntervalSeconds === sec" name="check" size="sm" class="text-primary-500" />
-                    </button>
-                  </div>
-                </div>
-              </div>
-
-              <!-- More Tools Dropdown -->
-              <div class="relative" ref="accountToolsDropdownRef">
-                <button
-                  ref="accountToolsTriggerRef"
-                  @click="toggleAccountToolsDropdown"
-                  class="btn btn-secondary px-2 md:px-3"
-                  :title="t('admin.accounts.moreActions')"
-                  :aria-expanded="showAccountToolsDropdown"
-                >
-                  <Icon name="more" size="sm" class="md:mr-1.5" />
-                  <span class="hidden md:inline">{{ t('admin.accounts.moreActions') }}</span>
-                  <Icon name="chevronDown" size="xs" class="ml-1 hidden md:inline" />
-                </button>
-                <Teleport to="body">
-                  <div
-                    v-if="showAccountToolsDropdown"
-                    class="fixed z-[9999] origin-top-right overflow-hidden rounded-xl border border-slate-200 bg-white shadow-xl dark:border-slate-800 dark:bg-slate-900"
-                    :style="accountToolsDropdownStyle"
-                    @click.stop
-                  >
-                    <div class="overflow-y-auto p-2" :style="{ maxHeight: `${accountToolsDropdownPosition.maxHeight}px` }">
-                      <div class="px-2 py-2">
-                        <div class="text-xs font-semibold uppercase tracking-wide text-slate-400 dark:text-slate-400">
-                          {{ t('admin.accounts.dataActions') }}
-                        </div>
-                      </div>
-                      <button class="account-tools-menu-item" @click="openSyncFromCrs">
-                        <span class="account-tools-menu-icon bg-blue-50 text-blue-600 dark:bg-blue-900/30 dark:text-blue-300">
-                          <Icon name="sync" size="sm" />
-                        </span>
-                        <span class="flex-1 text-left">{{ t('admin.accounts.syncFromCrs') }}</span>
-                      </button>
-                      <button class="account-tools-menu-item" @click="openImportData">
-                        <span class="account-tools-menu-icon bg-emerald-50 text-blue-600 dark:bg-emerald-900/30 dark:text-emerald-300">
-                          <Icon name="upload" size="sm" />
-                        </span>
-                        <span class="flex-1 text-left">{{ t('admin.accounts.dataImport') }}</span>
-                      </button>
-                      <button class="account-tools-menu-item" @click="openExportDataDialogFromMenu">
-                        <span class="account-tools-menu-icon bg-violet-50 text-violet-600 dark:bg-violet-900/30 dark:text-violet-300">
-                          <Icon name="download" size="sm" />
-                        </span>
-                        <span class="flex-1 text-left">
-                          {{ selIds.length ? t('admin.accounts.dataExportSelected') : t('admin.accounts.dataExport') }}
-                        </span>
-                        <span
-                          v-if="selIds.length"
-                          class="rounded-full bg-primary-100 px-2 py-0.5 text-xs font-medium text-primary-700 dark:bg-primary-900/40 dark:text-primary-300"
-                        >
-                          {{ t('admin.accounts.selectedCount', { count: selIds.length }) }}
-                        </span>
-                      </button>
-
-                      <div class="my-2 border-t border-slate-100 dark:border-slate-800"></div>
-                      <div class="px-2 py-2">
-                        <div class="text-xs font-semibold uppercase tracking-wide text-slate-400 dark:text-slate-400">
-                          {{ t('admin.accounts.toolActions') }}
-                        </div>
-                      </div>
-                      <button class="account-tools-menu-item" @click="openErrorPassthrough">
-                        <span class="account-tools-menu-icon bg-amber-50 text-amber-600 dark:bg-amber-900/30 dark:text-amber-300">
-                          <Icon name="shield" size="sm" />
-                        </span>
-                        <span class="flex-1 text-left">{{ t('admin.errorPassthrough.title') }}</span>
-                      </button>
-                      <button class="account-tools-menu-item" @click="openTLSFingerprintProfiles">
-                        <span class="account-tools-menu-icon bg-slate-100 text-slate-600 dark:bg-slate-700 dark:text-slate-200">
-                          <Icon name="lock" size="sm" />
-                        </span>
-                        <span class="flex-1 text-left">{{ t('admin.tlsFingerprintProfiles.title') }}</span>
-                      </button>
-
-                      <div class="my-2 border-t border-slate-100 dark:border-slate-800"></div>
-                      <div class="px-2 py-2">
-                        <div class="flex items-center justify-between gap-3">
-                          <span class="text-xs font-semibold uppercase tracking-wide text-slate-400 dark:text-slate-400">
-                            {{ t('admin.accounts.viewColumns') }}
-                          </span>
-                          <Icon name="grid" size="sm" class="text-slate-400" />
-                        </div>
-                      </div>
-                      <div class="grid grid-cols-1 gap-1">
-                        <button
-                          v-for="col in toggleableColumns"
-                          :key="col.key"
-                          @click="toggleColumn(col.key)"
-                          class="flex w-full items-center justify-between rounded-xl px-3 py-2 text-sm text-slate-700 transition-colors hover:bg-slate-100 dark:text-gray-200 dark:hover:bg-dark-700"
-                        >
-                          <span class="truncate">{{ col.label }}</span>
-                          <Icon v-if="isColumnVisible(col.key)" name="check" size="sm" class="text-primary-500" />
-                        </button>
-                      </div>
-                    </div>
-                  </div>
-                </Teleport>
-              </div>
-            </template>
-          </AccountTableActions>
-        </div>
-        <div
-          v-if="hasPendingListSync"
-          class="mt-2 flex items-center justify-between rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-800 dark:border-amber-700/40 dark:bg-amber-900/20 dark:text-amber-200"
-        >
-          <span>{{ t('admin.accounts.listPendingSyncHint') }}</span>
-          <button
-            class="btn btn-secondary px-2 py-1 text-xs"
-            @click="syncPendingListChanges"
-          >
-            {{ t('admin.accounts.listPendingSyncAction') }}
-          </button>
-        </div>
+        <AccountManagementToolbar
+          :search-query="params.search"
+          :filters="params"
+          :groups="groups"
+          :loading="loading"
+          :auto-refresh-enabled="autoRefreshEnabled"
+          :auto-refresh-countdown="autoRefreshCountdown"
+          :auto-refresh-intervals="autoRefreshIntervals"
+          :auto-refresh-interval-seconds="autoRefreshIntervalSeconds"
+          :selected-count="selIds.length"
+          :toggleable-columns="toggleableColumns"
+          :is-column-visible="isColumnVisible"
+          :has-pending-list-sync="hasPendingListSync"
+          @update:search-query="params.search = $event; debouncedReload()"
+          @update:filters="Object.assign(params, $event)"
+          @change="debouncedReload"
+          @refresh="handleManualRefresh"
+          @create="showCreate = true"
+          @set-auto-refresh-enabled="setAutoRefreshEnabled"
+          @set-auto-refresh-interval="setAutoRefreshInterval"
+          @toggle-column="toggleColumn"
+          @tool-action="handleToolbarAction"
+          @sync-pending="syncPendingListChanges"
+          @dropdown-visibility-change="toolbarDropdownOpen = $event"
+        />
       </template>
       <template #table>
         <AccountBulkActionsBar
@@ -191,285 +45,59 @@
           @select-all-results="handleSelectAllResults"
           @toggle-schedulable="handleBulkToggleSchedulable"
         />
-        <div ref="accountTableRef" class="flex min-h-0 flex-1 flex-col overflow-hidden">
-        <DataTable
-          :sticky-first-column="true"
-          ref="dataTableRef"
-          :columns="cols"
-          :data="accounts"
+        <AccountDataTable
+          ref="accountDataTableRef"
+          :cols="cols"
+          :accounts="accounts"
           :loading="loading"
-          row-key="id"
-          :server-side-sort="true"
-          @sort="handleSort"
-          default-sort-key="name"
-          default-sort-order="asc"
           :sort-storage-key="ACCOUNT_SORT_STORAGE_KEY"
-          :estimate-row-height="156"
-          :overscan="5"
-          :virtualize-threshold="50"
-        >
-          <template #header-select>
-            <input
-              type="checkbox"
-              class="h-4 w-4 cursor-pointer rounded border-slate-300 text-primary-600 focus:ring-primary-500"
-              :checked="allVisibleSelected"
-              @click.stop
-              @change="toggleSelectAllVisible($event)"
-            />
-          </template>
-          <template #cell-select="{ row }">
-            <input type="checkbox" :checked="isSelected(row.id)" @change="toggleSel(row.id)" class="rounded border-slate-300 text-primary-600 focus:ring-primary-500" />
-          </template>
-          <template #cell-id="{ value }">
-            <span class="font-mono text-xs text-slate-400 dark:text-slate-400">#{{ value }}</span>
-          </template>
-          <template #cell-name="{ row, value }">
-            <div class="flex items-center justify-between gap-2 min-w-0">
-              <div class="flex flex-col min-w-0 flex-1">
-                <HelpTooltip
-                  v-if="accountHomepageUrl(row)"
-                  :content="accountHomepageUrl(row)"
-                  width-class="w-max max-w-sm break-all"
-                  class="-ml-1 self-start"
-                >
-                  <template #trigger>
-                    <a
-                      :href="accountHomepageUrl(row)"
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      class="border-b border-dotted border-slate-300 font-medium text-slate-900 hover:text-primary-600 dark:border-slate-700 dark:text-white dark:hover:text-primary-400 transition-colors truncate max-w-[170px] sm:max-w-xs inline-block"
-                    >
-                      {{ value }}
-                    </a>
-                  </template>
-                </HelpTooltip>
-                <span v-else class="font-medium text-slate-900 dark:text-white truncate max-w-[170px] sm:max-w-xs">{{ value }}</span>
-                <span
-                  v-if="accountDisplayEmail(row)"
-                  class="text-xs text-slate-400 dark:text-slate-400 truncate max-w-[170px] sm:max-w-xs"
-                  :title="accountDisplayEmail(row) + (row.parent_chatgpt_account_id ? ' · ' + row.parent_chatgpt_account_id : '')"
-                >
-                  {{ accountDisplayEmail(row) }}
-                </span>
-              </div>
-              <button
-                type="button"
-                @click.stop="handleTest(row)"
-                class="inline-flex items-center gap-1 shrink-0 rounded-lg px-2 py-1 text-xs font-medium text-primary-600 bg-primary-50 border border-primary-200/70 hover:bg-primary-600 hover:text-white transition-all shadow-2xs dark:bg-primary-950/40 dark:border-primary-800/60 dark:text-primary-300 dark:hover:bg-primary-600 dark:hover:text-white"
-                :title="t('admin.accounts.testConnection')"
-              >
-                <Icon name="play" size="xs" :stroke-width="2.2" />
-                <span>{{ t('admin.accounts.testConnection') || '测试' }}</span>
-              </button>
-            </div>
-          </template>
-          <template #cell-notes="{ value }">
-            <span v-if="value" :title="value" class="block max-w-xs truncate text-sm text-slate-600 dark:text-gray-300">{{ value }}</span>
-            <span v-else class="text-sm text-slate-400 dark:text-dark-500">-</span>
-          </template>
-          <template #cell-platform_type="{ row }">
-            <div class="flex min-w-0 flex-col gap-1">
-              <div class="flex flex-wrap items-center gap-1">
-                <PlatformTypeBadge :platform="row.platform" :type="row.type"
-                  :auth-mode="getOpenAIAuthMode(row)"
-                  :plan-type="getAccountPlanType(row)"
-                  :privacy-mode="row.extra?.privacy_mode || row.parent_privacy_mode"
-                  :subscription-expires-at="row.credentials?.subscription_expires_at || row.parent_subscription_expires_at" />
-                <span
-                  v-if="getAntigravityTierLabel(row)"
-                  :class="['inline-block rounded px-1.5 py-0.5 text-[10px] font-medium', getAntigravityTierClass(row)]"
-                >
-                  {{ getAntigravityTierLabel(row) }}
-                </span>
-              </div>
-              <div
-                v-if="getOpenAICompactMeta(row)"
-                :class="[
-                  'inline-flex items-center gap-1.5 pl-0.5 text-[11px] font-medium leading-4',
-                  getOpenAICompactMeta(row)?.className
-                ]"
-                :title="getOpenAICompactTitle(row)"
-              >
-                <span :class="['h-1.5 w-1.5 rounded-full', getOpenAICompactMeta(row)?.dotClass]" />
-                <span>{{ getOpenAICompactMeta(row)?.label }}</span>
-              </div>
-            </div>
-          </template>
-          <template #cell-capacity="{ row }">
-            <AccountCapacityCell :account="row" />
-          </template>
-          <template #cell-status="{ row }">
-            <div class="flex items-center gap-2">
-              <AccountStatusToggle
-                :account="row"
-                :loading="togglingStatus === row.id"
-                @toggle="handleToggleStatus(row)"
-              />
-              <AccountStatusIndicator
-                :account="row"
-                hide-normal-status
-                @show-temp-unsched="handleShowTempUnsched"
-              />
-            </div>
-          </template>
-          <template #cell-schedulable="{ row }">
-            <AccountSchedulableToggle
-              :account="row"
-              :loading="togglingSchedulable === row.id"
-              @toggle="handleToggleSchedulable(row)"
-            />
-          </template>
-          <template #cell-today_stats="{ row }">
-            <AccountTodayStatsCell
-              :stats="todayStatsByAccountId[String(row.id)] ?? null"
-              :loading="todayStatsLoading"
-              :error="todayStatsError"
-            />
-          </template>
-          <template #cell-groups="{ row }">
-            <AccountGroupsCell :groups="row.groups" :max-display="4" />
-          </template>
-          <template #header-usage="{ column }">
-            <div class="flex items-center">
-              <span>{{ column.label }}</span>
-              <HelpTooltip :content="t('admin.accounts.usageWindowsHint')" width-class="w-72" />
-            </div>
-          </template>
-          <template #cell-usage="{ row }">
-            <AccountUsageCell
-              :account="row"
-              :today-stats="todayStatsByAccountId[String(row.id)] ?? null"
-              :today-stats-loading="todayStatsLoading"
-              :manual-refresh-token="usageManualRefreshToken"
-              :batched-usage="usageBatchByAccountId[String(row.id)] ?? null"
-              :batched-usage-error="usageBatchErrorByAccountId[String(row.id)] ?? null"
-              :batched-usage-loading="usageBatchLoadingByAccountId[String(row.id)] === true"
-              :request-batched-usage="isDesktopViewport ? queueBatchedUsage : null"
-              @account-updated="handleAccountUpdated"
-              @usage-loaded="handleAccountUsageLoaded(row.id, $event)"
-            />
-          </template>
-          <template #cell-proxy="{ row }">
-            <div class="flex flex-col gap-1">
-              <div v-if="row.proxy" class="flex items-center gap-2">
-                <span class="text-sm text-slate-700 dark:text-gray-300">{{ row.proxy.name }}</span>
-                <span v-if="row.proxy.country_code" class="text-xs text-slate-400 dark:text-slate-400">
-                  ({{ row.proxy.country_code }})
-                </span>
-              </div>
-              <span v-else class="text-sm text-slate-400 dark:text-dark-500">-</span>
-              <div v-if="row.proxy && row.proxy.expires_at" class="flex items-center gap-2 text-xs">
-                <span class="text-slate-600 dark:text-gray-300">{{ formatDateTime(row.proxy.expires_at) }}</span>
-                <span :class="proxyExpiryBadge(row.proxy)">{{ proxyExpiryText(row.proxy) }}</span>
-              </div>
-              <div v-if="row.proxy_fallback_origin_id" class="flex items-center gap-1">
-                <span class="inline-flex items-center px-1.5 py-0.5 rounded text-xs font-medium bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200" :title="t('admin.accounts.fallbackActiveTip', { origin: row.proxy_fallback_origin_name })">
-                  {{ t('admin.accounts.fallbackActive') }}
-                </span>
-                <button class="text-xs px-1.5 py-0.5 rounded border border-slate-300 dark:border-slate-700 text-slate-600 dark:text-gray-300 hover:bg-slate-100 dark:hover:bg-dark-700" @click="onRevertFallback(row)">{{ t('admin.accounts.revertProxy') }}</button>
-              </div>
-            </div>
-          </template>
-          <template #cell-rate_multiplier="{ row }">
-            <span class="inline-flex items-center gap-1 text-sm font-mono text-slate-700 dark:text-gray-300">
-              <span>{{ formatMultiplier(row.rate_multiplier ?? 1) }}x</span>
-              <span
-                v-if="row.extra?.upstream_billing_rate_sync_enabled === true"
-                class="inline-flex cursor-help text-blue-600 dark:text-emerald-400"
-                :aria-label="t('admin.accounts.upstreamBilling.syncedRateTooltip')"
-                :title="t('admin.accounts.upstreamBilling.syncedRateTooltip')"
-                data-testid="account-rate-sync-indicator"
-              >
-                <Icon name="sync" size="xs" />
-              </span>
-            </span>
-          </template>
-          <template #header-upstream_billing_rate="{ column }">
-            <div class="flex items-center gap-1">
-              <span>{{ column.label }}</span>
-              <span @click.stop>
-                <HelpTooltip :content="t('admin.accounts.upstreamBilling.trustWarning')" width-class="w-80" />
-              </span>
-            </div>
-          </template>
-          <template #cell-upstream_billing_rate="{ row }">
-            <UpstreamBillingRateCell
-              :account="row"
-              :global-probe-enabled="upstreamBillingProbeGloballyEnabled"
-              :now="upstreamBillingNow"
-              :probing="probingUpstreamBilling.has(row.id)"
-              @probe="handleProbeUpstreamBilling(row)"
-            />
-          </template>
-          <template #cell-priority="{ value }">
-            <span class="text-sm text-slate-700 dark:text-gray-300">{{ value }}</span>
-          </template>
-          <template #header-scheduler_score="{ column }">
-            <div class="flex items-center">
-              <span>{{ column.label }}</span>
-              <HelpTooltip :content="t('admin.accounts.schedulerScore.hint')" width-class="w-80" />
-            </div>
-          </template>
-          <template #cell-scheduler_score="{ row }">
-            <div v-if="getSchedulerScoreRows(row).length" class="flex min-w-[7rem] flex-col gap-0.5 font-mono text-[11px] leading-4">
-              <div
-                v-for="score in getSchedulerScoreRows(row)"
-                :key="String(score.group_id)"
-                class="flex items-center gap-1 whitespace-nowrap text-slate-700 dark:text-gray-300"
-                :title="`${formatSchedulerScoreGroup(score)} / ${formatSchedulerScore(score.base_score)} / ${formatStickySchedulerScore(score)}`"
-              >
-                <span class="max-w-[4.75rem] truncate text-slate-400 dark:text-dark-400">{{ formatSchedulerScoreGroup(score) }}</span>
-                <span class="text-gray-300 dark:text-slate-600">/</span>
-                <span>{{ formatSchedulerScore(score.base_score) }}</span>
-                <span class="text-gray-300 dark:text-slate-600">/</span>
-                <span class="text-primary-700 dark:text-primary-300">{{ formatStickySchedulerScore(score) }}</span>
-              </div>
-            </div>
-            <span v-else class="text-sm text-slate-400 dark:text-dark-500">-</span>
-          </template>
-          <template #cell-last_used_at="{ value }">
-            <span class="text-sm text-slate-400 dark:text-dark-400">{{ formatRelativeTime(value) }}</span>
-          </template>
-          <template #cell-created_at="{ value }">
-            <span class="text-sm text-slate-400 dark:text-dark-400">{{ formatDateTime(value) }}</span>
-          </template>
-          <template #cell-expires_at="{ row, value }">
-            <div class="flex flex-col items-start gap-1">
-              <span class="text-sm text-slate-400 dark:text-dark-400">{{ formatExpiresAt(value) }}</span>
-              <div v-if="isExpired(value) || (row.auto_pause_on_expired && value)" class="flex items-center gap-1">
-                <span
-                  v-if="isExpired(value)"
-                  class="inline-flex items-center rounded-xl bg-amber-100 px-2 py-0.5 text-xs font-medium text-amber-700 dark:bg-amber-900/30 dark:text-amber-300"
-                >
-                  {{ t('admin.accounts.expired') }}
-                </span>
-                <span
-                  v-if="row.auto_pause_on_expired && value"
-                  class="inline-flex items-center rounded-xl bg-emerald-100 px-2 py-0.5 text-xs font-medium text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-300"
-                >
-                  {{ t('admin.accounts.autoPauseOnExpired') }}
-                </span>
-              </div>
-            </div>
-          </template>
-          <template #cell-actions="{ row }">
-            <div class="flex items-center gap-1">
-              <button @click="handleEdit(row)" class="flex flex-col items-center gap-0.5 rounded-xl p-1.5 text-slate-400 transition-colors hover:bg-slate-100 hover:text-primary-600 dark:hover:bg-dark-700 dark:hover:text-primary-400">
-                <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5"><path stroke-linecap="round" stroke-linejoin="round" d="M16.862 4.487l1.687-1.688a1.875 1.875 0 112.652 2.652L10.582 16.07a4.5 4.5 0 01-1.897 1.13L6 18l.8-2.685a4.5 4.5 0 011.13-1.897l8.932-8.931zm0 0L19.5 7.125M18 14v4.75A2.25 2.25 0 0115.75 21H5.25A2.25 2.25 0 013 18.75V8.25A2.25 2.25 0 015.25 6H10" /></svg>
-                <span class="text-xs">{{ t('common.edit') }}</span>
-              </button>
-              <button @click="handleDelete(row)" class="flex flex-col items-center gap-0.5 rounded-xl p-1.5 text-slate-400 transition-colors hover:bg-red-50 hover:text-red-600 dark:hover:bg-red-900/20 dark:hover:text-red-400">
-                <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5"><path stroke-linecap="round" stroke-linejoin="round" d="M14.74 9l-.346 9m-4.788 0L9.26 9m9.968-3.21c.342.052.682.107 1.022.166m-1.022-.165L18.16 19.673a2.25 2.25 0 01-2.244 2.077H8.084a2.25 2.25 0 01-2.244-2.077L4.772 5.79m14.456 0a48.108 48.108 0 00-3.478-.397m-12 .562c.34-.059.68-.114 1.022-.165m0 0a48.11 48.11 0 013.478-.397m7.5 0v-.916c0-1.18-.91-2.164-2.09-2.201a51.964 51.964 0 00-3.32 0c-1.18.037-2.09 1.022-2.09 2.201v.916m7.5 0a48.667 48.667 0 00-7.5 0" /></svg>
-                <span class="text-xs">{{ t('common.delete') }}</span>
-              </button>
-              <button @click="openMenu(row, $event)" class="flex flex-col items-center gap-0.5 rounded-xl p-1.5 text-slate-400 transition-colors hover:bg-slate-100 hover:text-slate-900 dark:hover:bg-dark-700 dark:hover:text-white">
-                <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5"><path stroke-linecap="round" stroke-linejoin="round" d="M6.75 12a.75.75 0 11-1.5 0 .75.75 0 011.5 0zM12.75 12a.75.75 0 11-1.5 0 .75.75 0 011.5 0zM18.75 12a.75.75 0 11-1.5 0 .75.75 0 011.5 0z" /></svg>
-                <span class="text-xs">{{ t('common.more') }}</span>
-              </button>
-            </div>
-          </template>
-        </DataTable>
-        </div>
+          :all-visible-selected="allVisibleSelected"
+          :is-selected="isSelected"
+          :toggling-status="togglingStatus"
+          :toggling-schedulable="togglingSchedulable"
+          :today-stats-by-account-id="todayStatsByAccountId"
+          :today-stats-loading="todayStatsLoading"
+          :today-stats-error="todayStatsError"
+          :usage-batch-by-account-id="usageBatchByAccountId"
+          :usage-batch-error-by-account-id="usageBatchErrorByAccountId"
+          :usage-batch-loading-by-account-id="usageBatchLoadingByAccountId"
+          :usage-manual-refresh-token="usageManualRefreshToken"
+          :is-desktop-viewport="isDesktopViewport"
+          :queue-batched-usage="queueBatchedUsage"
+          :upstream-billing-probe-globally-enabled="upstreamBillingProbeGloballyEnabled"
+          :upstream-billing-now="upstreamBillingNow"
+          :probing-upstream-billing="probingUpstreamBilling"
+          :account-homepage-url="accountHomepageUrl"
+          :account-display-email="accountDisplayEmail"
+          :get-open-a-i-auth-mode="getOpenAIAuthMode"
+          :get-account-plan-type="getAccountPlanType"
+          :get-antigravity-tier-label="getAntigravityTierLabel"
+          :get-antigravity-tier-class="getAntigravityTierClass"
+          :get-open-a-i-compact-meta="getOpenAICompactMeta"
+          :get-open-a-i-compact-title="getOpenAICompactTitle"
+          :get-scheduler-score-rows="getSchedulerScoreRows"
+          :format-scheduler-score-group="formatSchedulerScoreGroup"
+          :format-scheduler-score="formatSchedulerScore"
+          :format-sticky-scheduler-score="formatStickySchedulerScore"
+          :format-expires-at="formatExpiresAt"
+          :is-expired="isExpired"
+          :proxy-expiry-badge="proxyExpiryBadge"
+          :proxy-expiry-text="proxyExpiryText"
+          @sort="handleSort"
+          @toggle-select-all-visible="toggleSelectAllVisible"
+          @toggle-selection="toggleSel"
+          @test="handleTest"
+          @toggle-status="handleToggleStatus"
+          @show-temp-unsched="handleShowTempUnsched"
+          @toggle-schedulable="handleToggleSchedulable"
+          @account-updated="handleAccountUpdated"
+          @usage-loaded="handleAccountUsageLoaded"
+          @revert-fallback="onRevertFallback"
+          @probe-upstream-billing="handleProbeUpstreamBilling"
+          @edit="handleEdit"
+          @delete="handleDelete"
+          @open-menu="openMenu"
+        />
       </template>
       <template #pagination><Pagination v-if="pagination.total > 0" :page="pagination.page" :total="pagination.total" :page-size="pagination.page_size" @update:page="handlePageChange" @update:pageSize="handlePageSizeChange" /></template>
     </TablePageLayout>
@@ -522,14 +150,13 @@ import { useStepUp, isStepUpBlocked, isStepUpCancelled, stepUpBlockReason } from
 import TotpStepUpDialog from '@/components/auth/TotpStepUpDialog.vue'
 import AppLayout from '@/components/layout/AppLayout.vue'
 import TablePageLayout from '@/components/layout/TablePageLayout.vue'
-import DataTable from '@/components/common/DataTable.vue'
-import HelpTooltip from '@/components/common/HelpTooltip.vue'
 import Pagination from '@/components/common/Pagination.vue'
 import ConfirmDialog from '@/components/common/ConfirmDialog.vue'
 import { CreateAccountModal, EditAccountModal, BulkEditAccountModal, SyncFromCrsModal, TempUnschedStatusModal } from '@/components/account'
-import AccountTableActions from '@/components/admin/account/AccountTableActions.vue'
-import AccountTableFilters from '@/components/admin/account/AccountTableFilters.vue'
 import AccountBulkActionsBar from '@/components/admin/account/AccountBulkActionsBar.vue'
+import AccountManagementToolbar from '@/components/admin/account/AccountManagementToolbar.vue'
+import AccountDataTable from '@/components/admin/account/AccountDataTable.vue'
+import { useAccountUsageBatches } from '@/components/admin/account/useAccountUsageBatches'
 import AccountActionMenu from '@/components/admin/account/AccountActionMenu.vue'
 import ImportDataModal from '@/components/admin/account/ImportDataModal.vue'
 import ReAuthAccountModal from '@/components/admin/account/ReAuthAccountModal.vue'
@@ -537,27 +164,15 @@ import AccountTestModal from '@/components/admin/account/AccountTestModal.vue'
 import AccountStatsModal from '@/components/admin/account/AccountStatsModal.vue'
 import ScheduledTestsPanel from '@/components/admin/account/ScheduledTestsPanel.vue'
 import type { SelectOption } from '@/components/common/Select.vue'
-import AccountStatusIndicator from '@/components/account/AccountStatusIndicator.vue'
-import AccountStatusToggle from '@/components/account/AccountStatusToggle.vue'
-import AccountSchedulableToggle from '@/components/account/AccountSchedulableToggle.vue'
-import AccountUsageCell from '@/components/account/AccountUsageCell.vue'
-import AccountTodayStatsCell from '@/components/account/AccountTodayStatsCell.vue'
-import AccountGroupsCell from '@/components/account/AccountGroupsCell.vue'
-import AccountCapacityCell from '@/components/account/AccountCapacityCell.vue'
-import UpstreamBillingRateCell from '@/components/account/UpstreamBillingRateCell.vue'
-import PlatformTypeBadge from '@/components/common/PlatformTypeBadge.vue'
-import Icon from '@/components/icons/Icon.vue'
 import ErrorPassthroughRulesModal from '@/components/admin/ErrorPassthroughRulesModal.vue'
 import TLSFingerprintProfilesModal from '@/components/admin/TLSFingerprintProfilesModal.vue'
 import { fetchAllAccountIds } from '@/utils/accountSelection'
 import { buildGrokUsageRefreshKey, buildOpenAIUsageRefreshKey } from '@/utils/accountUsageRefresh'
-import { formatDateTime, formatRelativeTime } from '@/utils/format'
+import { formatDateTime } from '@/utils/format'
 import { proxyExpiryBadgeClass, proxyExpiryLabelKey } from '@/utils/proxyExpiry'
 import { extractApiErrorMessage } from '@/utils/apiError'
 import { sanitizeUrl } from '@/utils/url'
-import { getFloatingPanelPosition } from '@/utils/floatingPanel'
-import { formatMultiplier } from '@/utils/formatters'
-import type { Account, AccountPlatform, AccountSchedulerGroupScore, AccountType, AccountUsageInfo, Proxy as AccountProxy, AdminGroup, WindowStats, ClaudeModel, UpstreamBillingProbeSnapshot } from '@/types'
+import type { Account, AccountPlatform, AccountSchedulerGroupScore, AccountType, Proxy as AccountProxy, AdminGroup, ClaudeModel, UpstreamBillingProbeSnapshot } from '@/types'
 
 const { t } = useI18n()
 const appStore = useAppStore()
@@ -565,8 +180,8 @@ const authStore = useAuthStore()
 
 const proxies = ref<AccountProxy[]>([])
 const groups = ref<AdminGroup[]>([])
-const accountTableRef = ref<HTMLElement | null>(null)
-const dataTableRef = ref<InstanceType<typeof DataTable> | null>(null)
+const accountDataTableRef = ref<InstanceType<typeof AccountDataTable> | null>(null)
+const accountTableRef = computed(() => accountDataTableRef.value?.tableRootRef ?? null)
 type AccountBulkEditTarget =
   | {
       mode: 'selected'
@@ -642,23 +257,7 @@ const upstreamBillingNow = ref(Date.now())
 let lastUpstreamBillingSortRefreshMinute = -1
 useIntervalFn(() => { upstreamBillingNow.value = Date.now() }, 60_000)
 
-// Account tools dropdown
-const showAccountToolsDropdown = ref(false)
-const accountToolsDropdownRef = ref<HTMLElement | null>(null)
-const accountToolsTriggerRef = ref<HTMLElement | null>(null)
-const accountToolsDropdownPosition = reactive({
-  top: null as number | null,
-  bottom: null as number | null,
-  left: 16,
-  width: 320,
-  maxHeight: 0
-})
-const accountToolsDropdownStyle = computed(() => ({
-  top: accountToolsDropdownPosition.top == null ? 'auto' : `${accountToolsDropdownPosition.top}px`,
-  bottom: accountToolsDropdownPosition.bottom == null ? 'auto' : `${accountToolsDropdownPosition.bottom}px`,
-  left: `${accountToolsDropdownPosition.left}px`,
-  width: `${accountToolsDropdownPosition.width}px`
-}))
+const toolbarDropdownOpen = ref(false)
 const hiddenColumns = reactive<Set<string>>(new Set())
 const DEFAULT_HIDDEN_COLUMNS = [
   'today_stats',
@@ -713,8 +312,6 @@ const loadInitialAccountSortState = (): AccountSortState => {
 const sortState = reactive<AccountSortState>(loadInitialAccountSortState())
 
 // Auto refresh settings
-const showAutoRefreshDropdown = ref(false)
-const autoRefreshDropdownRef = ref<HTMLElement | null>(null)
 const AUTO_REFRESH_STORAGE_KEY = 'account-auto-refresh'
 const autoRefreshIntervals = [5, 10, 15, 30] as const
 const autoRefreshEnabled = ref(false)
@@ -725,222 +322,8 @@ const autoRefreshFetching = ref(false)
 const AUTO_REFRESH_SILENT_WINDOW_MS = 15000
 const autoRefreshSilentUntil = ref(0)
 const hasPendingListSync = ref(false)
-const todayStatsByAccountId = ref<Record<string, WindowStats>>({})
-const todayStatsLoading = ref(false)
-const todayStatsError = ref<string | null>(null)
-const todayStatsReqSeq = ref(0)
 const pendingTodayStatsRefresh = ref(false)
 const usageManualRefreshToken = ref(0)
-
-const desktopViewportQuery = '(min-width: 768px)'
-const isDesktopViewport = ref(
-  typeof window === 'undefined' ? true : window.matchMedia(desktopViewportQuery).matches
-)
-let desktopViewportMediaQuery: MediaQueryList | null = null
-let desktopViewportListener: ((event: MediaQueryListEvent) => void) | null = null
-
-const usageBatchByAccountId = ref<Record<string, AccountUsageInfo | null>>({})
-const usageBatchErrorByAccountId = ref<Record<string, string | null>>({})
-const usageBatchLoadingByAccountId = ref<Record<string, boolean>>({})
-const usageBatchRequestTokenByAccountId = ref<Record<string, number>>({})
-const usageBatchCache = new Map<number, { data: AccountUsageInfo; ts: number }>()
-const USAGE_BATCH_CACHE_TTL = 5 * 60 * 1000
-const pendingUsageBatchIds = new Set<number>()
-let usageBatchFlushTimer: ReturnType<typeof setTimeout> | null = null
-let queuedUsageBatchForce = false
-let usageBatchRequestToken = 0
-
-const buildDefaultTodayStats = (): WindowStats => ({
-  requests: 0,
-  tokens: 0,
-  cost: 0,
-  standard_cost: 0,
-  user_cost: 0
-})
-
-const accountSupportsBatchUsage = (account: Account) => {
-  if (account.platform === 'anthropic') {
-    return account.type === 'oauth' || account.type === 'setup-token'
-  }
-  if (account.platform === 'gemini') return true
-  if (account.platform === 'antigravity') return account.type === 'oauth'
-  if (account.platform === 'openai') return account.type === 'oauth'
-  if (account.platform === 'grok') return account.type === 'oauth'
-  return false
-}
-
-const setUsageBatchLoading = (accountID: number, loadingState: boolean) => {
-  usageBatchLoadingByAccountId.value = {
-    ...usageBatchLoadingByAccountId.value,
-    [String(accountID)]: loadingState
-  }
-}
-
-const setUsageBatchState = (accountID: number, usage: AccountUsageInfo | null, error: string | null) => {
-  const key = String(accountID)
-  usageBatchByAccountId.value = {
-    ...usageBatchByAccountId.value,
-    [key]: usage
-  }
-  usageBatchErrorByAccountId.value = {
-    ...usageBatchErrorByAccountId.value,
-    [key]: error
-  }
-}
-
-const handleAccountUsageLoaded = (accountID: number, usage: AccountUsageInfo) => {
-  if (usageBatchByAccountId.value[String(accountID)] === usage) return
-  setUsageBatchState(accountID, usage, null)
-}
-
-const flushQueuedUsageBatch = async () => {
-  usageBatchFlushTimer = null
-  const accountIDs = Array.from(pendingUsageBatchIds)
-  const force = queuedUsageBatchForce
-  pendingUsageBatchIds.clear()
-  queuedUsageBatchForce = false
-
-  if (accountIDs.length === 0) return
-
-  const requestTokensByAccount = accountIDs.reduce<Record<string, number>>((acc, accountID) => {
-    acc[String(accountID)] = usageBatchRequestTokenByAccountId.value[String(accountID)] ?? 0
-    return acc
-  }, {})
-
-  try {
-    const result = await adminAPI.accounts.getBatchUsage(accountIDs, force)
-
-    const usageMap = result.usage ?? {}
-    const errorMap = result.errors ?? {}
-    const now = Date.now()
-    const nextUsage = { ...usageBatchByAccountId.value }
-    const nextErrors = { ...usageBatchErrorByAccountId.value }
-    const nextLoading = { ...usageBatchLoadingByAccountId.value }
-
-    for (const accountID of accountIDs) {
-      const key = String(accountID)
-      if ((usageBatchRequestTokenByAccountId.value[key] ?? 0) !== requestTokensByAccount[key]) {
-        continue
-      }
-      const usage = usageMap[key] ?? null
-      nextUsage[key] = usage
-      nextErrors[key] = errorMap[key] ?? null
-      nextLoading[key] = false
-      if (usage) {
-        usageBatchCache.set(accountID, { data: usage, ts: now })
-      } else {
-        usageBatchCache.delete(accountID)
-      }
-    }
-
-    usageBatchByAccountId.value = nextUsage
-    usageBatchErrorByAccountId.value = nextErrors
-    usageBatchLoadingByAccountId.value = nextLoading
-  } catch (error) {
-    const nextErrors = { ...usageBatchErrorByAccountId.value }
-    const nextLoading = { ...usageBatchLoadingByAccountId.value }
-    for (const accountID of accountIDs) {
-      const key = String(accountID)
-      if ((usageBatchRequestTokenByAccountId.value[key] ?? 0) !== requestTokensByAccount[key]) {
-        continue
-      }
-      nextErrors[key] = 'Failed'
-      nextLoading[key] = false
-    }
-    usageBatchErrorByAccountId.value = nextErrors
-    usageBatchLoadingByAccountId.value = nextLoading
-    console.error('Failed to load account usage batch:', error)
-  }
-}
-
-const queueBatchedUsage = (account: Account, options?: { force?: boolean }) => {
-  if (!isDesktopViewport.value) return
-  if (!accountSupportsBatchUsage(account)) return
-
-  const force = options?.force === true
-  const cacheKey = account.id
-  const key = String(cacheKey)
-
-  if (force) {
-    usageBatchCache.delete(cacheKey)
-  } else {
-    const cached = usageBatchCache.get(cacheKey)
-    if (cached && Date.now() - cached.ts < USAGE_BATCH_CACHE_TTL) {
-      setUsageBatchState(cacheKey, cached.data, null)
-      setUsageBatchLoading(cacheKey, false)
-      return
-    }
-  }
-
-  usageBatchErrorByAccountId.value = {
-    ...usageBatchErrorByAccountId.value,
-    [key]: null
-  }
-  usageBatchRequestTokenByAccountId.value = {
-    ...usageBatchRequestTokenByAccountId.value,
-    [key]: ++usageBatchRequestToken
-  }
-  setUsageBatchLoading(cacheKey, true)
-  pendingUsageBatchIds.add(cacheKey)
-  queuedUsageBatchForce = queuedUsageBatchForce || force
-
-  if (usageBatchFlushTimer !== null) return
-  usageBatchFlushTimer = setTimeout(() => {
-    void flushQueuedUsageBatch()
-  }, 0)
-}
-
-const refreshTodayStatsBatch = async () => {
-  // Why this checks both columns:
-  // - today_stats column shows dedicated today's metrics.
-  // - usage column also embeds today's stats for Key/Bedrock rows.
-  // So we only skip fetching when BOTH columns are hidden.
-  if (hiddenColumns.has('today_stats') && hiddenColumns.has('usage')) {
-    todayStatsLoading.value = false
-    todayStatsError.value = null
-    return
-  }
-
-  const accountIDs = accounts.value.map(account => account.id)
-  const reqSeq = ++todayStatsReqSeq.value
-  if (accountIDs.length === 0) {
-    todayStatsByAccountId.value = {}
-    todayStatsError.value = null
-    todayStatsLoading.value = false
-    return
-  }
-
-  todayStatsLoading.value = true
-  todayStatsError.value = null
-
-  try {
-    const result = await adminAPI.accounts.getBatchTodayStats(accountIDs)
-    if (reqSeq !== todayStatsReqSeq.value) return
-    const serverStats = result.stats ?? {}
-    const nextStats: Record<string, WindowStats> = {}
-    for (const accountID of accountIDs) {
-      const key = String(accountID)
-      nextStats[key] = serverStats[key] ?? buildDefaultTodayStats()
-    }
-    todayStatsByAccountId.value = nextStats
-  } catch (error) {
-    if (reqSeq !== todayStatsReqSeq.value) return
-    todayStatsError.value = 'Failed'
-    console.error('Failed to load account today stats:', error)
-  } finally {
-    if (reqSeq === todayStatsReqSeq.value) {
-      todayStatsLoading.value = false
-    }
-  }
-}
-
-const autoRefreshIntervalLabel = (sec: number) => {
-  if (sec === 5) return t('admin.accounts.refreshInterval5s')
-  if (sec === 10) return t('admin.accounts.refreshInterval10s')
-  if (sec === 15) return t('admin.accounts.refreshInterval15s')
-  if (sec === 30) return t('admin.accounts.refreshInterval30s')
-  return `${sec}s`
-}
 
 const formatSchedulerScore = (value: unknown): string => {
   const num = Number(value)
@@ -1117,6 +500,19 @@ const {
 })
 
 const {
+  isDesktopViewport,
+  todayStatsByAccountId,
+  todayStatsLoading,
+  todayStatsError,
+  usageBatchByAccountId,
+  usageBatchErrorByAccountId,
+  usageBatchLoadingByAccountId,
+  queueBatchedUsage,
+  handleAccountUsageLoaded,
+  refreshTodayStatsBatch
+} = useAccountUsageBatches(accounts, hiddenColumns)
+
+const {
   selectedSet,
   selectedIds: selIds,
   allVisibleSelected,
@@ -1156,8 +552,8 @@ const selectPage = () => {
 }
 
 const swipeVirtualContext: SwipeSelectVirtualContext = {
-  getVirtualizer: () => dataTableRef.value?.virtualizer ?? null,
-  getSortedData: () => dataTableRef.value?.sortedData ?? accounts.value,
+  getVirtualizer: () => accountDataTableRef.value?.dataTableRef?.virtualizer ?? null,
+  getSortedData: () => accountDataTableRef.value?.dataTableRef?.sortedData ?? accounts.value,
   getRowId: (row: any) => row.id,
 }
 
@@ -1270,22 +666,6 @@ watch(loading, (isLoading, wasLoading) => {
       console.error('Failed to refresh account today stats after table load:', error)
     })
   }
-})
-
-watch(accounts, (rows) => {
-  const visibleIDs = new Set(rows.map((row) => String(row.id)))
-  usageBatchByAccountId.value = Object.fromEntries(
-    Object.entries(usageBatchByAccountId.value).filter(([key]) => visibleIDs.has(key))
-  )
-  usageBatchErrorByAccountId.value = Object.fromEntries(
-    Object.entries(usageBatchErrorByAccountId.value).filter(([key]) => visibleIDs.has(key))
-  )
-  usageBatchLoadingByAccountId.value = Object.fromEntries(
-    Object.entries(usageBatchLoadingByAccountId.value).filter(([key]) => visibleIDs.has(key))
-  )
-  usageBatchRequestTokenByAccountId.value = Object.fromEntries(
-    Object.entries(usageBatchRequestTokenByAccountId.value).filter(([key]) => visibleIDs.has(key))
-  )
 })
 
 watch(upstreamBillingNow, () => {
@@ -1433,52 +813,14 @@ const loadUpstreamBillingProbeGlobalState = async () => {
   }
 }
 
-const closeAccountToolsDropdown = () => {
-  showAccountToolsDropdown.value = false
-}
+type AccountToolbarAction = 'sync' | 'import' | 'export' | 'error-passthrough' | 'tls-profiles'
 
-const updateAccountToolsDropdownPosition = () => {
-  const trigger = accountToolsTriggerRef.value
-  if (!trigger) return
-
-  const position = getFloatingPanelPosition(
-    trigger.getBoundingClientRect(),
-    document.documentElement.clientWidth || window.innerWidth,
-    window.innerHeight
-  )
-  Object.assign(accountToolsDropdownPosition, position)
-}
-
-const toggleAccountToolsDropdown = () => {
-  const nextVisible = !showAccountToolsDropdown.value
-  showAutoRefreshDropdown.value = false
-  if (nextVisible) updateAccountToolsDropdownPosition()
-  showAccountToolsDropdown.value = nextVisible
-}
-
-const openSyncFromCrs = () => {
-  closeAccountToolsDropdown()
-  showSync.value = true
-}
-
-const openImportData = () => {
-  closeAccountToolsDropdown()
-  showImportData.value = true
-}
-
-const openExportDataDialogFromMenu = () => {
-  closeAccountToolsDropdown()
-  openExportDataDialog()
-}
-
-const openErrorPassthrough = () => {
-  closeAccountToolsDropdown()
-  showErrorPassthrough.value = true
-}
-
-const openTLSFingerprintProfiles = () => {
-  closeAccountToolsDropdown()
-  showTLSFingerprintProfiles.value = true
+const handleToolbarAction = (action: AccountToolbarAction) => {
+  if (action === 'sync') showSync.value = true
+  else if (action === 'import') showImportData.value = true
+  else if (action === 'export') openExportDataDialog()
+  else if (action === 'error-passthrough') showErrorPassthrough.value = true
+  else if (action === 'tls-profiles') showTLSFingerprintProfiles.value = true
 }
 
 const syncPendingListChanges = async () => {
@@ -1494,7 +836,7 @@ const { pause: pauseAutoRefresh, resume: resumeAutoRefresh } = useIntervalFn(
     if (document.hidden) return
     if (loading.value || autoRefreshFetching.value) return
     if (isAnyModalOpen.value) return
-    if (menu.show || showAccountToolsDropdown.value || showAutoRefreshDropdown.value) return
+    if (menu.show || toolbarDropdownOpen.value) return
     if (inAutoRefreshSilentWindow()) {
       autoRefreshCountdown.value = Math.max(
         0,
@@ -2477,38 +1819,9 @@ const proxyExpiryText = (p: AccountProxy): string => {
 // 表格滚动时关闭行操作菜单，并让顶部工具菜单继续贴紧触发按钮。
 const handleScroll = () => {
   menu.show = false
-  if (showAccountToolsDropdown.value) updateAccountToolsDropdownPosition()
-}
-
-const handleViewportResize = () => {
-  if (showAccountToolsDropdown.value) updateAccountToolsDropdownPosition()
-}
-
-// 点击外部关闭顶部下拉菜单
-const handleClickOutside = (event: MouseEvent) => {
-  const target = event.target as HTMLElement
-  if (accountToolsDropdownRef.value && !accountToolsDropdownRef.value.contains(target)) {
-    showAccountToolsDropdown.value = false
-  }
-  if (autoRefreshDropdownRef.value && !autoRefreshDropdownRef.value.contains(target)) {
-    showAutoRefreshDropdown.value = false
-  }
 }
 
 onMounted(async () => {
-  if (typeof window !== 'undefined') {
-    desktopViewportMediaQuery = window.matchMedia(desktopViewportQuery)
-    isDesktopViewport.value = desktopViewportMediaQuery.matches
-    desktopViewportListener = (event: MediaQueryListEvent) => {
-      isDesktopViewport.value = event.matches
-    }
-    if (typeof desktopViewportMediaQuery.addEventListener === 'function') {
-      desktopViewportMediaQuery.addEventListener('change', desktopViewportListener)
-    } else {
-      desktopViewportMediaQuery.addListener(desktopViewportListener)
-    }
-  }
-
   load()
   loadUpstreamBillingProbeGlobalState()
   const [proxiesResult, groupsResult] = await Promise.allSettled([
@@ -2526,8 +1839,6 @@ onMounted(async () => {
     console.error('Failed to load groups:', groupsResult.reason)
   }
   window.addEventListener('scroll', handleScroll, true)
-  window.addEventListener('resize', handleViewportResize)
-  document.addEventListener('click', handleClickOutside)
 
   if (autoRefreshEnabled.value) {
     autoRefreshCountdown.value = autoRefreshIntervalSeconds.value
@@ -2538,32 +1849,6 @@ onMounted(async () => {
 })
 
 onUnmounted(() => {
-  if (usageBatchFlushTimer !== null) {
-    clearTimeout(usageBatchFlushTimer)
-    usageBatchFlushTimer = null
-  }
-  pendingUsageBatchIds.clear()
   window.removeEventListener('scroll', handleScroll, true)
-  window.removeEventListener('resize', handleViewportResize)
-  document.removeEventListener('click', handleClickOutside)
-  if (desktopViewportMediaQuery && desktopViewportListener) {
-    if (typeof desktopViewportMediaQuery.removeEventListener === 'function') {
-      desktopViewportMediaQuery.removeEventListener('change', desktopViewportListener)
-    } else {
-      desktopViewportMediaQuery.removeListener(desktopViewportListener)
-    }
-  }
-  desktopViewportListener = null
-  desktopViewportMediaQuery = null
 })
 </script>
-
-<style scoped>
-.account-tools-menu-item {
-  @apply flex w-full items-center gap-3 rounded-xl px-3 py-2 text-sm text-slate-700 transition-colors hover:bg-slate-100 dark:text-gray-200 dark:hover:bg-dark-700;
-}
-
-.account-tools-menu-icon {
-  @apply inline-flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-xl;
-}
-</style>
