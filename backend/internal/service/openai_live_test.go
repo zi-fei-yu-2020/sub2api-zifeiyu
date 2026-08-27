@@ -240,3 +240,18 @@ func TestRequestTypeLive(t *testing.T) {
 	require.NoError(t, err)
 	require.Equal(t, RequestTypeLive, parsed)
 }
+
+func TestCreateLiveCallRequiresExplicitFreePolicy(t *testing.T) {
+	request := &LiveCallRequest{SDP: "v=0\r\n", Session: json.RawMessage(`{"model":"gpt-live-test"}`)}
+
+	disabled := &OpenAIGatewayService{cfg: &config.Config{}}
+	_, err := disabled.CreateLiveCall(context.Background(), request, LiveCallIdentity{}, 1)
+	require.ErrorIs(t, err, ErrLiveBillingPolicyDisabled)
+
+	explicitFree := &OpenAIGatewayService{cfg: &config.Config{
+		Gateway: config.GatewayConfig{Live: config.GatewayLiveConfig{BillingPolicy: config.LiveBillingPolicyExplicitFree, BillingPolicyExplicit: true}},
+	}}
+	_, err = explicitFree.CreateLiveCall(context.Background(), request, LiveCallIdentity{}, 1)
+	require.ErrorIs(t, err, ErrLiveUnavailable)
+	require.NotErrorIs(t, err, ErrLiveBillingPolicyDisabled)
+}

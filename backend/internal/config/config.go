@@ -1206,7 +1206,13 @@ type GatewayCNProvidersConfig struct {
 }
 
 type GatewayLiveConfig struct {
-	// MaxSessionDurationSeconds 是 Live 会话的硬上限。
+	// BillingPolicy controls whether zero-cost Live sessions may be created.
+	// disabled is fail-closed; explicit_free is the only policy that permits Live.
+	BillingPolicy string `mapstructure:"billing_policy"`
+	// BillingPolicyExplicit records whether an operator explicitly configured the policy.
+	// It is runtime metadata and is never serialized back into config files.
+	BillingPolicyExplicit bool `mapstructure:"-" json:"-" yaml:"-"`
+	// MaxSessionDurationSeconds is the hard upper bound for one Live session.
 	MaxSessionDurationSeconds int `mapstructure:"max_session_duration_seconds"`
 }
 
@@ -1881,6 +1887,8 @@ func load(allowMissingJWTSecret bool) (*Config, error) {
 	}
 	_, urlPolicyProfileEnvConfigured := nonEmptyEnv("SECURITY_URL_POLICY_PROFILE")
 	urlPolicyProfileConfigured := viper.InConfig("security.url_policy.profile") || urlPolicyProfileEnvConfigured
+	_, liveBillingPolicyEnvConfigured := nonEmptyEnv("GATEWAY_LIVE_BILLING_POLICY")
+	liveBillingPolicyConfigured := viper.InConfig("gateway.live.billing_policy") || liveBillingPolicyEnvConfigured
 	legacyURLPolicyConfigured := configOrNonEmptyEnv("security.url_allowlist.enabled", "SECURITY_URL_ALLOWLIST_ENABLED") ||
 		configOrNonEmptyEnv("security.url_allowlist.allow_private_hosts", "SECURITY_URL_ALLOWLIST_ALLOW_PRIVATE_HOSTS") ||
 		configOrNonEmptyEnv("security.url_allowlist.allow_insecure_http", "SECURITY_URL_ALLOWLIST_ALLOW_INSECURE_HTTP") ||
@@ -1897,6 +1905,7 @@ func load(allowMissingJWTSecret bool) (*Config, error) {
 	if err := viper.Unmarshal(&cfg); err != nil {
 		return nil, fmt.Errorf("unmarshal config error: %w", err)
 	}
+	cfg.Gateway.Live.BillingPolicyExplicit = liveBillingPolicyConfigured
 	if err := applyURLPolicyProfile(&cfg, urlPolicyProfileConfigured, legacyURLPolicyConfigured, existingConfig); err != nil {
 		return nil, err
 	}
@@ -2052,6 +2061,13 @@ func load(allowMissingJWTSecret bool) (*Config, error) {
 	}
 	if !cfg.Security.ResponseHeaders.Enabled {
 		slog.Warn("security.response_headers.enabled=false; configurable header filtering disabled (default allowlist only).")
+	}
+	if !cfg.Gateway.Live.BillingPolicyExplicit {
+		slog.Warn("OpenAI Live billing policy was not explicitly configured; Live remains disabled. Existing allow_live groups cannot create zero-cost sessions until gateway.live.billing_policy=explicit_free is acknowledged.")
+	} else if cfg.Gateway.Live.BillingPolicy == LiveBillingPolicyDisabled {
+		slog.Info("OpenAI Live is disabled by gateway.live.billing_policy")
+	} else if cfg.Gateway.Live.BillingPolicy == LiveBillingPolicyExplicitFree {
+		slog.Warn("OpenAI Live explicit-free policy enabled; Live usage is recorded at zero cost while existing RPM, concurrency, and maximum-duration limits remain enforced.")
 	}
 
 	if cfg.JWT.Secret != "" && isWeakJWTSecret(cfg.JWT.Secret) {
@@ -2473,6 +2489,7 @@ func setDefaults() {
 	viper.SetDefault("gateway.codex_image_generation_bridge_enabled", false)
 	viper.SetDefault("gateway.openai_passthrough_allow_timeout_headers", false)
 	viper.SetDefault("gateway.openai_compact_model", "gpt-5.4")
+	viper.SetDefault("gateway.live.billing_policy", LiveBillingPolicyDisabled)
 	viper.SetDefault("gateway.live.max_session_duration_seconds", 3600)
 	// OpenAI Responses WebSocket（默认开启；可通过 force_http 紧急回滚）
 	viper.SetDefault("gateway.openai_ws.enabled", true)
@@ -3396,6 +3413,12 @@ func (c *Config) Validate() error {
 	if c.Gateway.OpenAIHighEffortFirstOutputTimeoutSeconds < 0 || c.Gateway.OpenAIHighEffortFirstOutputTimeoutSeconds > 1800 ||
 		(c.Gateway.OpenAIHighEffortFirstOutputTimeoutSeconds > 0 && c.Gateway.OpenAIHighEffortFirstOutputTimeoutSeconds < 30) {
 		return fmt.Errorf("gateway.openai_high_effort_first_output_timeout_seconds must be 0 or between 30-1800 seconds")
+	}
+	c.Gateway.Live.BillingPolicy = NormalizeLiveBillingPolicy(c.Gateway.Live.BillingPolicy)
+	switch c.Gateway.Live.BillingPolicy {
+	case LiveBillingPolicyDisabled, LiveBillingPolicyExplicitFree:
+	default:
+		return fmt.Errorf("gateway.live.billing_policy must be one of: disabled/explicit_free")
 	}
 	if c.Gateway.Live.MaxSessionDurationSeconds <= 0 {
 		c.Gateway.Live.MaxSessionDurationSeconds = 3600

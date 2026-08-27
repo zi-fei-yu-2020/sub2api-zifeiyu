@@ -315,8 +315,11 @@ gateway:
   # Use this to avoid compact failures when newer models are not yet supported by the compact endpoint.
   # 当 compact 端点暂未支持更新模型时，可通过这里降级规避失败。
   openai_compact_model: "gpt-5.4"
-  # ChatGPT Frameless Live 单会话硬上限（秒）。
+  # ChatGPT Frameless Live policy. Zero-cost Live must be explicitly acknowledged.
+  # disabled: fail closed (default); explicit_free: permit zero-cost Live sessions.
   live:
+    billing_policy: "disabled"
+    # Hard upper bound for one session in seconds; explicit_free does not bypass it.
     max_session_duration_seconds: 3600
   # OpenAI Responses WebSocket 配置（默认开启，可按需回滚到 HTTP）
   openai_ws:

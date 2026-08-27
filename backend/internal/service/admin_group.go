@@ -9,6 +9,7 @@ import (
 	"time"
 
 	dbent "github.com/Wei-Shaw/sub2api/ent"
+	"github.com/Wei-Shaw/sub2api/internal/config"
 	"github.com/Wei-Shaw/sub2api/internal/pkg/antigravity"
 	"github.com/Wei-Shaw/sub2api/internal/pkg/claude"
 	infraerrors "github.com/Wei-Shaw/sub2api/internal/pkg/errors"
@@ -18,6 +19,20 @@ import (
 	"github.com/Wei-Shaw/sub2api/internal/pkg/pagination"
 	"github.com/Wei-Shaw/sub2api/internal/pkg/xai"
 )
+
+func (s *adminServiceImpl) validateLiveGroupPolicy(allowLive bool) error {
+	if !allowLive {
+		return nil
+	}
+	if s == nil || !config.LiveExplicitFreeEnabled(s.cfg) {
+		return infraerrors.Newf(
+			http.StatusBadRequest,
+			"LIVE_BILLING_POLICY_DISABLED",
+			"OpenAI Live requires gateway.live.billing_policy=explicit_free",
+		)
+	}
+	return nil
+}
 
 // Group management implementations
 func (s *adminServiceImpl) ListGroups(ctx context.Context, page, pageSize int, platform, status, search string, isExclusive *bool, sortBy, sortOrder string) ([]Group, int64, error) {
@@ -296,6 +311,12 @@ func groupSupportsOAuthOnlyFilter(platform string) bool {
 }
 
 func (s *adminServiceImpl) CreateGroup(ctx context.Context, input *CreateGroupInput) (*Group, error) {
+	if input == nil {
+		return nil, infraerrors.Newf(http.StatusBadRequest, "INVALID_GROUP", "group input is required")
+	}
+	if err := s.validateLiveGroupPolicy(input.AllowLive); err != nil {
+		return nil, err
+	}
 	if input.RateMultiplier <= 0 {
 		return nil, errors.New("rate_multiplier must be > 0")
 	}
@@ -636,6 +657,14 @@ func (s *adminServiceImpl) validateFallbackGroupOnInvalidRequest(ctx context.Con
 }
 
 func (s *adminServiceImpl) UpdateGroup(ctx context.Context, id int64, input *UpdateGroupInput) (*Group, error) {
+	if input == nil {
+		return nil, infraerrors.Newf(http.StatusBadRequest, "INVALID_GROUP", "group input is required")
+	}
+	if input.AllowLive != nil {
+		if err := s.validateLiveGroupPolicy(*input.AllowLive); err != nil {
+			return nil, err
+		}
+	}
 	group, err := s.groupRepo.GetByID(ctx, id)
 	if err != nil {
 		return nil, err

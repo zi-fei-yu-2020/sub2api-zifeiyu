@@ -8,6 +8,7 @@ import (
 	"net/http/httptest"
 	"testing"
 
+	"github.com/Wei-Shaw/sub2api/internal/config"
 	"github.com/Wei-Shaw/sub2api/internal/service"
 	"github.com/gin-gonic/gin"
 	"github.com/stretchr/testify/require"
@@ -118,4 +119,21 @@ func jsonPathString(t *testing.T, raw json.RawMessage, keys ...string) string {
 	result, ok := current.(string)
 	require.True(t, ok)
 	return result
+}
+
+func TestLiveExplicitFreePolicyGate(t *testing.T) {
+	require.False(t, (&OpenAIGatewayHandler{}).liveExplicitFreeEnabled())
+	require.False(t, (&OpenAIGatewayHandler{cfg: &config.Config{}}).liveExplicitFreeEnabled())
+	require.True(t, (&OpenAIGatewayHandler{cfg: &config.Config{
+		Gateway: config.GatewayConfig{Live: config.GatewayLiveConfig{BillingPolicy: config.LiveBillingPolicyExplicitFree, BillingPolicyExplicit: true}},
+	}}).liveExplicitFreeEnabled())
+}
+
+func TestLiveBillingPolicyErrorIsExplicit(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	recorder := httptest.NewRecorder()
+	context, _ := gin.CreateTestContext(recorder)
+	(&OpenAIGatewayHandler{}).writeLiveCreateError(context, service.ErrLiveBillingPolicyDisabled)
+	require.Equal(t, http.StatusServiceUnavailable, recorder.Code)
+	require.Contains(t, recorder.Body.String(), "Live billing policy is disabled")
 }

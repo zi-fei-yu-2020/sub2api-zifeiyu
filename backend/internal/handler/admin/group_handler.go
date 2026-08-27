@@ -10,6 +10,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/Wei-Shaw/sub2api/internal/config"
 	"github.com/Wei-Shaw/sub2api/internal/handler/dto"
 	infraerrors "github.com/Wei-Shaw/sub2api/internal/pkg/errors"
 	"github.com/Wei-Shaw/sub2api/internal/pkg/response"
@@ -25,14 +26,30 @@ type GroupHandler struct {
 	dashboardService        *service.DashboardService
 	groupCapacityService    *service.GroupCapacityService
 	groupDetailStatsService *service.GroupDetailStatsService
+	cfg                     *config.Config
 }
 
 // GetLiveCapability 返回当前服务端是否具备生成 Live attestation 的运行环境。
 func (h *GroupHandler) GetLiveCapability(c *gin.Context) {
-	err := liveattestation.NewProvider().Check(c.Request.Context())
-	result := gin.H{"supported": err == nil}
-	if err != nil {
-		result["reason"] = err.Error()
+	attestationErr := liveattestation.NewProvider().Check(c.Request.Context())
+	policy := config.LiveBillingPolicyDisabled
+	policyExplicit := false
+	if h != nil && h.cfg != nil {
+		policy = config.NormalizeLiveBillingPolicy(h.cfg.Gateway.Live.BillingPolicy)
+		policyExplicit = h.cfg.Gateway.Live.BillingPolicyExplicit
+	}
+	policyAllowed := config.LiveExplicitFreeEnabled(h.cfg)
+	result := gin.H{
+		"supported":               attestationErr == nil && policyAllowed,
+		"attestation_supported":   attestationErr == nil,
+		"billing_policy":          policy,
+		"billing_policy_explicit": policyExplicit,
+	}
+	switch {
+	case !policyAllowed:
+		result["reason"] = "OpenAI Live requires gateway.live.billing_policy=explicit_free"
+	case attestationErr != nil:
+		result["reason"] = attestationErr.Error()
 	}
 	response.Success(c, result)
 }
@@ -92,12 +109,14 @@ func NewGroupHandler(
 	dashboardService *service.DashboardService,
 	groupCapacityService *service.GroupCapacityService,
 	groupDetailStatsService *service.GroupDetailStatsService,
+	cfg *config.Config,
 ) *GroupHandler {
 	return &GroupHandler{
 		adminService:            adminService,
 		dashboardService:        dashboardService,
 		groupCapacityService:    groupCapacityService,
 		groupDetailStatsService: groupDetailStatsService,
+		cfg:                     cfg,
 	}
 }
 

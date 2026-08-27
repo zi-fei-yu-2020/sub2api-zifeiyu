@@ -1144,7 +1144,8 @@ export default {
       openaiLive: {
         title: 'OpenAI Live',
         allow: 'Allow Live access',
-        hint: 'When enabled, API keys in this OpenAI group can create and control Live voice sessions. Disabled by default. The Sub2API server must run on Apple Silicon macOS with the official ChatGPT app installed; client platforms are unrestricted.',
+        hint: 'When enabled, API keys in this OpenAI group can create and control Live sessions. The server must also explicitly set the zero-cost policy to explicit_free; existing user/group RPM, API-key limits, concurrency, and maximum-duration controls still apply. The Sub2API server must run on Apple Silicon macOS with the official ChatGPT app installed.',
+        policyDisabled: 'OpenAI Live cannot be enabled until gateway.live.billing_policy is explicitly set to explicit_free and the service is restarted.',
         unsupportedTitle: 'Current server does not support Live',
         unsupportedMessage: 'This Sub2API server cannot generate the required Live attestation. Live will not work even if enabled. Continue anyway?',
         enableAnyway: 'Enable anyway'

@@ -15,6 +15,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/Wei-Shaw/sub2api/internal/config"
 	"github.com/Wei-Shaw/sub2api/internal/pkg/logger"
 	coderws "github.com/coder/websocket"
 	"github.com/google/uuid"
@@ -30,6 +31,9 @@ const (
 	liveObserverPollInterval      = 250 * time.Millisecond
 	liveObserverStoreRetryLimit   = 5
 	liveUpstreamBodyLimit         = 2 << 20
+
+	LiveUsageBillingTierExplicitFree   = "live_explicit_free"
+	LiveUsageBillingTierLegacyUnpriced = "live_legacy_unpriced"
 )
 
 // liveObserverStoreRetryInterval 是 var 以便测试缩短 store 报错的重试等待。
@@ -95,6 +99,17 @@ func (s *OpenAIGatewayService) liveConcurrencyCache() (LiveConcurrencyCache, err
 	return cache, nil
 }
 
+func (s *OpenAIGatewayService) liveBillingPolicy() string {
+	if s == nil || s.cfg == nil {
+		return config.LiveBillingPolicyDisabled
+	}
+	return config.NormalizeLiveBillingPolicy(s.cfg.Gateway.Live.BillingPolicy)
+}
+
+func (s *OpenAIGatewayService) liveExplicitFreeEnabled() bool {
+	return s != nil && config.LiveExplicitFreeEnabled(s.cfg)
+}
+
 func (s *OpenAIGatewayService) liveMaxSessionDuration() time.Duration {
 	if s != nil && s.cfg != nil && s.cfg.Gateway.Live.MaxSessionDurationSeconds > 0 {
 		return time.Duration(s.cfg.Gateway.Live.MaxSessionDurationSeconds) * time.Second
@@ -129,6 +144,9 @@ func (s *OpenAIGatewayService) CreateLiveCall(
 ) (*LiveCallCreated, error) {
 	if err := ValidateLiveCallRequest(request); err != nil {
 		return nil, err
+	}
+	if !s.liveExplicitFreeEnabled() {
+		return nil, ErrLiveBillingPolicyDisabled
 	}
 	store, err := s.liveStore()
 	if err != nil {
@@ -228,6 +246,7 @@ func (s *OpenAIGatewayService) CreateLiveCall(
 			UserAgent:             identity.UserAgent,
 			IPAddress:             identity.IPAddress,
 			InboundEndpoint:       identity.InboundEndpoint,
+			BillingPolicy:         s.liveBillingPolicy(),
 			AttestationCiphertext: attestationCiphertext,
 		}
 		mappingTTL := s.liveMaxSessionDuration() + 5*time.Minute
@@ -824,14 +843,17 @@ func (s *OpenAIGatewayService) finalizeLiveCall(record *LiveCallRecord) {
 	if record.SubscriptionID > 0 {
 		billingType = BillingTypeSubscription
 	}
-	// TODO(billing): Live 会话目前不计费：TotalCost/ActualCost 恒为 0，完全绕过
-	// recordUsageCore/applyUsageBilling，余额模式下极低余额也能反复开启最长
-	// liveMaxSessionDuration 的会话。若确认按时长计费，应在此接入计费管道；
-	// 若确认有意免费，删除本注释即可（零值行为由
-	// TestFinalizeLiveCallIsIdempotentAndWritesZeroUsage 锁定）。
-	//
-	// 这是该会话唯一一次落库机会（MarkLiveCallClosed 已标记 first），失败即永久
-	// 丢失，因此走带日志与同步兜底的 writeUsageLogBestEffort（issue #3656）。
+	// MarkLiveCallClosed makes this the only settlement path. Live remains
+	// zero-cost by design here; the explicit policy snapshot below makes that
+	// decision auditable instead of silently bypassing the normal billing path.
+	billingTier := LiveUsageBillingTierLegacyUnpriced
+	if config.NormalizeLiveBillingPolicy(record.BillingPolicy) == config.LiveBillingPolicyExplicitFree {
+		billingTier = LiveUsageBillingTierExplicitFree
+	}
+	billingMode := string(BillingModeToken)
+	// Live is intentionally zero-cost only under the explicit_free policy. The
+	// policy snapshot is persisted as billing_tier so operators can distinguish
+	// acknowledged free sessions from legacy unpriced sessions.
 	writeUsageLogBestEffort(context.Background(), s.usageLogRepo, &UsageLog{
 		UserID:           record.UserID,
 		APIKeyID:         record.APIKeyID,
@@ -842,6 +864,8 @@ func (s *OpenAIGatewayService) finalizeLiveCall(record *LiveCallRecord) {
 		GroupID:          liveOptionalID(record.GroupID),
 		SubscriptionID:   liveOptionalID(record.SubscriptionID),
 		RateMultiplier:   1,
+		BillingTier:      &billingTier,
+		BillingMode:      &billingMode,
 		BillingType:      billingType,
 		RequestType:      RequestTypeLive,
 		DurationMs:       &duration,

@@ -1016,6 +1016,12 @@
           <p class="text-xs text-slate-400 dark:text-slate-400 mt-1">
             {{ t("admin.groups.openaiLive.hint") }}
           </p>
+          <p
+            v-if="liveCapability && liveCapability.billing_policy !== 'explicit_free'"
+            class="mt-2 text-xs font-medium text-amber-600 dark:text-amber-400"
+          >
+            {{ t("admin.groups.openaiLive.policyDisabled") }}
+          </p>
         </div>
 
         <!-- OpenAI Messages 调度配置（OpenAI 与 Composite 平台） -->
@@ -2467,6 +2473,12 @@
           <p class="text-xs text-slate-400 dark:text-slate-400 mt-1">
             {{ t("admin.groups.openaiLive.hint") }}
           </p>
+          <p
+            v-if="liveCapability && liveCapability.billing_policy !== 'explicit_free'"
+            class="mt-2 text-xs font-medium text-amber-600 dark:text-amber-400"
+          >
+            {{ t("admin.groups.openaiLive.policyDisabled") }}
+          </p>
         </div>
 
         <!-- OpenAI Messages 调度配置（OpenAI 与 Composite 平台） -->
@@ -3122,6 +3134,7 @@ import { useI18n } from "vue-i18n";
 import { useAppStore } from "@/stores/app";
 import { useOnboardingStore } from "@/stores/onboarding";
 import { adminAPI } from "@/api/admin";
+import type { LiveCapability } from "@/api/admin/groups";
 import type {
   AdminGroup,
   CompositeModelRoute,
@@ -3620,11 +3633,8 @@ const pendingLiveForm = ref<"create" | "edit" | null>(null);
 const showUnsupportedLiveConfirm = computed(
   () => pendingLiveForm.value !== null,
 );
-const liveCapability = ref<{ supported: boolean; reason?: string } | null>(null);
-let liveCapabilityRequest: Promise<{
-  supported: boolean;
-  reason?: string;
-}> | null = null;
+const liveCapability = ref<LiveCapability | null>(null);
+let liveCapabilityRequest: Promise<LiveCapability> | null = null;
 const showSortModal = ref(false);
 const submitting = ref(false);
 const sortSubmitting = ref(false);
@@ -4294,13 +4304,23 @@ const loadLiveCapability = async () => {
   if (!liveCapabilityRequest) {
     liveCapabilityRequest = adminAPI.groups
       .getLiveCapability()
-      .catch(() => ({ supported: false }))
+      .catch(() => ({
+        supported: false,
+        attestation_supported: false,
+        billing_policy: "disabled" as const,
+        billing_policy_explicit: false,
+      }))
       .finally(() => {
         liveCapabilityRequest = null;
       });
   }
   liveCapability.value = await liveCapabilityRequest;
-  return liveCapability.value ?? { supported: false };
+  return liveCapability.value ?? {
+    supported: false,
+    attestation_supported: false,
+    billing_policy: "disabled",
+    billing_policy_explicit: false,
+  };
 };
 
 const toggleLive = async (target: "create" | "edit") => {
@@ -4310,6 +4330,10 @@ const toggleLive = async (target: "create" | "edit") => {
     return;
   }
   const capability = await loadLiveCapability();
+  if (capability.billing_policy !== "explicit_free") {
+    appStore.showError(t("admin.groups.openaiLive.policyDisabled"));
+    return;
+  }
   if (capability.supported) {
     form.allow_live = true;
     return;

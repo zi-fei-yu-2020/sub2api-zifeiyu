@@ -9,6 +9,7 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/Wei-Shaw/sub2api/internal/config"
 	"github.com/Wei-Shaw/sub2api/internal/pkg/ip"
 	middleware2 "github.com/Wei-Shaw/sub2api/internal/server/middleware"
 	"github.com/Wei-Shaw/sub2api/internal/service"
@@ -36,6 +37,10 @@ func (h *OpenAIGatewayHandler) Live(c *gin.Context) {
 	}
 	if !liveEnabledForAPIKey(apiKey) {
 		h.errorResponse(c, http.StatusForbidden, "permission_error", "Live is not enabled for this group")
+		return
+	}
+	if !h.liveExplicitFreeEnabled() {
+		h.errorResponse(c, http.StatusServiceUnavailable, "api_error", "Live billing policy is disabled")
 		return
 	}
 	request, err := parseLiveCallRequest(c)
@@ -179,6 +184,8 @@ func liveCallIdentity(
 
 func (h *OpenAIGatewayHandler) writeLiveCreateError(c *gin.Context, err error) {
 	switch {
+	case errors.Is(err, service.ErrLiveBillingPolicyDisabled):
+		h.errorResponse(c, http.StatusServiceUnavailable, "api_error", "Live billing policy is disabled")
 	case errors.Is(err, service.ErrLiveConcurrencyFull):
 		h.errorResponse(c, http.StatusTooManyRequests, "rate_limit_error", "Live concurrency limit reached")
 	case errors.Is(err, service.ErrLiveUnavailable):
@@ -213,6 +220,10 @@ func (h *OpenAIGatewayHandler) LiveSideband(c *gin.Context) {
 		h.errorResponse(c, http.StatusForbidden, "permission_error", "Live is not enabled for this group")
 		return
 	}
+	if !h.liveExplicitFreeEnabled() {
+		h.errorResponse(c, http.StatusServiceUnavailable, "api_error", "Live billing policy is disabled")
+		return
+	}
 	identity := service.LiveCallIdentity{
 		APIKeyID: apiKey.ID,
 		UserID:   subject.UserID,
@@ -239,6 +250,10 @@ func (h *OpenAIGatewayHandler) LiveSideband(c *gin.Context) {
 		return
 	}
 	_ = downstream.Close(coderws.StatusNormalClosure, "")
+}
+
+func (h *OpenAIGatewayHandler) liveExplicitFreeEnabled() bool {
+	return h != nil && config.LiveExplicitFreeEnabled(h.cfg)
 }
 
 func liveEnabledForAPIKey(apiKey *service.APIKey) bool {

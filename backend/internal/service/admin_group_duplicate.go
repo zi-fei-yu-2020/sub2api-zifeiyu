@@ -201,6 +201,9 @@ func (s *adminServiceImpl) DuplicateGroup(ctx context.Context, id int64, actorSc
 	if s.groupDuplicateRepo == nil {
 		return nil, errors.New("group duplicate repository is not configured")
 	}
+	if err := s.validateLiveGroupPolicy(source.AllowLive); err != nil {
+		return nil, err
+	}
 
 	duplicate := cloneGroupForDuplicate(source, duplicateGroupOperationID(id, actorScope, operationKey))
 	sanitizeGroupReasoningEffortPolicy(duplicate)

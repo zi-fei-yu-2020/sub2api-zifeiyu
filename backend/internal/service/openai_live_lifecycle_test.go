@@ -279,6 +279,7 @@ func TestFinalizeLiveCallIsIdempotentAndWritesZeroUsage(t *testing.T) {
 		ExpiresAt:       time.Now().Add(time.Hour),
 		Controller:      LiveControllerPending,
 		InboundEndpoint: "/v1/live",
+		BillingPolicy:   config.LiveBillingPolicyExplicitFree,
 	}
 	store := &liveTestStore{}
 	require.NoError(t, store.SaveLiveCall(context.Background(), record, time.Hour))
@@ -308,6 +309,10 @@ func TestFinalizeLiveCallIsIdempotentAndWritesZeroUsage(t *testing.T) {
 	require.Zero(t, log.OutputTokens)
 	require.Zero(t, log.TotalCost)
 	require.Zero(t, log.ActualCost)
+	require.NotNil(t, log.BillingTier)
+	require.Equal(t, LiveUsageBillingTierExplicitFree, *log.BillingTier)
+	require.NotNil(t, log.BillingMode)
+	require.Equal(t, string(BillingModeToken), *log.BillingMode)
 }
 
 func TestGetLiveCallForIdentityRejectsMismatchedCaller(t *testing.T) {
@@ -600,4 +605,22 @@ func TestFinalizeLiveCallUsageLogFallsBackToSyncCreate(t *testing.T) {
 	require.Equal(t, 1, usageRepo.bestEffortCalls)
 	require.Len(t, usageRepo.logs, 1, "best-effort 失败后必须同步兜底落库")
 	require.Equal(t, record.CallHash, usageRepo.logs[0].RequestID)
+}
+
+func TestFinalizeLegacyLiveCallMarksUsageUnpriced(t *testing.T) {
+	record := &LiveCallRecord{
+		CallID: "call_legacy", CallHash: hashLiveCallID("call_legacy"),
+		AccountID: 11, APIKeyID: 22, UserID: 33, LeaseID: "lease-legacy",
+		Model: "gpt-live-test", CreatedAt: time.Now().Add(-time.Second), ExpiresAt: time.Now().Add(time.Hour),
+		Controller: LiveControllerPending,
+	}
+	store := &liveTestStore{}
+	require.NoError(t, store.SaveLiveCall(context.Background(), record, time.Hour))
+	usageRepo := &liveTestUsageRepo{}
+	svc := &OpenAIGatewayService{
+		cache: store, concurrencyService: NewConcurrencyService(&liveTestConcurrencyCache{}), usageLogRepo: usageRepo,
+	}
+	svc.finalizeLiveCall(record)
+	require.Len(t, usageRepo.logs, 1)
+	require.Equal(t, LiveUsageBillingTierLegacyUnpriced, *usageRepo.logs[0].BillingTier)
 }

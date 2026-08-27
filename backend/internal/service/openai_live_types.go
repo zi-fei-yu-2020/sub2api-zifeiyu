@@ -15,11 +15,12 @@ const (
 )
 
 var (
-	ErrLiveUnavailable       = errors.New("live is unavailable")
-	ErrLiveConcurrencyFull   = errors.New("live concurrency is full")
-	ErrLiveCallNotFound      = errors.New("live call not found")
-	ErrLiveIdentityMismatch  = errors.New("live call identity mismatch")
-	ErrLiveControllerChanged = errors.New("live controller changed")
+	ErrLiveUnavailable           = errors.New("live is unavailable")
+	ErrLiveBillingPolicyDisabled = errors.New("live billing policy is disabled")
+	ErrLiveConcurrencyFull       = errors.New("live concurrency is full")
+	ErrLiveCallNotFound          = errors.New("live call not found")
+	ErrLiveIdentityMismatch      = errors.New("live call identity mismatch")
+	ErrLiveControllerChanged     = errors.New("live controller changed")
 )
 
 type LiveAttestationUnavailableError struct {
@@ -66,6 +67,9 @@ type LiveCallRecord struct {
 	UserAgent       string
 	IPAddress       string
 	InboundEndpoint string
+	// BillingPolicy snapshots the policy that authorized creation so usage
+	// records remain auditable even if configuration changes before finalization.
+	BillingPolicy string
 	// AttestationCiphertext 仅用于让同一会话的 Sideband 复用创建时的证明。
 	AttestationCiphertext string
 }

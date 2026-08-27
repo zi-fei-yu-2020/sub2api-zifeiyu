@@ -31,7 +31,7 @@ func newGroupDetailStatsTestService(stats *service.GroupDetailStats, err error) 
 func setupGroupDetailStatsRouter(statsService *service.GroupDetailStatsService) *gin.Engine {
 	gin.SetMode(gin.TestMode)
 	router := gin.New()
-	handler := NewGroupHandler(nil, nil, nil, statsService)
+	handler := NewGroupHandler(nil, nil, nil, statsService, nil)
 	router.GET("/api/v1/admin/groups/:id/stats", handler.GetStats)
 	return router
 }

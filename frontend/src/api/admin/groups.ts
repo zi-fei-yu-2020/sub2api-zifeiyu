@@ -18,6 +18,9 @@ import type {
 
 export interface LiveCapability {
   supported: boolean
+  attestation_supported: boolean
+  billing_policy: 'disabled' | 'explicit_free'
+  billing_policy_explicit: boolean
   reason?: string
 }
 
