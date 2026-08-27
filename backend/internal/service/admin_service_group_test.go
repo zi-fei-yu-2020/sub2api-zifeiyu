@@ -1006,7 +1006,7 @@ func TestAdminService_UpdateGroup_NormalizesMessagesDispatchModelConfig(t *testi
 
 func TestAdminService_CreateGroup_ClearsMessagesDispatchFieldsForNonOpenAIPlatform(t *testing.T) {
 	repo := &groupRepoStubForAdmin{}
-	svc := &adminServiceImpl{groupRepo: repo}
+	svc := &adminServiceImpl{groupRepo: repo, cfg: explicitFreeLiveConfigForTest()}
 
 	group, err := svc.CreateGroup(context.Background(), &CreateGroupInput{
 		Name:                  "anthropic-group",
@@ -1031,7 +1031,7 @@ func TestAdminService_CreateGroup_ClearsMessagesDispatchFieldsForNonOpenAIPlatfo
 
 func TestAdminService_CreateCompositeGroupPreservesLive(t *testing.T) {
 	repo := &groupRepoStubForAdmin{}
-	svc := &adminServiceImpl{groupRepo: repo}
+	svc := &adminServiceImpl{groupRepo: repo, cfg: explicitFreeLiveConfigForTest()}
 
 	group, err := svc.CreateGroup(context.Background(), &CreateGroupInput{
 		Name:           "composite-group",
@@ -1054,7 +1054,7 @@ func TestAdminService_UpdateCompositeGroupPreservesLive(t *testing.T) {
 		Status:   StatusActive,
 	}
 	repo := &groupRepoStubForAdmin{getByID: existingGroup}
-	svc := &adminServiceImpl{groupRepo: repo}
+	svc := &adminServiceImpl{groupRepo: repo, cfg: explicitFreeLiveConfigForTest()}
 	allowLive := true
 
 	group, err := svc.UpdateGroup(context.Background(), existingGroup.ID, &UpdateGroupInput{

@@ -192,7 +192,7 @@ func TestDuplicateGroupCopiesConfigurationDeeplyAndResetsRuntimeState(t *testing
 		{AccountID: 13, GroupID: source.ID, Priority: 37},
 		{AccountID: 17, GroupID: source.ID, Priority: 8},
 	}
-	svc := &adminServiceImpl{groupRepo: repo, groupDuplicateRepo: repo}
+	svc := &adminServiceImpl{groupRepo: repo, groupDuplicateRepo: repo, cfg: explicitFreeLiveConfigForTest()}
 
 	duplicate, err := svc.DuplicateGroup(context.Background(), source.ID, "admin:7", "stable-key")
 

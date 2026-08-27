@@ -8,6 +8,13 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
+func explicitFreeLiveConfigForTest() *config.Config {
+	return &config.Config{Gateway: config.GatewayConfig{Live: config.GatewayLiveConfig{
+		BillingPolicy:         config.LiveBillingPolicyExplicitFree,
+		BillingPolicyExplicit: true,
+	}}}
+}
+
 func TestAdminGroupLivePolicyRequiresExplicitFree(t *testing.T) {
 	tests := []struct {
 		name      string
