@@ -48,6 +48,40 @@ type RedeemCache interface {
 	ReleaseRedeemLock(ctx context.Context, code string) error
 }
 
+type RedeemCodeStatsByType struct {
+	Balance      int64 `json:"balance"`
+	Concurrency  int64 `json:"concurrency"`
+	Subscription int64 `json:"subscription"`
+	Invitation   int64 `json:"invitation"`
+}
+
+// RedeemCodeDistributedByType keeps different redemption units separate.
+// BalanceValue is monetary, ConcurrencyUnits is a request concurrency delta,
+// SubscriptionDays is a duration, and InvitationCodes is a count.
+type RedeemCodeDistributedByType struct {
+	BalanceValue     float64 `json:"balance_value"`
+	ConcurrencyUnits float64 `json:"concurrency_units"`
+	SubscriptionDays int64   `json:"subscription_days"`
+	InvitationCodes  int64   `json:"invitation_codes"`
+}
+
+type RedeemCodeStats struct {
+	TotalCodes            int64                       `json:"total_codes"`
+	ActiveCodes           int64                       `json:"active_codes"`
+	UsedCodes             int64                       `json:"used_codes"`
+	ExpiredCodes          int64                       `json:"expired_codes"`
+	TotalValueDistributed float64                     `json:"total_value_distributed"`
+	ByType                RedeemCodeStatsByType       `json:"by_type"`
+	DistributedByType     RedeemCodeDistributedByType `json:"distributed_by_type"`
+}
+
+// RedeemCodeStatsRepository is separate from RedeemCodeRepository so
+// lightweight repositories used by authentication flows do not need to
+// implement an unrelated admin reporting capability.
+type RedeemCodeStatsRepository interface {
+	GetStats(ctx context.Context) (*RedeemCodeStats, error)
+}
+
 type RedeemCodeRepository interface {
 	Create(ctx context.Context, code *RedeemCode) error
 	CreateBatch(ctx context.Context, codes []RedeemCode) error
@@ -637,19 +671,21 @@ func (s *RedeemService) Delete(ctx context.Context, id int64) error {
 	return nil
 }
 
-// GetStats 获取兑换码统计信息
-func (s *RedeemService) GetStats(ctx context.Context) (map[string]any, error) {
-	// TODO: 实现统计逻辑
-	// 统计未使用、已使用的兑换码数量
-	// 统计总面值等
-
-	stats := map[string]any{
-		"total_codes":  0,
-		"unused_codes": 0,
-		"used_codes":   0,
-		"total_value":  0.0,
+// GetStats returns database-aggregated redeem code statistics.
+func (s *RedeemService) GetStats(ctx context.Context) (*RedeemCodeStats, error) {
+	if s == nil || s.redeemRepo == nil {
+		return nil, errors.New("redeem code repository is not configured")
 	}
 
+	statsRepo, ok := s.redeemRepo.(RedeemCodeStatsRepository)
+	if !ok {
+		return nil, errors.New("redeem code repository does not support statistics")
+	}
+
+	stats, err := statsRepo.GetStats(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("get redeem code stats: %w", err)
+	}
 	return stats, nil
 }
 

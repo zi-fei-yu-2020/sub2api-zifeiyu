@@ -527,3 +527,55 @@ func (s *RedeemCodeRepoSuite) TestCreateBatch_Filters_Use_Idempotency_ListByUser
 	s.Require().Len(used, 2, "expected 2 used codes")
 	s.Require().Equal("CODEA", used[0].Code, "expected newest used code first")
 }
+
+func (s *RedeemCodeRepoSuite) TestGetStatsEmpty() {
+	stats, err := s.repo.GetStats(s.ctx)
+	s.Require().NoError(err)
+	s.Require().Equal(&service.RedeemCodeStats{}, stats)
+}
+
+func (s *RedeemCodeRepoSuite) TestGetStats() {
+	now := time.Now().UTC()
+	past := now.Add(-time.Hour)
+	future := now.Add(time.Hour)
+
+	codes := []service.RedeemCode{
+		{Code: "STATS-ACTIVE-BAL", Type: service.RedeemTypeBalance, Value: 10, Status: service.StatusUnused},
+		{Code: "STATS-ACTIVE-CON", Type: service.RedeemTypeConcurrency, Value: 2, Status: service.StatusUnused, ExpiresAt: &future},
+		{Code: "STATS-TIME-EXP-SUB", Type: service.RedeemTypeSubscription, Value: 99, Status: service.StatusUnused, ExpiresAt: &past, ValidityDays: 15},
+		{Code: "STATS-EXPLICIT-INV", Type: service.RedeemTypeInvitation, Status: service.StatusExpired},
+		{Code: "STATS-USED-BAL-POS", Type: service.RedeemTypeBalance, Value: 25, Status: service.StatusUsed},
+		{Code: "STATS-USED-BAL-NEG", Type: service.RedeemTypeBalance, Value: -7, Status: service.StatusUsed},
+		{Code: "STATS-USED-ADMIN-BAL", Type: service.AdjustmentTypeAdminBalance, Value: 3, Status: service.StatusUsed},
+		{Code: "STATS-USED-CON-POS", Type: service.RedeemTypeConcurrency, Value: 4.8, Status: service.StatusUsed},
+		{Code: "STATS-USED-ADMIN-CON-NEG", Type: service.AdjustmentTypeAdminConcurrency, Value: -2, Status: service.StatusUsed},
+		{Code: "STATS-USED-CON-FRACTION", Type: service.RedeemTypeConcurrency, Value: 0.5, Status: service.StatusUsed},
+		{Code: "STATS-USED-SUB", Type: service.RedeemTypeSubscription, Value: 199, Status: service.StatusUsed, ValidityDays: 30},
+		{Code: "STATS-USED-SUB-DEFAULT", Type: service.RedeemTypeSubscription, Value: 199, Status: service.StatusUsed},
+		{Code: "STATS-USED-INV", Type: service.RedeemTypeInvitation, Status: service.StatusUsed},
+		{Code: "STATS-DISABLED-BAL", Type: service.RedeemTypeBalance, Value: 50, Status: service.StatusDisabled},
+	}
+	for i := range codes {
+		s.Require().NoError(s.repo.Create(s.ctx, &codes[i]))
+	}
+
+	stats, err := s.repo.GetStats(s.ctx)
+	s.Require().NoError(err)
+	s.Require().Equal(int64(14), stats.TotalCodes)
+	s.Require().Equal(int64(2), stats.ActiveCodes)
+	s.Require().Equal(int64(9), stats.UsedCodes)
+	s.Require().Equal(int64(2), stats.ExpiredCodes)
+	s.Require().Equal(float64(28), stats.TotalValueDistributed)
+	s.Require().Equal(service.RedeemCodeStatsByType{
+		Balance:      5,
+		Concurrency:  4,
+		Subscription: 3,
+		Invitation:   2,
+	}, stats.ByType)
+	s.Require().Equal(service.RedeemCodeDistributedByType{
+		BalanceValue:     28,
+		ConcurrencyUnits: 4,
+		SubscriptionDays: 60,
+		InvitationCodes:  1,
+	}, stats.DistributedByType)
+}

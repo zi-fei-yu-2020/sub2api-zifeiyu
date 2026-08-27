@@ -98,6 +98,111 @@ func (r *redeemCodeRepository) Delete(ctx context.Context, id int64) error {
 	return err
 }
 
+type redeemCodeStatsRow struct {
+	TotalCodes          int64   `json:"total_codes"`
+	ActiveCodes         int64   `json:"active_codes"`
+	UsedCodes           int64   `json:"used_codes"`
+	ExpiredCodes        int64   `json:"expired_codes"`
+	BalanceCodes        int64   `json:"balance_codes"`
+	ConcurrencyCodes    int64   `json:"concurrency_codes"`
+	SubscriptionCodes   int64   `json:"subscription_codes"`
+	InvitationCodes     int64   `json:"invitation_codes"`
+	BalanceValue        float64 `json:"balance_value"`
+	ConcurrencyUnits    float64 `json:"concurrency_units"`
+	SubscriptionDays    int64   `json:"subscription_days"`
+	UsedInvitationCodes int64   `json:"used_invitation_codes"`
+}
+
+// GetStats aggregates redeem-code reporting in the database. CURRENT_TIMESTAMP
+// is evaluated consistently by PostgreSQL for the whole statement.
+func (r *redeemCodeRepository) GetStats(ctx context.Context) (*service.RedeemCodeStats, error) {
+	statusColumn := func(selector *entsql.Selector) string { return selector.C(redeemcode.FieldStatus) }
+	typeColumn := func(selector *entsql.Selector) string { return selector.C(redeemcode.FieldType) }
+	valueColumn := func(selector *entsql.Selector) string { return selector.C(redeemcode.FieldValue) }
+	expiresAtColumn := func(selector *entsql.Selector) string { return selector.C(redeemcode.FieldExpiresAt) }
+	validityDaysColumn := func(selector *entsql.Selector) string { return selector.C(redeemcode.FieldValidityDays) }
+
+	countWhere := func(alias string, predicate func(*entsql.Selector) string) dbent.AggregateFunc {
+		return dbent.As(func(selector *entsql.Selector) string {
+			return "COUNT(*) FILTER (WHERE " + predicate(selector) + ")"
+		}, alias)
+	}
+	sumWhere := func(alias string, value func(*entsql.Selector) string, predicate func(*entsql.Selector) string) dbent.AggregateFunc {
+		return dbent.As(func(selector *entsql.Selector) string {
+			return "COALESCE(SUM(" + value(selector) + ") FILTER (WHERE " + predicate(selector) + "), 0)"
+		}, alias)
+	}
+
+	var rows []redeemCodeStatsRow
+	err := r.client.RedeemCode.Query().Aggregate(
+		dbent.As(dbent.Count(), "total_codes"),
+		countWhere("active_codes", func(selector *entsql.Selector) string {
+			return statusColumn(selector) + " = '" + service.StatusUnused + "' AND (" + expiresAtColumn(selector) + " IS NULL OR " + expiresAtColumn(selector) + " > CURRENT_TIMESTAMP)"
+		}),
+		countWhere("used_codes", func(selector *entsql.Selector) string {
+			return statusColumn(selector) + " = '" + service.StatusUsed + "'"
+		}),
+		countWhere("expired_codes", func(selector *entsql.Selector) string {
+			return statusColumn(selector) + " = '" + service.StatusExpired + "' OR (" + statusColumn(selector) + " = '" + service.StatusUnused + "' AND " + expiresAtColumn(selector) + " IS NOT NULL AND " + expiresAtColumn(selector) + " <= CURRENT_TIMESTAMP)"
+		}),
+		countWhere("balance_codes", func(selector *entsql.Selector) string {
+			return typeColumn(selector) + " IN ('" + service.RedeemTypeBalance + "', '" + service.AdjustmentTypeAdminBalance + "', '" + service.RedeemTypeAffiliateBalance + "')"
+		}),
+		countWhere("concurrency_codes", func(selector *entsql.Selector) string {
+			return typeColumn(selector) + " IN ('" + service.RedeemTypeConcurrency + "', '" + service.AdjustmentTypeAdminConcurrency + "')"
+		}),
+		countWhere("subscription_codes", func(selector *entsql.Selector) string {
+			return typeColumn(selector) + " = '" + service.RedeemTypeSubscription + "'"
+		}),
+		countWhere("invitation_codes", func(selector *entsql.Selector) string {
+			return typeColumn(selector) + " = '" + service.RedeemTypeInvitation + "'"
+		}),
+		sumWhere("balance_value", valueColumn, func(selector *entsql.Selector) string {
+			return statusColumn(selector) + " = '" + service.StatusUsed + "' AND " + valueColumn(selector) + " > 0 AND " + typeColumn(selector) + " IN ('" + service.RedeemTypeBalance + "', '" + service.AdjustmentTypeAdminBalance + "', '" + service.RedeemTypeAffiliateBalance + "')"
+		}),
+		sumWhere("concurrency_units", func(selector *entsql.Selector) string {
+			return "TRUNC(" + valueColumn(selector) + ")"
+		}, func(selector *entsql.Selector) string {
+			return statusColumn(selector) + " = '" + service.StatusUsed + "' AND TRUNC(" + valueColumn(selector) + ") > 0 AND " + typeColumn(selector) + " IN ('" + service.RedeemTypeConcurrency + "', '" + service.AdjustmentTypeAdminConcurrency + "')"
+		}),
+		sumWhere("subscription_days", func(selector *entsql.Selector) string {
+			return "CASE WHEN " + validityDaysColumn(selector) + " = 0 THEN 30 ELSE " + validityDaysColumn(selector) + " END"
+		}, func(selector *entsql.Selector) string {
+			return statusColumn(selector) + " = '" + service.StatusUsed + "' AND " + validityDaysColumn(selector) + " >= 0 AND " + typeColumn(selector) + " = '" + service.RedeemTypeSubscription + "'"
+		}),
+		countWhere("used_invitation_codes", func(selector *entsql.Selector) string {
+			return statusColumn(selector) + " = '" + service.StatusUsed + "' AND " + typeColumn(selector) + " = '" + service.RedeemTypeInvitation + "'"
+		}),
+	).Scan(ctx, &rows)
+	if err != nil {
+		return nil, err
+	}
+	if len(rows) == 0 {
+		return &service.RedeemCodeStats{}, nil
+	}
+
+	row := rows[0]
+	return &service.RedeemCodeStats{
+		TotalCodes:            row.TotalCodes,
+		ActiveCodes:           row.ActiveCodes,
+		UsedCodes:             row.UsedCodes,
+		ExpiredCodes:          row.ExpiredCodes,
+		TotalValueDistributed: row.BalanceValue,
+		ByType: service.RedeemCodeStatsByType{
+			Balance:      row.BalanceCodes,
+			Concurrency:  row.ConcurrencyCodes,
+			Subscription: row.SubscriptionCodes,
+			Invitation:   row.InvitationCodes,
+		},
+		DistributedByType: service.RedeemCodeDistributedByType{
+			BalanceValue:     row.BalanceValue,
+			ConcurrencyUnits: row.ConcurrencyUnits,
+			SubscriptionDays: row.SubscriptionDays,
+			InvitationCodes:  row.UsedInvitationCodes,
+		},
+	}, nil
+}
+
 func (r *redeemCodeRepository) List(ctx context.Context, params pagination.PaginationParams) ([]service.RedeemCode, *pagination.PaginationResult, error) {
 	return r.ListWithFilters(ctx, params, "", "", "")
 }

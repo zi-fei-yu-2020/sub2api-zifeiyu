@@ -149,26 +149,29 @@ export async function expire(id: number): Promise<RedeemCode> {
   return data
 }
 
-/**
- * Get redeem code statistics
- * @returns Statistics about redeem codes
- */
-export async function getStats(): Promise<{
+/** Aggregated redeem-code statistics returned by the admin API. */
+export interface RedeemCodeStats {
   total_codes: number
   active_codes: number
   used_codes: number
   expired_codes: number
+  /** Positive monetary value distributed by used balance-type codes only. */
   total_value_distributed: number
   by_type: Record<RedeemCodeType, number>
-}> {
-  const { data } = await apiClient.get<{
-    total_codes: number
-    active_codes: number
-    used_codes: number
-    expired_codes: number
-    total_value_distributed: number
-    by_type: Record<RedeemCodeType, number>
-  }>('/admin/redeem-codes/stats')
+  distributed_by_type: {
+    balance_value: number
+    concurrency_units: number
+    subscription_days: number
+    invitation_codes: number
+  }
+}
+
+/**
+ * Get redeem code statistics.
+ * @returns Statistics about redeem codes
+ */
+export async function getStats(): Promise<RedeemCodeStats> {
+  const { data } = await apiClient.get<RedeemCodeStats>('/admin/redeem-codes/stats')
   return data
 }
 

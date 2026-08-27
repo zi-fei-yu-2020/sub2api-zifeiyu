@@ -2,7 +2,9 @@ package admin
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
+	"errors"
 	"net/http"
 	"net/http/httptest"
 	"testing"
@@ -169,4 +171,69 @@ func TestResolveRedeemCodeExpiresAt_RejectsConflictingInputs(t *testing.T) {
 	expiresAt, err := resolveRedeemCodeExpiresAt(&future, &days)
 	require.Error(t, err)
 	require.Nil(t, expiresAt)
+}
+
+type redeemHandlerStatsRepositoryStub struct {
+	service.RedeemCodeRepository
+	stats *service.RedeemCodeStats
+	err   error
+}
+
+func (s *redeemHandlerStatsRepositoryStub) GetStats(context.Context) (*service.RedeemCodeStats, error) {
+	return s.stats, s.err
+}
+
+func newRedeemStatsTestService(stats *service.RedeemCodeStats, err error) *service.RedeemService {
+	repo := &redeemHandlerStatsRepositoryStub{stats: stats, err: err}
+	return service.NewRedeemService(repo, nil, nil, nil, nil, nil, nil, nil)
+}
+
+func TestRedeemHandlerGetStats(t *testing.T) {
+	given := &service.RedeemCodeStats{
+		TotalCodes:            12,
+		ActiveCodes:           2,
+		UsedCodes:             7,
+		ExpiredCodes:          2,
+		TotalValueDistributed: 28,
+		ByType: service.RedeemCodeStatsByType{
+			Balance:      5,
+			Concurrency:  3,
+			Subscription: 2,
+			Invitation:   2,
+		},
+		DistributedByType: service.RedeemCodeDistributedByType{
+			BalanceValue:     28,
+			ConcurrencyUnits: 4,
+			SubscriptionDays: 30,
+			InvitationCodes:  1,
+		},
+	}
+	h := NewRedeemHandler(newStubAdminService(), newRedeemStatsTestService(given, nil))
+	router := gin.New()
+	router.GET("/api/v1/admin/redeem-codes/stats", h.GetStats)
+
+	rec := httptest.NewRecorder()
+	req := httptest.NewRequest(http.MethodGet, "/api/v1/admin/redeem-codes/stats", nil)
+	router.ServeHTTP(rec, req)
+
+	require.Equal(t, http.StatusOK, rec.Code)
+	var body struct {
+		Code int                     `json:"code"`
+		Data service.RedeemCodeStats `json:"data"`
+	}
+	require.NoError(t, json.Unmarshal(rec.Body.Bytes(), &body))
+	require.Zero(t, body.Code)
+	require.Equal(t, *given, body.Data)
+}
+
+func TestRedeemHandlerGetStatsReturnsServiceError(t *testing.T) {
+	h := NewRedeemHandler(newStubAdminService(), newRedeemStatsTestService(nil, errors.New("stats failed")))
+	router := gin.New()
+	router.GET("/api/v1/admin/redeem-codes/stats", h.GetStats)
+
+	rec := httptest.NewRecorder()
+	req := httptest.NewRequest(http.MethodGet, "/api/v1/admin/redeem-codes/stats", nil)
+	router.ServeHTTP(rec, req)
+
+	require.Equal(t, http.StatusInternalServerError, rec.Code)
 }
