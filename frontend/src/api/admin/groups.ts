@@ -240,23 +240,22 @@ export async function toggleStatus(id: number, status: 'active' | 'inactive'): P
   return update(id, { status })
 }
 
-/**
- * Get group statistics
- * @param id - Group ID
- * @returns Group usage statistics
- */
-export async function getStats(id: number): Promise<{
+export interface GroupDetailStats {
   total_api_keys: number
   active_api_keys: number
   total_requests: number
+  total_tokens: number
   total_cost: number
-}> {
-  const { data } = await apiClient.get<{
-    total_api_keys: number
-    active_api_keys: number
-    total_requests: number
-    total_cost: number
-  }>(`/admin/groups/${id}/stats`)
+  total_actual_cost: number
+}
+
+/**
+ * Get cumulative statistics for a group.
+ * @param id - Group ID
+ * @returns Group API key and usage statistics
+ */
+export async function getStats(id: number): Promise<GroupDetailStats> {
+  const { data } = await apiClient.get<GroupDetailStats>(`/admin/groups/${id}/stats`)
   return data
 }
 

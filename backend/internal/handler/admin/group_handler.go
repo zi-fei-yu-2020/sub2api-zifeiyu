@@ -21,9 +21,10 @@ import (
 
 // GroupHandler handles admin group management
 type GroupHandler struct {
-	adminService         service.AdminService
-	dashboardService     *service.DashboardService
-	groupCapacityService *service.GroupCapacityService
+	adminService            service.AdminService
+	dashboardService        *service.DashboardService
+	groupCapacityService    *service.GroupCapacityService
+	groupDetailStatsService *service.GroupDetailStatsService
 }
 
 // GetLiveCapability 返回当前服务端是否具备生成 Live attestation 的运行环境。
@@ -86,11 +87,17 @@ func (f optionalLimitField) ToServiceInput() *float64 {
 }
 
 // NewGroupHandler creates a new admin group handler
-func NewGroupHandler(adminService service.AdminService, dashboardService *service.DashboardService, groupCapacityService *service.GroupCapacityService) *GroupHandler {
+func NewGroupHandler(
+	adminService service.AdminService,
+	dashboardService *service.DashboardService,
+	groupCapacityService *service.GroupCapacityService,
+	groupDetailStatsService *service.GroupDetailStatsService,
+) *GroupHandler {
 	return &GroupHandler{
-		adminService:         adminService,
-		dashboardService:     dashboardService,
-		groupCapacityService: groupCapacityService,
+		adminService:            adminService,
+		dashboardService:        dashboardService,
+		groupCapacityService:    groupCapacityService,
+		groupDetailStatsService: groupDetailStatsService,
 	}
 }
 
@@ -724,14 +731,13 @@ func (h *GroupHandler) GetStats(c *gin.Context) {
 		return
 	}
 
-	// Return mock data for now
-	response.Success(c, gin.H{
-		"total_api_keys":  0,
-		"active_api_keys": 0,
-		"total_requests":  0,
-		"total_cost":      0.0,
-	})
-	_ = groupID // TODO: implement actual stats
+	stats, err := h.groupDetailStatsService.GetStats(c.Request.Context(), groupID)
+	if err != nil {
+		response.ErrorFrom(c, err)
+		return
+	}
+
+	response.Success(c, stats)
 }
 
 // GetUsageSummary returns today's, yesterday's, and cumulative cost for all groups.

@@ -7,6 +7,7 @@ import (
 	"net/http/httptest"
 	"testing"
 
+	"github.com/Wei-Shaw/sub2api/internal/service"
 	"github.com/gin-gonic/gin"
 	"github.com/stretchr/testify/require"
 )
@@ -17,9 +18,9 @@ func setupAdminRouter() (*gin.Engine, *stubAdminService) {
 	adminSvc := newStubAdminService()
 
 	userHandler := NewUserHandler(adminSvc, nil, nil, nil, nil, nil, nil)
-	groupHandler := NewGroupHandler(adminSvc, nil, nil)
+	groupHandler := NewGroupHandler(adminSvc, nil, nil, newGroupDetailStatsTestService(&service.GroupDetailStats{}, nil))
 	proxyHandler := NewProxyHandler(adminSvc)
-	redeemHandler := NewRedeemHandler(adminSvc, nil)
+	redeemHandler := NewRedeemHandler(adminSvc, newRedeemStatsTestService(&service.RedeemCodeStats{}, nil))
 
 	router.GET("/api/v1/admin/users", userHandler.List)
 	router.GET("/api/v1/admin/users/:id", userHandler.GetByID)
@@ -64,7 +65,7 @@ func setupAdminRouter() (*gin.Engine, *stubAdminService) {
 	router.DELETE("/api/v1/admin/redeem-codes/:id", redeemHandler.Delete)
 	router.POST("/api/v1/admin/redeem-codes/batch-delete", redeemHandler.BatchDelete)
 	router.POST("/api/v1/admin/redeem-codes/:id/expire", redeemHandler.Expire)
-	router.GET("/api/v1/admin/redeem-codes/:id/stats", redeemHandler.GetStats)
+	router.GET("/api/v1/admin/redeem-codes/stats", redeemHandler.GetStats)
 
 	return router, adminSvc
 }
@@ -367,7 +368,7 @@ func TestRedeemHandlerEndpoints(t *testing.T) {
 	require.Equal(t, http.StatusOK, rec.Code)
 
 	rec = httptest.NewRecorder()
-	req = httptest.NewRequest(http.MethodGet, "/api/v1/admin/redeem-codes/5/stats", nil)
+	req = httptest.NewRequest(http.MethodGet, "/api/v1/admin/redeem-codes/stats", nil)
 	router.ServeHTTP(rec, req)
 	require.Equal(t, http.StatusOK, rec.Code)
 }
