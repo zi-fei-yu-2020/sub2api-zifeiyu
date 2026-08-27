@@ -178,6 +178,13 @@ type PricingService struct {
 
 // NewPricingService 创建价格服务
 func NewPricingService(cfg *config.Config, remoteClient PricingRemoteClient) *PricingService {
+	if cfg != nil {
+		if configurable, ok := remoteClient.(interface {
+			ConfigureURLPolicy(config.URLAllowlistConfig)
+		}); ok {
+			configurable.ConfigureURLPolicy(cfg.Security.URLAllowlist)
+		}
+	}
 	s := &PricingService{
 		cfg:          cfg,
 		remoteClient: remoteClient,
@@ -628,7 +635,7 @@ func (s *PricingService) validatePricingURL(raw string) (string, error) {
 		}
 		return normalized, nil
 	}
-	normalized, err := urlvalidator.ValidateHTTPSURL(raw, urlvalidator.ValidationOptions{
+	normalized, err := urlvalidator.ValidateHTTPURL(raw, s.cfg.Security.URLAllowlist.AllowInsecureHTTP, urlvalidator.ValidationOptions{
 		AllowedHosts:     s.cfg.Security.URLAllowlist.PricingHosts,
 		RequireAllowlist: true,
 		AllowPrivate:     s.cfg.Security.URLAllowlist.AllowPrivateHosts,

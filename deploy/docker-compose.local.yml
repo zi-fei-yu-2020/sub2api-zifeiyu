@@ -142,14 +142,17 @@ services:
       # =======================================================================
       # Security Configuration (URL Allowlist)
       # =======================================================================
-      # Enable URL allowlist validation (false to skip allowlist checks)
-      - SECURITY_URL_ALLOWLIST_ENABLED=${SECURITY_URL_ALLOWLIST_ENABLED:-false}
-      # Allow insecure HTTP URLs when allowlist is disabled (default: true; set to false to require https)
-      - SECURITY_URL_ALLOWLIST_ALLOW_INSECURE_HTTP=${SECURITY_URL_ALLOWLIST_ALLOW_INSECURE_HTTP:-true}
-      # Allow private IP addresses for upstream/pricing/CRS (default: true; set to false to block private hosts)
-      - SECURITY_URL_ALLOWLIST_ALLOW_PRIVATE_HOSTS=${SECURITY_URL_ALLOWLIST_ALLOW_PRIVATE_HOSTS:-true}
-      # Upstream hosts whitelist (comma-separated, only used when enabled=true)
+      # Outbound URL profile. Empty means: strict for a new install; preserve
+      # legacy switches for an existing config file that has no profile yet.
+      - SECURITY_URL_POLICY_PROFILE=${SECURITY_URL_POLICY_PROFILE:-}
+      # Deprecated switches are forwarded only when explicitly present in .env.
+      - SECURITY_URL_ALLOWLIST_ENABLED=${SECURITY_URL_ALLOWLIST_ENABLED:-}
+      - SECURITY_URL_ALLOWLIST_ALLOW_INSECURE_HTTP=${SECURITY_URL_ALLOWLIST_ALLOW_INSECURE_HTTP:-}
+      - SECURITY_URL_ALLOWLIST_ALLOW_PRIVATE_HOSTS=${SECURITY_URL_ALLOWLIST_ALLOW_PRIVATE_HOSTS:-}
+      # Host or host:port entries, comma-separated.
       - SECURITY_URL_ALLOWLIST_UPSTREAM_HOSTS=${SECURITY_URL_ALLOWLIST_UPSTREAM_HOSTS:-}
+      - SECURITY_URL_ALLOWLIST_PRICING_HOSTS=${SECURITY_URL_ALLOWLIST_PRICING_HOSTS:-}
+      - SECURITY_URL_ALLOWLIST_CRS_HOSTS=${SECURITY_URL_ALLOWLIST_CRS_HOSTS:-}
 
       # =======================================================================
       # Update Configuration (在线更新配置)

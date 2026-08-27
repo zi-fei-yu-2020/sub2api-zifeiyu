@@ -73,3 +73,56 @@ func TestValidateHTTPURL(t *testing.T) {
 		t.Fatalf("expected localhost to be blocked when allow_private_hosts is false")
 	}
 }
+
+func TestValidateHTTPURL_PrivateNetworkRequiresExplicitTarget(t *testing.T) {
+	opts := ValidationOptions{
+		AllowedHosts:     []string{"192.168.1.20:11434"},
+		RequireAllowlist: true,
+		AllowPrivate:     true,
+	}
+	if _, err := ValidateHTTPURL("http://192.168.1.20:11434/v1", true, opts); err != nil {
+		t.Fatalf("expected explicitly allowlisted private HTTP target to pass: %v", err)
+	}
+	if _, err := ValidateHTTPURL("http://192.168.1.20:8080/v1", true, opts); err == nil {
+		t.Fatal("expected non-allowlisted port to fail")
+	}
+	if _, err := ValidateHTTPURL("http://192.168.1.21:11434/v1", true, opts); err == nil {
+		t.Fatal("expected non-allowlisted private host to fail")
+	}
+}
+
+func TestValidateHTTPURL_MetadataAlwaysBlocked(t *testing.T) {
+	for _, raw := range []string{
+		"http://169.254.169.254/latest/meta-data",
+		"http://100.100.100.200/latest/meta-data",
+		"http://metadata.google.internal/computeMetadata/v1",
+		"http://metadata.tencentyun.com/latest/meta-data",
+		"http://[fd00:ec2::254]/latest/meta-data",
+	} {
+		if _, err := ValidateHTTPURL(raw, true, ValidationOptions{
+			AllowedHosts:     []string{"169.254.169.254", "100.100.100.200", "metadata.google.internal", "metadata.tencentyun.com", "fd00:ec2::254"},
+			RequireAllowlist: true,
+			AllowPrivate:     true,
+		}); err == nil {
+			t.Fatalf("expected metadata URL %q to fail", raw)
+		}
+	}
+}
+
+func TestValidateResolvedIPWithOptions(t *testing.T) {
+	if err := ValidateResolvedIPWithOptions("127.0.0.1", true); err != nil {
+		t.Fatalf("expected loopback to pass in private-network mode: %v", err)
+	}
+	if err := ValidateResolvedIPWithOptions("127.0.0.1", false); err == nil {
+		t.Fatal("expected loopback to fail in strict mode")
+	}
+	if err := ValidateResolvedIPWithOptions("169.254.169.254", true); err == nil {
+		t.Fatal("expected metadata IP to fail even in private-network mode")
+	}
+	if err := ValidateResolvedIPWithOptions("100.100.100.200", true); err == nil {
+		t.Fatal("expected Alibaba metadata IP to fail even in private-network mode")
+	}
+	if err := ValidateResolvedIPWithOptions("fd00:ec2::254", true); err == nil {
+		t.Fatal("expected AWS metadata IPv6 to fail even in private-network mode")
+	}
+}

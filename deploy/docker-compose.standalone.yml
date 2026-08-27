@@ -106,6 +106,19 @@ services:
       - ANTIGRAVITY_USER_AGENT_VERSION=${ANTIGRAVITY_USER_AGENT_VERSION:-}
 
       # =======================================================================
+      # Outbound URL Security Policy
+      # =======================================================================
+      # Empty profile uses strict for a new install. Existing configs without a
+      # profile keep their legacy switches and emit a migration warning.
+      - SECURITY_URL_POLICY_PROFILE=${SECURITY_URL_POLICY_PROFILE:-}
+      - SECURITY_URL_ALLOWLIST_ENABLED=${SECURITY_URL_ALLOWLIST_ENABLED:-}
+      - SECURITY_URL_ALLOWLIST_ALLOW_INSECURE_HTTP=${SECURITY_URL_ALLOWLIST_ALLOW_INSECURE_HTTP:-}
+      - SECURITY_URL_ALLOWLIST_ALLOW_PRIVATE_HOSTS=${SECURITY_URL_ALLOWLIST_ALLOW_PRIVATE_HOSTS:-}
+      - SECURITY_URL_ALLOWLIST_UPSTREAM_HOSTS=${SECURITY_URL_ALLOWLIST_UPSTREAM_HOSTS:-}
+      - SECURITY_URL_ALLOWLIST_PRICING_HOSTS=${SECURITY_URL_ALLOWLIST_PRICING_HOSTS:-}
+      - SECURITY_URL_ALLOWLIST_CRS_HOSTS=${SECURITY_URL_ALLOWLIST_CRS_HOSTS:-}
+
+      # =======================================================================
       # Gateway Upstream, Scheduling & Image Configuration
       # =======================================================================
       # Gateway values come from Compose .env or the shell.

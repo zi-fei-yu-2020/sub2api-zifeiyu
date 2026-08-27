@@ -2,19 +2,26 @@ package repository
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"io"
 	"log/slog"
 	"net/http"
 	"strings"
+	"sync"
 	"time"
 
+	"github.com/Wei-Shaw/sub2api/internal/config"
 	"github.com/Wei-Shaw/sub2api/internal/pkg/httpclient"
 	"github.com/Wei-Shaw/sub2api/internal/service"
 )
 
 type pricingRemoteClient struct {
-	httpClient *http.Client
+	mu                      sync.RWMutex
+	httpClient              *http.Client
+	proxyURL                string
+	allowDirectOnProxyError bool
+	initializationError     error
 }
 
 // pricingRemoteClientError 代理初始化失败时的错误占位客户端
@@ -37,22 +44,70 @@ func (c *pricingRemoteClientError) FetchHashText(_ context.Context, _ string) (s
 //   - false（默认）：返回错误占位客户端，禁止回退到直连
 //   - true：回退到直连（仅限管理员显式开启）
 func NewPricingRemoteClient(proxyURL string, allowDirectOnProxyError bool) service.PricingRemoteClient {
-	// 安全说明：httpclient.GetClient 的错误链（url.Parse / proxyutil）不含明文代理凭据，
-	// 但仍通过 slog 仅在服务端日志记录，不会暴露给 HTTP 响应。
-	sharedClient, err := httpclient.GetClient(httpclient.Options{
-		Timeout:  30 * time.Second,
-		ProxyURL: proxyURL,
-	})
+	client, err := buildPricingHTTPClient(proxyURL, allowDirectOnProxyError, httpclient.Options{})
 	if err != nil {
-		if strings.TrimSpace(proxyURL) != "" && !allowDirectOnProxyError {
-			slog.Warn("proxy client init failed, all requests will fail", "service", "pricing", "error", err)
-			return &pricingRemoteClientError{err: fmt.Errorf("proxy client init failed and direct fallback is disabled; set security.proxy_fallback.allow_direct_on_error=true to allow fallback: %w", err)}
-		}
-		sharedClient = &http.Client{Timeout: 30 * time.Second}
+		return &pricingRemoteClientError{err: err}
 	}
 	return &pricingRemoteClient{
-		httpClient: sharedClient,
+		httpClient:              client,
+		proxyURL:                proxyURL,
+		allowDirectOnProxyError: allowDirectOnProxyError,
 	}
+}
+
+// ConfigureURLPolicy is invoked by PricingService during construction. Keeping
+// this optional capability on the client avoids changing the public Wire
+// provider signature while ensuring redirects and DNS resolution use the same
+// policy as the initial pricing URL validation.
+func (c *pricingRemoteClient) ConfigureURLPolicy(policy config.URLAllowlistConfig) {
+	if c == nil {
+		return
+	}
+	client, err := buildPricingHTTPClient(c.proxyURL, c.allowDirectOnProxyError, httpclient.Options{
+		ValidateResolvedIP: policy.Enabled,
+		AllowPrivateHosts:  policy.AllowPrivateHosts,
+		AllowedHosts:       policy.PricingHosts,
+		RequireAllowlist:   policy.Enabled,
+		AllowInsecureHTTP:  policy.AllowInsecureHTTP,
+	})
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	c.httpClient = client
+	c.initializationError = err
+}
+
+func buildPricingHTTPClient(proxyURL string, allowDirectOnProxyError bool, opts httpclient.Options) (*http.Client, error) {
+	opts.Timeout = 30 * time.Second
+	opts.ProxyURL = proxyURL
+	sharedClient, err := httpclient.GetClient(opts)
+	if err == nil {
+		return sharedClient, nil
+	}
+	if strings.TrimSpace(proxyURL) != "" && !allowDirectOnProxyError {
+		slog.Warn("proxy client init failed, all requests will fail", "service", "pricing", "error", err)
+		return nil, fmt.Errorf("proxy client init failed and direct fallback is disabled; set security.proxy_fallback.allow_direct_on_error=true to allow fallback: %w", err)
+	}
+	opts.ProxyURL = ""
+	sharedClient, directErr := httpclient.GetClient(opts)
+	if directErr != nil {
+		return nil, fmt.Errorf("direct client init failed: %w", directErr)
+	}
+	return sharedClient, nil
+}
+
+func (c *pricingRemoteClient) client() (*http.Client, error) {
+	if c == nil {
+		return nil, errors.New("pricing remote client is nil")
+	}
+	c.mu.RLock()
+	defer c.mu.RUnlock()
+	if c.initializationError != nil {
+		return nil, c.initializationError
+	}
+	if c.httpClient == nil {
+		return nil, errors.New("pricing remote client is not initialized")
+	}
+	return c.httpClient, nil
 }
 
 func (c *pricingRemoteClient) FetchPricingJSON(ctx context.Context, url string) ([]byte, error) {
@@ -61,7 +116,11 @@ func (c *pricingRemoteClient) FetchPricingJSON(ctx context.Context, url string) 
 		return nil, err
 	}
 
-	resp, err := c.httpClient.Do(req)
+	client, err := c.client()
+	if err != nil {
+		return nil, err
+	}
+	resp, err := client.Do(req)
 	if err != nil {
 		return nil, err
 	}
@@ -80,7 +139,11 @@ func (c *pricingRemoteClient) FetchHashText(ctx context.Context, url string) (st
 		return "", err
 	}
 
-	resp, err := c.httpClient.Do(req)
+	client, err := c.client()
+	if err != nil {
+		return "", err
+	}
+	resp, err := client.Do(req)
 	if err != nil {
 		return "", err
 	}

@@ -4,8 +4,10 @@ import (
 	"context"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
 
+	"github.com/Wei-Shaw/sub2api/internal/config"
 	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
 )
@@ -154,6 +156,41 @@ func TestNewPricingRemoteClient_InvalidProxy_WithFallback(t *testing.T) {
 	client := NewPricingRemoteClient("://bad", true)
 	_, ok := client.(*pricingRemoteClient)
 	require.True(t, ok, "should fallback to direct client when allowed")
+}
+
+func TestPricingRemoteClientConfigureURLPolicy(t *testing.T) {
+	client, ok := NewPricingRemoteClient("", false).(*pricingRemoteClient)
+	require.True(t, ok)
+	client.ConfigureURLPolicy(config.URLAllowlistConfig{
+		Enabled:      true,
+		PricingHosts: []string{"raw.githubusercontent.com"},
+	})
+
+	_, err := client.FetchPricingJSON(context.Background(), "https://example.com/pricing.json")
+	require.Error(t, err)
+	require.Contains(t, err.Error(), "host is not allowed")
+}
+
+func TestPricingRemoteClientPrivateNetworkPolicyAllowsExplicitLocalTarget(t *testing.T) {
+	server := newLocalTestServer(t, http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		w.WriteHeader(http.StatusOK)
+		_, _ = w.Write([]byte(`{"ok":true}`))
+	}))
+	defer server.Close()
+
+	client, ok := NewPricingRemoteClient("", false).(*pricingRemoteClient)
+	require.True(t, ok)
+	host := strings.TrimPrefix(server.URL, "http://")
+	client.ConfigureURLPolicy(config.URLAllowlistConfig{
+		Enabled:           true,
+		PricingHosts:      []string{host},
+		AllowPrivateHosts: true,
+		AllowInsecureHTTP: true,
+	})
+
+	body, err := client.FetchPricingJSON(context.Background(), server.URL)
+	require.NoError(t, err)
+	require.JSONEq(t, `{"ok":true}`, string(body))
 }
 
 func TestPricingServiceSuite(t *testing.T) {

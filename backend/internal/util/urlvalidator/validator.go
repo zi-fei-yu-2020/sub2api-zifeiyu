@@ -20,11 +20,11 @@ type ValidationOptions struct {
 // ValidateHTTPURL validates an outbound HTTP/HTTPS URL.
 //
 // It provides a single validation entry point that supports:
-// - scheme 校验（https 或可选允许 http）
-// - 可选 allowlist（支持 *.example.com 通配）
-// - allow_private_hosts 策略（阻断 localhost/私网字面量 IP）
+// - HTTP/HTTPS scheme enforcement
+// - optional host or host:port allowlists, including *.example.com wildcards
+// - strict/public and explicitly allowlisted private-network policies
 //
-// 注意：DNS Rebinding 防护（解析后 IP 校验）应在实际发起请求时执行，避免 TOCTOU。
+// Call ValidateResolvedIPWithOptions immediately before dispatch to validate DNS results.
 func ValidateHTTPURL(raw string, allowInsecureHTTP bool, opts ValidationOptions) (string, error) {
 	trimmed := strings.TrimSpace(raw)
 	if trimmed == "" {
@@ -45,8 +45,8 @@ func ValidateHTTPURL(raw string, allowInsecureHTTP bool, opts ValidationOptions)
 	if host == "" {
 		return "", errors.New("invalid host")
 	}
-	if !opts.AllowPrivate && isBlockedHost(host) {
-		return "", fmt.Errorf("host is not allowed: %s", host)
+	if err := validateHostLiteral(host, opts.AllowPrivate); err != nil {
+		return "", err
 	}
 
 	if port := parsed.Port(); port != "" {
@@ -60,8 +60,8 @@ func ValidateHTTPURL(raw string, allowInsecureHTTP bool, opts ValidationOptions)
 	if opts.RequireAllowlist && len(allowlist) == 0 {
 		return "", errors.New("allowlist is not configured")
 	}
-	if len(allowlist) > 0 && !isAllowedHost(host, allowlist) {
-		return "", fmt.Errorf("host is not allowed: %s", host)
+	if len(allowlist) > 0 && !isAllowedTarget(host, parsed.Port(), scheme, allowlist) {
+		return "", fmt.Errorf("host is not allowed: %s", parsed.Host)
 	}
 
 	parsed.Path = strings.TrimRight(parsed.Path, "/")
@@ -70,7 +70,8 @@ func ValidateHTTPURL(raw string, allowInsecureHTTP bool, opts ValidationOptions)
 }
 
 func ValidateURLFormat(raw string, allowInsecureHTTP bool) (string, error) {
-	// 最小格式校验：仅保证 URL 可解析且 scheme 合规，不做白名单/私网/SSRF 校验
+	// Minimal parser used only by compatible and legacy configurations.
+	// It intentionally does not enforce host allowlists or private-address policy.
 	trimmed := strings.TrimSpace(raw)
 	if trimmed == "" {
 		return "", errors.New("url is required")
@@ -105,9 +106,26 @@ func ValidateHTTPSURL(raw string, opts ValidationOptions) (string, error) {
 	return ValidateHTTPURL(raw, false, opts)
 }
 
-// ValidateResolvedIP 验证 DNS 解析后的 IP 地址是否安全
-// 用于防止 DNS Rebinding 攻击：在实际 HTTP 请求时调用此函数验证解析后的 IP
+// ValidateResolvedIP validates DNS results using the strict public-network policy.
 func ValidateResolvedIP(host string) error {
+	return ValidateResolvedIPWithOptions(host, false)
+}
+
+// ValidateResolvedIPWithOptions validates every resolved address. Private-network
+// mode may use loopback/RFC1918 targets, but link-local, multicast, unspecified,
+// and known cloud metadata endpoints remain blocked in every profile.
+func ValidateResolvedIPWithOptions(host string, allowPrivate bool) error {
+	host = strings.ToLower(strings.TrimSpace(host))
+	if host == "" {
+		return errors.New("host is required")
+	}
+	if isBlockedMetadataHostname(host) {
+		return fmt.Errorf("metadata host is not allowed: %s", host)
+	}
+	if ip := net.ParseIP(host); ip != nil {
+		return validateResolvedAddress(ip, allowPrivate)
+	}
+
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 
@@ -115,14 +133,64 @@ func ValidateResolvedIP(host string) error {
 	if err != nil {
 		return fmt.Errorf("dns resolution failed: %w", err)
 	}
-
 	for _, ip := range ips {
-		if ip.IsLoopback() || ip.IsPrivate() || ip.IsLinkLocalUnicast() ||
-			ip.IsLinkLocalMulticast() || ip.IsUnspecified() {
-			return fmt.Errorf("resolved ip %s is not allowed", ip.String())
+		if err := validateResolvedAddress(ip, allowPrivate); err != nil {
+			return err
 		}
 	}
 	return nil
+}
+
+func validateHostLiteral(host string, allowPrivate bool) error {
+	if isBlockedMetadataHostname(host) {
+		return fmt.Errorf("metadata host is not allowed: %s", host)
+	}
+	if host == "localhost" || strings.HasSuffix(host, ".localhost") {
+		if allowPrivate {
+			return nil
+		}
+		return fmt.Errorf("host is not allowed: %s", host)
+	}
+	if ip := net.ParseIP(host); ip != nil {
+		if err := validateResolvedAddress(ip, allowPrivate); err != nil {
+			return fmt.Errorf("host is not allowed: %s: %w", host, err)
+		}
+	}
+	return nil
+}
+
+func validateResolvedAddress(ip net.IP, allowPrivate bool) error {
+	if ip == nil {
+		return errors.New("resolved ip is invalid")
+	}
+	if isKnownMetadataIP(ip) || ip.IsLinkLocalUnicast() || ip.IsLinkLocalMulticast() ||
+		ip.IsUnspecified() || ip.IsMulticast() || ip.IsInterfaceLocalMulticast() {
+		return fmt.Errorf("resolved ip %s is not allowed", ip.String())
+	}
+	if !allowPrivate && (ip.IsLoopback() || ip.IsPrivate()) {
+		return fmt.Errorf("resolved ip %s is not allowed", ip.String())
+	}
+	return nil
+}
+
+func isKnownMetadataIP(ip net.IP) bool {
+	for _, raw := range []string{
+		"169.254.169.254", // AWS, Azure, GCP, OpenStack and others
+		"100.100.100.200", // Alibaba Cloud
+		"fd00:ec2::254",   // AWS IMDS IPv6 endpoint
+	} {
+		if candidate := net.ParseIP(raw); candidate != nil && candidate.Equal(ip) {
+			return true
+		}
+	}
+	return false
+}
+
+func isBlockedMetadataHostname(host string) bool {
+	host = strings.TrimSuffix(strings.ToLower(strings.TrimSpace(host)), ".")
+	return host == "metadata.google.internal" || strings.HasSuffix(host, ".metadata.google.internal") ||
+		host == "metadata.goog" || strings.HasSuffix(host, ".metadata.goog") ||
+		host == "metadata.tencentyun.com" || strings.HasSuffix(host, ".metadata.tencentyun.com")
 }
 
 func normalizeAllowlist(values []string) []string {
@@ -132,44 +200,54 @@ func normalizeAllowlist(values []string) []string {
 	normalized := make([]string, 0, len(values))
 	for _, v := range values {
 		entry := strings.ToLower(strings.TrimSpace(v))
-		if entry == "" {
-			continue
+		if entry != "" {
+			normalized = append(normalized, entry)
 		}
-		if host, _, err := net.SplitHostPort(entry); err == nil {
-			entry = host
-		}
-		normalized = append(normalized, entry)
 	}
 	return normalized
 }
 
-func isAllowedHost(host string, allowlist []string) bool {
+func isAllowedTarget(host, port, scheme string, allowlist []string) bool {
+	effectivePort := port
+	if effectivePort == "" {
+		switch scheme {
+		case "https":
+			effectivePort = "443"
+		case "http":
+			effectivePort = "80"
+		}
+	}
+
 	for _, entry := range allowlist {
-		if entry == "" {
+		entryHost, entryPort := splitAllowlistEntry(entry)
+		if entryHost == "" || (entryPort != "" && entryPort != effectivePort) {
 			continue
 		}
-		if strings.HasPrefix(entry, "*.") {
-			suffix := strings.TrimPrefix(entry, "*.")
+		if strings.HasPrefix(entryHost, "*.") {
+			suffix := strings.TrimPrefix(entryHost, "*.")
 			if host == suffix || strings.HasSuffix(host, "."+suffix) {
 				return true
 			}
 			continue
 		}
-		if host == entry {
+		if host == entryHost {
 			return true
 		}
 	}
 	return false
 }
 
-func isBlockedHost(host string) bool {
-	if host == "localhost" || strings.HasSuffix(host, ".localhost") {
-		return true
+func splitAllowlistEntry(entry string) (string, string) {
+	entry = strings.ToLower(strings.TrimSpace(entry))
+	if entry == "" {
+		return "", ""
 	}
-	if ip := net.ParseIP(host); ip != nil {
-		if ip.IsLoopback() || ip.IsPrivate() || ip.IsLinkLocalUnicast() || ip.IsLinkLocalMulticast() || ip.IsUnspecified() {
-			return true
-		}
+	if host, port, err := net.SplitHostPort(entry); err == nil {
+		return strings.Trim(strings.TrimSpace(host), "[]"), strings.TrimSpace(port)
 	}
-	return false
+	// Bare IPv6 literals contain multiple colons and intentionally have no port.
+	if net.ParseIP(strings.Trim(entry, "[]")) != nil {
+		return strings.Trim(entry, "[]"), ""
+	}
+	return entry, ""
 }

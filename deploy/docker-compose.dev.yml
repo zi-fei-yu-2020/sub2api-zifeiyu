@@ -53,6 +53,19 @@ services:
       - HTTPS_PROXY=${SUB2API_DEV_HTTPS_PROXY:-http://host.docker.internal:7897}
       - ALL_PROXY=${SUB2API_DEV_ALL_PROXY:-socks5://host.docker.internal:7897}
       - NO_PROXY=${SUB2API_DEV_NO_PROXY:-127.0.0.1,localhost,::1,postgres,redis,sub2api,192.168.0.0/16,10.0.0.0/8,172.16.0.0/12,.local}
+      # =======================================================================
+      # Outbound URL Security Policy
+      # =======================================================================
+      # Empty profile uses strict for a new install. Existing configs without a
+      # profile keep their legacy switches and emit a migration warning.
+      - SECURITY_URL_POLICY_PROFILE=${SECURITY_URL_POLICY_PROFILE:-}
+      - SECURITY_URL_ALLOWLIST_ENABLED=${SECURITY_URL_ALLOWLIST_ENABLED:-}
+      - SECURITY_URL_ALLOWLIST_ALLOW_INSECURE_HTTP=${SECURITY_URL_ALLOWLIST_ALLOW_INSECURE_HTTP:-}
+      - SECURITY_URL_ALLOWLIST_ALLOW_PRIVATE_HOSTS=${SECURITY_URL_ALLOWLIST_ALLOW_PRIVATE_HOSTS:-}
+      - SECURITY_URL_ALLOWLIST_UPSTREAM_HOSTS=${SECURITY_URL_ALLOWLIST_UPSTREAM_HOSTS:-}
+      - SECURITY_URL_ALLOWLIST_PRICING_HOSTS=${SECURITY_URL_ALLOWLIST_PRICING_HOSTS:-}
+      - SECURITY_URL_ALLOWLIST_CRS_HOSTS=${SECURITY_URL_ALLOWLIST_CRS_HOSTS:-}
+
       # Gateway values come from Compose .env or the shell.
       # Fallbacks mirror Sub2API backend defaults so omitted values preserve behavior.
       - GATEWAY_FORCE_CODEX_CLI=${GATEWAY_FORCE_CODEX_CLI:-false}

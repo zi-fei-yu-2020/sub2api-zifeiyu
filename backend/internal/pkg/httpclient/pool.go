@@ -41,24 +41,27 @@ const (
 
 // Options 定义共享 HTTP 客户端的构建参数
 type Options struct {
-	ProxyURL              string        // 代理 URL（支持 http/https/socks5/socks5h）
-	Timeout               time.Duration // 请求总超时时间
-	ResponseHeaderTimeout time.Duration // 等待响应头超时时间
-	InsecureSkipVerify    bool          // 是否跳过 TLS 证书验证（已禁用，不允许设置为 true）
-	ValidateResolvedIP    bool          // 是否校验解析后的 IP（防止 DNS Rebinding）
-	AllowPrivateHosts     bool          // 允许私有地址解析（与 ValidateResolvedIP 一起使用）
+	ProxyURL              string        // Proxy URL: http/https/socks5/socks5h.
+	Timeout               time.Duration // Total request timeout.
+	ResponseHeaderTimeout time.Duration // Timeout while waiting for response headers.
+	InsecureSkipVerify    bool          // TLS verification bypass is prohibited.
+	ValidateResolvedIP    bool          // Validate resolved addresses against the SSRF policy.
+	AllowPrivateHosts     bool          // Permit loopback/RFC1918; metadata/link-local remain blocked.
+	AllowedHosts          []string      // Optional request and redirect host allowlist.
+	RequireAllowlist      bool          // Require AllowedHosts to be non-empty and matched.
+	AllowInsecureHTTP     bool          // Permit HTTP while still enforcing the host allowlist.
 
-	// 可选的连接池参数（不设置则使用默认值）
-	MaxIdleConns        int // 最大空闲连接总数（默认 100）
-	MaxIdleConnsPerHost int // 每主机最大空闲连接（默认 10）
-	MaxConnsPerHost     int // 每主机最大连接数（默认 0 无限制）
+	// Optional connection-pool settings; zero values use package defaults.
+	MaxIdleConns        int
+	MaxIdleConnsPerHost int
+	MaxConnsPerHost     int
 }
 
 // sharedClients 存储按配置参数缓存的 http.Client 实例
 var sharedClients sync.Map
 
 // 允许测试替换校验函数，生产默认指向真实实现。
-var validateResolvedIP = urlvalidator.ValidateResolvedIP
+var validateResolvedIP = urlvalidator.ValidateResolvedIPWithOptions
 
 // GetClient 返回共享的 HTTP 客户端实例
 // 性能优化：相同配置复用同一客户端，避免重复创建 Transport
@@ -90,8 +93,8 @@ func buildClient(opts Options) (*http.Client, error) {
 	}
 
 	var rt http.RoundTripper = transport
-	if opts.ValidateResolvedIP && !opts.AllowPrivateHosts {
-		rt = newValidatedTransport(transport)
+	if opts.ValidateResolvedIP || opts.RequireAllowlist || len(opts.AllowedHosts) > 0 {
+		rt = newValidatedTransport(transport, opts)
 	}
 	rt = servertiming.WrapRoundTripper(rt)
 	return &http.Client{
@@ -144,13 +147,16 @@ func buildTransport(opts Options) (*http.Transport, error) {
 }
 
 func buildClientKey(opts Options) string {
-	return fmt.Sprintf("%s|%s|%s|%t|%t|%t|%d|%d|%d",
+	return fmt.Sprintf("%s|%s|%s|%t|%t|%t|%t|%t|%s|%d|%d|%d",
 		strings.TrimSpace(opts.ProxyURL),
 		opts.Timeout.String(),
 		opts.ResponseHeaderTimeout.String(),
 		opts.InsecureSkipVerify,
 		opts.ValidateResolvedIP,
 		opts.AllowPrivateHosts,
+		opts.RequireAllowlist,
+		opts.AllowInsecureHTTP,
+		strings.Join(opts.AllowedHosts, ","),
 		opts.MaxIdleConns,
 		opts.MaxIdleConnsPerHost,
 		opts.MaxConnsPerHost,
@@ -158,51 +164,33 @@ func buildClientKey(opts Options) string {
 }
 
 type validatedTransport struct {
-	base           http.RoundTripper
-	validatedHosts sync.Map // map[string]time.Time, value 为过期时间
-	now            func() time.Time
+	base    http.RoundTripper
+	options Options
 }
 
-func newValidatedTransport(base http.RoundTripper) *validatedTransport {
-	return &validatedTransport{
-		base: base,
-		now:  time.Now,
-	}
-}
-
-func (t *validatedTransport) isValidatedHost(host string, now time.Time) bool {
-	if t == nil {
-		return false
-	}
-	raw, ok := t.validatedHosts.Load(host)
-	if !ok {
-		return false
-	}
-	expireAt, ok := raw.(time.Time)
-	if !ok {
-		t.validatedHosts.Delete(host)
-		return false
-	}
-	if now.Before(expireAt) {
-		return true
-	}
-	t.validatedHosts.Delete(host)
-	return false
+func newValidatedTransport(base http.RoundTripper, opts Options) *validatedTransport {
+	return &validatedTransport{base: base, options: opts}
 }
 
 func (t *validatedTransport) RoundTrip(req *http.Request) (*http.Response, error) {
 	if req != nil && req.URL != nil {
 		host := strings.ToLower(strings.TrimSpace(req.URL.Hostname()))
 		if host != "" {
-			now := time.Now()
-			if t != nil && t.now != nil {
-				now = t.now()
-			}
-			if !t.isValidatedHost(host, now) {
-				if err := validateResolvedIP(host); err != nil {
+			if t.options.RequireAllowlist || len(t.options.AllowedHosts) > 0 {
+				if _, err := urlvalidator.ValidateHTTPURL(req.URL.String(), t.options.AllowInsecureHTTP, urlvalidator.ValidationOptions{
+					AllowedHosts:     t.options.AllowedHosts,
+					RequireAllowlist: t.options.RequireAllowlist,
+					AllowPrivate:     t.options.AllowPrivateHosts,
+				}); err != nil {
 					return nil, err
 				}
-				t.validatedHosts.Store(host, now.Add(validatedHostTTL))
+			}
+			if t.options.ValidateResolvedIP {
+				// Re-resolve for every dispatch, including every redirect. Caching a
+				// previous public answer would reopen a DNS-rebinding window.
+				if err := validateResolvedIP(host, t.options.AllowPrivateHosts); err != nil {
+					return nil, err
+				}
 			}
 		}
 	}

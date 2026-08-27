@@ -803,22 +803,13 @@ func TestLoadDefaultSecurityToggles(t *testing.T) {
 	resetViperWithJWTSecret(t)
 
 	cfg, err := Load()
-	if err != nil {
-		t.Fatalf("Load() error: %v", err)
-	}
-
-	if cfg.Security.URLAllowlist.Enabled {
-		t.Fatalf("URLAllowlist.Enabled = true, want false")
-	}
-	if !cfg.Security.URLAllowlist.AllowInsecureHTTP {
-		t.Fatalf("URLAllowlist.AllowInsecureHTTP = false, want true")
-	}
-	if !cfg.Security.URLAllowlist.AllowPrivateHosts {
-		t.Fatalf("URLAllowlist.AllowPrivateHosts = false, want true")
-	}
-	if !cfg.Security.ResponseHeaders.Enabled {
-		t.Fatalf("ResponseHeaders.Enabled = false, want true")
-	}
+	require.NoError(t, err)
+	require.Equal(t, URLPolicyProfileStrict, cfg.Security.URLPolicy.Profile)
+	require.False(t, cfg.Security.URLPolicy.LegacyCompatibility)
+	require.True(t, cfg.Security.URLAllowlist.Enabled)
+	require.False(t, cfg.Security.URLAllowlist.AllowInsecureHTTP)
+	require.False(t, cfg.Security.URLAllowlist.AllowPrivateHosts)
+	require.True(t, cfg.Security.ResponseHeaders.Enabled)
 
 	wantHosts := []string{
 		"api.kimi.com",
@@ -834,6 +825,134 @@ func TestLoadDefaultSecurityToggles(t *testing.T) {
 			t.Fatalf("URLAllowlist.UpstreamHosts missing %q; got %v", want, cfg.Security.URLAllowlist.UpstreamHosts)
 		}
 	}
+}
+
+func TestLoadExistingConfigWithoutURLProfilePreservesLegacyBehavior(t *testing.T) {
+	resetViperWithJWTSecret(t)
+	configFile := filepath.Join(t.TempDir(), "config.yaml")
+	require.NoError(t, os.WriteFile(configFile, []byte("server:\n  port: 8080\n"), 0o600))
+	t.Setenv("CONFIG_FILE", configFile)
+
+	cfg, err := Load()
+	require.NoError(t, err)
+	require.Equal(t, URLPolicyProfileCompatible, cfg.Security.URLPolicy.Profile)
+	require.True(t, cfg.Security.URLPolicy.LegacyCompatibility)
+	require.False(t, cfg.Security.URLAllowlist.Enabled)
+	require.True(t, cfg.Security.URLAllowlist.AllowPrivateHosts)
+	require.True(t, cfg.Security.URLAllowlist.AllowInsecureHTTP)
+}
+
+func TestLoadExistingConfigWithoutURLProfilePreservesExplicitLegacySwitches(t *testing.T) {
+	resetViperWithJWTSecret(t)
+	configFile := filepath.Join(t.TempDir(), "config.yaml")
+	require.NoError(t, os.WriteFile(configFile, []byte(`security:
+  url_allowlist:
+    enabled: true
+    allow_private_hosts: false
+    allow_insecure_http: false
+    upstream_hosts:
+      - legacy.example.com
+`), 0o600))
+	t.Setenv("CONFIG_FILE", configFile)
+
+	cfg, err := Load()
+	require.NoError(t, err)
+	require.Equal(t, URLPolicyProfileCompatible, cfg.Security.URLPolicy.Profile)
+	require.True(t, cfg.Security.URLPolicy.LegacyCompatibility)
+	require.True(t, cfg.Security.URLAllowlist.Enabled)
+	require.False(t, cfg.Security.URLAllowlist.AllowPrivateHosts)
+	require.False(t, cfg.Security.URLAllowlist.AllowInsecureHTTP)
+	require.Equal(t, []string{"legacy.example.com"}, cfg.Security.URLAllowlist.UpstreamHosts)
+}
+
+func TestLoadURLPolicyProfiles(t *testing.T) {
+	tests := []struct {
+		profile      string
+		wantEnabled  bool
+		wantPrivate  bool
+		wantInsecure bool
+	}{
+		{profile: URLPolicyProfileStrict, wantEnabled: true},
+		{profile: URLPolicyProfilePrivateNetwork, wantEnabled: true, wantPrivate: true, wantInsecure: true},
+		{profile: URLPolicyProfileCompatible, wantPrivate: true, wantInsecure: true},
+	}
+	for _, tt := range tests {
+		t.Run(tt.profile, func(t *testing.T) {
+			resetViperWithJWTSecret(t)
+			t.Setenv("SECURITY_URL_POLICY_PROFILE", tt.profile)
+			// Explicit profile is authoritative over deprecated switches.
+			t.Setenv("SECURITY_URL_ALLOWLIST_ENABLED", "false")
+			t.Setenv("SECURITY_URL_ALLOWLIST_ALLOW_PRIVATE_HOSTS", "false")
+			t.Setenv("SECURITY_URL_ALLOWLIST_ALLOW_INSECURE_HTTP", "false")
+
+			cfg, err := Load()
+			require.NoError(t, err)
+			require.Equal(t, tt.profile, cfg.Security.URLPolicy.Profile)
+			require.False(t, cfg.Security.URLPolicy.LegacyCompatibility)
+			require.Equal(t, tt.wantEnabled, cfg.Security.URLAllowlist.Enabled)
+			require.Equal(t, tt.wantPrivate, cfg.Security.URLAllowlist.AllowPrivateHosts)
+			require.Equal(t, tt.wantInsecure, cfg.Security.URLAllowlist.AllowInsecureHTTP)
+		})
+	}
+}
+
+func TestLoadURLPolicyProfileFromConfigFile(t *testing.T) {
+	resetViperWithJWTSecret(t)
+	configFile := filepath.Join(t.TempDir(), "config.yaml")
+	require.NoError(t, os.WriteFile(configFile, []byte(`security:
+  url_policy:
+    profile: private-network
+  url_allowlist:
+    enabled: false
+    allow_private_hosts: false
+    allow_insecure_http: false
+    upstream_hosts:
+      - 192.168.1.20:11434
+`), 0o600))
+	t.Setenv("CONFIG_FILE", configFile)
+
+	cfg, err := Load()
+	require.NoError(t, err)
+	require.Equal(t, URLPolicyProfilePrivateNetwork, cfg.Security.URLPolicy.Profile)
+	require.False(t, cfg.Security.URLPolicy.LegacyCompatibility)
+	require.True(t, cfg.Security.URLAllowlist.Enabled)
+	require.True(t, cfg.Security.URLAllowlist.AllowPrivateHosts)
+	require.True(t, cfg.Security.URLAllowlist.AllowInsecureHTTP)
+	require.Equal(t, []string{"192.168.1.20:11434"}, cfg.Security.URLAllowlist.UpstreamHosts)
+}
+
+func TestLoadRejectsInvalidURLPolicyProfile(t *testing.T) {
+	resetViperWithJWTSecret(t)
+	t.Setenv("SECURITY_URL_POLICY_PROFILE", "unsafe")
+
+	_, err := Load()
+	require.Error(t, err)
+	require.Contains(t, err.Error(), "security.url_policy.profile")
+}
+
+func TestLoadEmptyDockerURLPolicyEnvironmentUsesStrictDefaults(t *testing.T) {
+	resetViperWithJWTSecret(t)
+	t.Setenv("SECURITY_URL_POLICY_PROFILE", "")
+	t.Setenv("SECURITY_URL_ALLOWLIST_ENABLED", "")
+	t.Setenv("SECURITY_URL_ALLOWLIST_ALLOW_PRIVATE_HOSTS", "")
+	t.Setenv("SECURITY_URL_ALLOWLIST_ALLOW_INSECURE_HTTP", "")
+
+	cfg, err := Load()
+	require.NoError(t, err)
+	require.Equal(t, URLPolicyProfileStrict, cfg.Security.URLPolicy.Profile)
+	require.True(t, cfg.Security.URLAllowlist.Enabled)
+	require.False(t, cfg.Security.URLAllowlist.AllowPrivateHosts)
+	require.False(t, cfg.Security.URLAllowlist.AllowInsecureHTTP)
+}
+
+func TestLoadPrivateNetworkHostsFromEnvironment(t *testing.T) {
+	resetViperWithJWTSecret(t)
+	t.Setenv("SECURITY_URL_POLICY_PROFILE", URLPolicyProfilePrivateNetwork)
+	t.Setenv("SECURITY_URL_ALLOWLIST_UPSTREAM_HOSTS", "api.openai.com,192.168.1.20:11434")
+
+	cfg, err := Load()
+	require.NoError(t, err)
+	require.Equal(t, []string{"api.openai.com", "192.168.1.20:11434"}, cfg.Security.URLAllowlist.UpstreamHosts)
 }
 
 func TestLoadDefaultServerMode(t *testing.T) {
