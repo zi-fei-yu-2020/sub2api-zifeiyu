@@ -7,8 +7,10 @@ import (
 	"fmt"
 	"strings"
 	"sync"
+	"time"
 
 	"github.com/Wei-Shaw/sub2api/internal/config"
+	"github.com/Wei-Shaw/sub2api/internal/pkg/httpclient"
 	"github.com/Wei-Shaw/sub2api/internal/pkg/logger"
 	"go.uber.org/zap"
 )
@@ -56,7 +58,8 @@ type ImageStorageSettingService struct {
 
 	// fallback 是 config.yaml 里的配置。后台从未保存过设置时沿用它，
 	// 保证升级前已用配置文件开启该功能的部署不被打断。
-	fallback config.ImageStorageConfig
+	fallback       config.ImageStorageConfig
+	downloadPolicy config.URLAllowlistConfig
 
 	mu       sync.Mutex
 	resolved bool
@@ -70,13 +73,15 @@ func NewImageStorageSettingService(
 	backup *BackupService,
 	factory ImageStorageFactory,
 	fallback config.ImageStorageConfig,
+	downloadPolicy config.URLAllowlistConfig,
 ) *ImageStorageSettingService {
 	return &ImageStorageSettingService{
-		settingRepo: settingRepo,
-		encryptor:   encryptor,
-		backup:      backup,
-		factory:     factory,
-		fallback:    fallback,
+		settingRepo:    settingRepo,
+		encryptor:      encryptor,
+		backup:         backup,
+		factory:        factory,
+		fallback:       fallback,
+		downloadPolicy: downloadPolicy,
 	}
 }
 
@@ -120,7 +125,18 @@ func (s *ImageStorageSettingService) resolve() (*ImageResultUploader, bool) {
 		logger.L().Error("image_storage.client_build_failed; async image tasks stay disabled", zap.Error(err))
 		return nil, false
 	}
-	s.uploader = NewImageResultUploader(storage, cfg.Prefix, cfg.MaxDownloadByte, nil)
+	downloadClient, err := httpclient.GetClient(httpclient.Options{
+		Timeout:            60 * time.Second,
+		ValidateResolvedIP: s.downloadPolicy.Enabled,
+		AllowPrivateHosts:  s.downloadPolicy.AllowPrivateHosts,
+		AllowInsecureHTTP:  s.downloadPolicy.AllowInsecureHTTP,
+	})
+	if err != nil {
+		logger.L().Error("image_storage.download_client_build_failed; async image tasks stay disabled", zap.Error(err))
+		return nil, false
+	}
+	s.uploader = NewImageResultUploader(storage, cfg.Prefix, cfg.MaxDownloadByte, downloadClient)
+	s.uploader.ConfigureDownloadPolicy(s.downloadPolicy)
 	s.enabled = true
 	return s.uploader, true
 }

@@ -176,14 +176,12 @@ func (t *validatedTransport) RoundTrip(req *http.Request) (*http.Response, error
 	if req != nil && req.URL != nil {
 		host := strings.ToLower(strings.TrimSpace(req.URL.Hostname()))
 		if host != "" {
-			if t.options.RequireAllowlist || len(t.options.AllowedHosts) > 0 {
-				if _, err := urlvalidator.ValidateHTTPURL(req.URL.String(), t.options.AllowInsecureHTTP, urlvalidator.ValidationOptions{
-					AllowedHosts:     t.options.AllowedHosts,
-					RequireAllowlist: t.options.RequireAllowlist,
-					AllowPrivate:     t.options.AllowPrivateHosts,
-				}); err != nil {
-					return nil, err
-				}
+			if _, err := urlvalidator.ValidateHTTPURL(req.URL.String(), t.options.AllowInsecureHTTP, urlvalidator.ValidationOptions{
+				AllowedHosts:     t.options.AllowedHosts,
+				RequireAllowlist: t.options.RequireAllowlist,
+				AllowPrivate:     t.options.AllowPrivateHosts,
+			}); err != nil {
+				return nil, err
 			}
 			if t.options.ValidateResolvedIP {
 				// Re-resolve for every dispatch, including every redirect. Caching a

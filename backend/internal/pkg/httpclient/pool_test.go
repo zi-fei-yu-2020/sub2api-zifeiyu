@@ -114,3 +114,17 @@ func TestValidatedTransport_RejectsRedirectTargetOutsideAllowlist(t *testing.T) 
 	require.Error(t, err)
 	require.Equal(t, int32(0), atomic.LoadInt32(&baseCalls))
 }
+
+func TestValidatedTransportRejectsInsecureRedirectRequest(t *testing.T) {
+	called := false
+	transport := newValidatedTransport(roundTripFunc(func(*http.Request) (*http.Response, error) {
+		called = true
+		return &http.Response{StatusCode: http.StatusOK, Body: http.NoBody}, nil
+	}), Options{ValidateResolvedIP: true, AllowInsecureHTTP: false})
+
+	req, err := http.NewRequest(http.MethodGet, "http://example.com/image.png", nil)
+	require.NoError(t, err)
+	_, err = transport.RoundTrip(req)
+	require.Error(t, err)
+	require.False(t, called)
+}

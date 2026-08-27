@@ -1,15 +1,18 @@
 package service
 
 import (
+	"bytes"
 	"context"
 	"encoding/base64"
 	"encoding/json"
 	"errors"
+	"io"
 	"net/http"
 	"net/http/httptest"
 	"testing"
 	"time"
 
+	"github.com/Wei-Shaw/sub2api/internal/config"
 	"github.com/stretchr/testify/require"
 )
 
@@ -81,6 +84,11 @@ func TestImageResultUploaderRewritesURL(t *testing.T) {
 
 	storage := &fakeImageStorage{}
 	uploader := NewImageResultUploader(storage, "images/", 0, nil)
+	uploader.ConfigureDownloadPolicy(config.URLAllowlistConfig{
+		Enabled:           true,
+		AllowPrivateHosts: true,
+		AllowInsecureHTTP: true,
+	})
 
 	result := json.RawMessage(`{"created":1,"data":[{"url":"` + upstream.URL + `/pic.png"}]}`)
 	out, err := uploader.Rewrite(context.Background(), "imgtask_xyz", result)
@@ -243,4 +251,65 @@ func TestImageTaskServiceCompleteOffloadFailureMarksFailed(t *testing.T) {
 	require.Equal(t, http.StatusBadGateway, got.HTTPStatus)
 	require.Contains(t, string(got.Error), "object storage")
 	require.NotContains(t, string(got.Result), "b64_json", "failed offload must not persist base64 to Redis")
+}
+
+func TestImageResultUploaderDownloadPolicy(t *testing.T) {
+	t.Run("strict rejects loopback before dispatch", func(t *testing.T) {
+		httpCalls := 0
+		client := &http.Client{Transport: roundTripFunc(func(*http.Request) (*http.Response, error) {
+			httpCalls++
+			return nil, errors.New("must not dispatch")
+		})}
+		uploader := NewImageResultUploader(&fakeImageStorage{}, "images/", 0, client)
+		uploader.ConfigureDownloadPolicy(config.URLAllowlistConfig{Enabled: true})
+		result := json.RawMessage(`{"data":[{"url":"http://127.0.0.1:8080/internal.png"}]}`)
+
+		_, err := uploader.Rewrite(context.Background(), "imgtask_ssrf", result)
+		require.ErrorContains(t, err, "rejected by security policy")
+		require.Zero(t, httpCalls)
+	})
+
+	t.Run("private network permits explicitly selected policy", func(t *testing.T) {
+		httpCalls := 0
+		client := &http.Client{Transport: roundTripFunc(func(*http.Request) (*http.Response, error) {
+			httpCalls++
+			return &http.Response{
+				StatusCode: http.StatusOK,
+				Header:     http.Header{"Content-Type": []string{"image/png"}},
+				Body:       io.NopCloser(bytes.NewReader(pngBytes)),
+			}, nil
+		})}
+		storage := &fakeImageStorage{}
+		uploader := NewImageResultUploader(storage, "images/", 0, client)
+		uploader.ConfigureDownloadPolicy(config.URLAllowlistConfig{
+			Enabled:           true,
+			AllowPrivateHosts: true,
+			AllowInsecureHTTP: true,
+		})
+		result := json.RawMessage(`{"data":[{"url":"http://127.0.0.1:8080/image.png"}]}`)
+
+		_, err := uploader.Rewrite(context.Background(), "imgtask_private", result)
+		require.NoError(t, err)
+		require.Equal(t, 1, httpCalls)
+		require.Len(t, storage.saved, 1)
+	})
+
+	t.Run("metadata remains blocked in private network mode", func(t *testing.T) {
+		httpCalls := 0
+		client := &http.Client{Transport: roundTripFunc(func(*http.Request) (*http.Response, error) {
+			httpCalls++
+			return nil, errors.New("must not dispatch")
+		})}
+		uploader := NewImageResultUploader(&fakeImageStorage{}, "images/", 0, client)
+		uploader.ConfigureDownloadPolicy(config.URLAllowlistConfig{
+			Enabled:           true,
+			AllowPrivateHosts: true,
+			AllowInsecureHTTP: true,
+		})
+		result := json.RawMessage(`{"data":[{"url":"http://169.254.169.254/latest/meta-data"}]}`)
+
+		_, err := uploader.Rewrite(context.Background(), "imgtask_metadata", result)
+		require.ErrorContains(t, err, "rejected by security policy")
+		require.Zero(t, httpCalls)
+	})
 }

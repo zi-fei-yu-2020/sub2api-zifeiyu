@@ -12,6 +12,9 @@ import (
 	"strconv"
 	"strings"
 	"time"
+
+	"github.com/Wei-Shaw/sub2api/internal/config"
+	"github.com/Wei-Shaw/sub2api/internal/util/urlvalidator"
 )
 
 const defaultImageMaxDownloadBytes int64 = 32 << 20 // 32 MiB
@@ -35,6 +38,7 @@ type ImageResultUploader struct {
 	httpClient       *http.Client
 	prefix           string
 	maxDownloadBytes int64
+	downloadPolicy   *config.URLAllowlistConfig
 }
 
 // NewImageResultUploader 构造一个 uploader；storage 为 nil 时 Rewrite 直接透传。
@@ -50,11 +54,24 @@ func NewImageResultUploader(storage ImageStorage, prefix string, maxDownloadByte
 		httpClient:       httpClient,
 		prefix:           prefix,
 		maxDownloadBytes: maxDownloadBytes,
+		downloadPolicy:   &config.URLAllowlistConfig{Enabled: true},
 	}
 }
 
 func defaultImageDownloadHTTPClient() *http.Client {
 	return &http.Client{Timeout: 60 * time.Second}
+}
+
+// ConfigureDownloadPolicy applies the global outbound URL policy to image URLs
+// returned by upstream providers. New uploaders default to strict public HTTPS;
+// production settings may explicitly select private-network or compatible mode.
+func (u *ImageResultUploader) ConfigureDownloadPolicy(policy config.URLAllowlistConfig) {
+	if u == nil {
+		return
+	}
+	cloned := policy
+	cloned.UpstreamHosts = append([]string(nil), policy.UpstreamHosts...)
+	u.downloadPolicy = &cloned
 }
 
 // Rewrite 将 result（上游生图响应 JSON）里的每张图片转存到对象存储，
@@ -192,6 +209,19 @@ func (u *ImageResultUploader) decodeImageDataURL(rawURL string) ([]byte, string,
 }
 
 func (u *ImageResultUploader) download(ctx context.Context, rawURL string) ([]byte, string, error) {
+	if u.downloadPolicy != nil {
+		var err error
+		if u.downloadPolicy.Enabled {
+			_, err = urlvalidator.ValidateHTTPURL(rawURL, u.downloadPolicy.AllowInsecureHTTP, urlvalidator.ValidationOptions{
+				AllowPrivate: u.downloadPolicy.AllowPrivateHosts,
+			})
+		} else {
+			_, err = urlvalidator.ValidateURLFormat(rawURL, u.downloadPolicy.AllowInsecureHTTP)
+		}
+		if err != nil {
+			return nil, "", fmt.Errorf("download image URL rejected by security policy: %w", err)
+		}
+	}
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, rawURL, nil)
 	if err != nil {
 		return nil, "", fmt.Errorf("build download request: %w", err)

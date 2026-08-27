@@ -85,7 +85,7 @@ func newImageStorageFixtureWithKey(t *testing.T, fallback config.ImageStorageCon
 		built = append(built, *cfg)
 		return &recordingStorage{}, nil
 	}
-	return NewImageStorageSettingService(repo, encryptor, backup, factory, fallback), repo, &built
+	return NewImageStorageSettingService(repo, encryptor, backup, factory, fallback, config.URLAllowlistConfig{}), repo, &built
 }
 
 func seedBackupS3(t *testing.T, repo *stubSettingRepo, cfg BackupS3Config) {
@@ -99,7 +99,7 @@ func seedBackupS3(t *testing.T, repo *stubSettingRepo, cfg BackupS3Config) {
 // The admin switch must take effect without a restart: that is the entire point
 // of moving image_storage out of config.yaml (#4542).
 func TestImageStorageSettingsToggleTakesEffectWithoutRestart(t *testing.T) {
-	svc, repo, built := newImageStorageFixture(t, config.ImageStorageConfig{})
+	svc, repo, built := newImageStorageFixture(t, config.ImageStorageConfig{}, config.URLAllowlistConfig{})
 	ctx := context.Background()
 	seedBackupS3(t, repo, BackupS3Config{
 		Endpoint: "https://acct.r2.cloudflarestorage.com", Region: "auto",
@@ -127,7 +127,7 @@ func TestImageStorageSettingsToggleTakesEffectWithoutRestart(t *testing.T) {
 }
 
 func TestImageStorageSettingsReuseBackupCredentials(t *testing.T) {
-	svc, repo, built := newImageStorageFixture(t, config.ImageStorageConfig{})
+	svc, repo, built := newImageStorageFixture(t, config.ImageStorageConfig{}, config.URLAllowlistConfig{})
 	ctx := context.Background()
 	seedBackupS3(t, repo, BackupS3Config{
 		Endpoint: "https://acct.r2.cloudflarestorage.com", Region: "wnam",
@@ -158,7 +158,7 @@ func TestImageStorageSettingsReuseBackupCredentials(t *testing.T) {
 }
 
 func TestImageStorageSettingsOwnCredentialsAreEncryptedAndMasked(t *testing.T) {
-	svc, repo, built := newImageStorageFixture(t, config.ImageStorageConfig{})
+	svc, repo, built := newImageStorageFixture(t, config.ImageStorageConfig{}, config.URLAllowlistConfig{})
 	ctx := context.Background()
 
 	saved, err := svc.Update(ctx, ImageStorageSettings{
@@ -222,7 +222,7 @@ func TestImageStorageSettingsRejectSecretWithEphemeralKey(t *testing.T) {
 }
 
 func TestImageStorageSettingsIncompleteStaysDisabled(t *testing.T) {
-	svc, _, built := newImageStorageFixture(t, config.ImageStorageConfig{})
+	svc, _, built := newImageStorageFixture(t, config.ImageStorageConfig{}, config.URLAllowlistConfig{})
 	ctx := context.Background()
 
 	_, err := svc.Update(ctx, ImageStorageSettings{Enabled: true, Bucket: "my-images"})
