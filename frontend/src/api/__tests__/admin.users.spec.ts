@@ -1,17 +1,20 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
-const { post } = vi.hoisted(() => ({
+const { get, post } = vi.hoisted(() => ({
+  get: vi.fn(),
   post: vi.fn(),
 }))
 
 vi.mock('@/api/client', () => ({
   apiClient: {
+    get,
     post,
   },
 }))
 
 import {
   batchUpdateLimits,
+  getUserUsageStats,
   bindUserAuthIdentity,
   type AdminBindAuthIdentityRequest,
   type AdminBoundAuthIdentity,
@@ -83,6 +86,7 @@ const batchResponseContractExact: Assert<
 
 describe('admin users api auth identity binding', () => {
   beforeEach(() => {
+    get.mockReset()
     post.mockReset()
   })
 
@@ -147,4 +151,28 @@ describe('admin users api auth identity binding', () => {
     expect(batchRequestContractExact).toBe(true)
     expect(batchResponseContractExact).toBe(true)
   })
+
+  it('requests real user usage aggregates with an explicit supported period', async () => {
+    const response = {
+      user_id: 9,
+      period: 'all' as const,
+      start_time: null,
+      end_time: '2026-08-27T08:00:00Z',
+      total_requests: 17,
+      total_input_tokens: 100,
+      total_output_tokens: 50,
+      total_cache_creation_tokens: 20,
+      total_cache_read_tokens: 10,
+      total_cache_tokens: 30,
+      total_tokens: 180,
+      total_cost: 2.5,
+      total_actual_cost: 1.75,
+      average_duration_ms: 425.5,
+    }
+    get.mockResolvedValue({ data: response })
+
+    await expect(getUserUsageStats(9, 'all')).resolves.toEqual(response)
+    expect(get).toHaveBeenCalledWith('/admin/users/9/usage', { params: { period: 'all' } })
+  })
+
 })

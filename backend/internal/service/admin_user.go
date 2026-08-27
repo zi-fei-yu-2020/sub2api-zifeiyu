@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"net/http"
 	"sort"
 	"strings"
 	"time"
@@ -16,6 +17,8 @@ import (
 	infraerrors "github.com/Wei-Shaw/sub2api/internal/pkg/errors"
 	"github.com/Wei-Shaw/sub2api/internal/pkg/logger"
 	"github.com/Wei-Shaw/sub2api/internal/pkg/pagination"
+	"github.com/Wei-Shaw/sub2api/internal/pkg/timezone"
+	"github.com/Wei-Shaw/sub2api/internal/pkg/usagestats"
 )
 
 // User management implementations
@@ -677,14 +680,87 @@ func (s *adminServiceImpl) GetUserRPMStatus(ctx context.Context, userID int64) (
 	}, nil
 }
 
-func (s *adminServiceImpl) GetUserUsageStats(ctx context.Context, userID int64, period string) (any, error) {
-	// Return mock data for now
-	return map[string]any{
-		"period":          period,
-		"total_requests":  0,
-		"total_cost":      0.0,
-		"total_tokens":    0,
-		"avg_duration_ms": 0,
+// AdminUserUsageStatsRepository is the narrow usage aggregate dependency used by admin user details.
+type AdminUserUsageStatsRepository interface {
+	GetStatsWithFilters(ctx context.Context, filters usagestats.UsageLogFilters) (*usagestats.UsageStats, error)
+}
+
+// AdminUserUsageStats is the usage aggregate returned by the admin user detail endpoint.
+type AdminUserUsageStats struct {
+	UserID                   int64      `json:"user_id"`
+	Period                   string     `json:"period"`
+	StartTime                *time.Time `json:"start_time"`
+	EndTime                  time.Time  `json:"end_time"`
+	TotalRequests            int64      `json:"total_requests"`
+	TotalInputTokens         int64      `json:"total_input_tokens"`
+	TotalOutputTokens        int64      `json:"total_output_tokens"`
+	TotalCacheCreationTokens int64      `json:"total_cache_creation_tokens"`
+	TotalCacheReadTokens     int64      `json:"total_cache_read_tokens"`
+	TotalCacheTokens         int64      `json:"total_cache_tokens"`
+	TotalTokens              int64      `json:"total_tokens"`
+	TotalCost                float64    `json:"total_cost"`
+	TotalActualCost          float64    `json:"total_actual_cost"`
+	AverageDurationMs        float64    `json:"average_duration_ms"`
+}
+
+func resolveAdminUserUsagePeriod(period string, now time.Time) (string, *time.Time, time.Time, error) {
+	normalized := strings.ToLower(strings.TrimSpace(period))
+	if normalized == "" {
+		normalized = "month"
+	}
+
+	var start time.Time
+	switch normalized {
+	case "today":
+		start = timezone.StartOfDay(now)
+	case "week":
+		start = timezone.StartOfWeek(now)
+	case "month":
+		start = timezone.StartOfMonth(now)
+	case "all":
+		return normalized, nil, now, nil
+	default:
+		return "", nil, time.Time{}, infraerrors.BadRequest(
+			"INVALID_USAGE_PERIOD",
+			"period must be one of today, week, month, or all",
+		)
+	}
+	return normalized, &start, now, nil
+}
+
+func (s *adminServiceImpl) GetUserUsageStats(ctx context.Context, userID int64, period string) (*AdminUserUsageStats, error) {
+	if s.adminUserUsageRepo == nil {
+		return nil, infraerrors.New(http.StatusNotImplemented, "USER_USAGE_STATS_UNAVAILABLE", "user usage statistics are unavailable")
+	}
+	if _, err := s.userRepo.GetByID(ctx, userID); err != nil {
+		return nil, err
+	}
+
+	normalizedPeriod, startTime, endTime, err := resolveAdminUserUsagePeriod(period, timezone.Now())
+	if err != nil {
+		return nil, err
+	}
+	filters := usagestats.UsageLogFilters{UserID: userID, StartTime: startTime, EndTime: &endTime}
+	stats, err := s.adminUserUsageRepo.GetStatsWithFilters(ctx, filters)
+	if err != nil {
+		return nil, fmt.Errorf("get admin user usage stats: %w", err)
+	}
+
+	return &AdminUserUsageStats{
+		UserID:                   userID,
+		Period:                   normalizedPeriod,
+		StartTime:                startTime,
+		EndTime:                  endTime,
+		TotalRequests:            stats.TotalRequests,
+		TotalInputTokens:         stats.TotalInputTokens,
+		TotalOutputTokens:        stats.TotalOutputTokens,
+		TotalCacheCreationTokens: stats.TotalCacheCreationTokens,
+		TotalCacheReadTokens:     stats.TotalCacheReadTokens,
+		TotalCacheTokens:         stats.TotalCacheTokens,
+		TotalTokens:              stats.TotalTokens,
+		TotalCost:                stats.TotalCost,
+		TotalActualCost:          stats.TotalActualCost,
+		AverageDurationMs:        stats.AverageDurationMs,
 	}, nil
 }
 
