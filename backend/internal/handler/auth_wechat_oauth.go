@@ -5,7 +5,6 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"io"
 	"net/http"
 	"net/url"
 	"strconv"
@@ -1155,9 +1154,9 @@ func exchangeWeChatOAuthCode(ctx context.Context, cfg wechatOAuthConfig, code st
 	}
 	defer func() { _ = resp.Body.Close() }()
 
-	body, err := io.ReadAll(resp.Body)
+	body, err := readOAuthHandlerResponseBody(resp, "wechat access token")
 	if err != nil {
-		return nil, fmt.Errorf("read wechat access token response: %w", err)
+		return nil, err
 	}
 	if resp.StatusCode < http.StatusOK || resp.StatusCode >= http.StatusMultipleChoices {
 		return nil, fmt.Errorf("wechat access token status=%d", resp.StatusCode)
@@ -1203,9 +1202,9 @@ func fetchWeChatUserInfo(ctx context.Context, tokenResp *wechatOAuthTokenRespons
 	}
 	defer func() { _ = resp.Body.Close() }()
 
-	body, err := io.ReadAll(resp.Body)
+	body, err := readOAuthHandlerResponseBody(resp, "wechat userinfo")
 	if err != nil {
-		return nil, fmt.Errorf("read wechat userinfo response: %w", err)
+		return nil, err
 	}
 	if resp.StatusCode < http.StatusOK || resp.StatusCode >= http.StatusMultipleChoices {
 		return nil, fmt.Errorf("wechat userinfo status=%d", resp.StatusCode)
