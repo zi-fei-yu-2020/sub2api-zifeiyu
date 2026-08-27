@@ -1,2 +1,10 @@
 version: 1
-exceptions:
+# High/critical exceptions must be short-lived and narrowly scoped. Example:
+# exceptions:
+#   - package: example-package
+#     advisory: GHSA-xxxx-xxxx-xxxx
+#     severity: high
+#     scope: development  # production, development, or all
+#     reason: Upgrade is blocked by an upstream compatibility issue.
+#     expires_on: 2026-09-30
+exceptions: []

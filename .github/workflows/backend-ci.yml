@@ -55,10 +55,11 @@ jobs:
           node-version: '20'
           cache: 'pnpm'
           cache-dependency-path: frontend/pnpm-lock.yaml
-      - name: Install frontend dependencies
-        working-directory: frontend
-        run: pnpm install --frozen-lockfile
-      - name: Frontend typecheck and critical vitest
+      - name: Verify pnpm version
+        run: test "$(pnpm --version)" = "9.15.9"
+      - name: Install frontend dependencies with frozen lockfile
+        run: make verify-frontend-lockfile
+      - name: Frontend lint, typecheck, and full vitest
         run: make test-frontend
 
   golangci-lint:

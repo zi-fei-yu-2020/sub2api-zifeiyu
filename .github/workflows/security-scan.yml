@@ -44,15 +44,23 @@ jobs:
           node-version: '20'
           cache: 'pnpm'
           cache-dependency-path: frontend/pnpm-lock.yaml
-      - name: Install dependencies
-        working-directory: frontend
-        run: pnpm install --frozen-lockfile
-      - name: Run pnpm audit
+      - name: Verify pnpm version
+        run: test "$(pnpm --version)" = "9.15.9"
+      - name: Install dependencies with frozen lockfile
+        run: make verify-frontend-lockfile
+      - name: Generate production dependency audit
         working-directory: frontend
         run: |
-          pnpm audit --prod --audit-level=high --json > audit.json || true
-      - name: Check audit exceptions
+          pnpm audit --prod --json --registry=https://registry.npmjs.org \
+            > audit.production.json || true
+      - name: Generate full dependency audit
+        working-directory: frontend
         run: |
-          python tools/check_pnpm_audit_exceptions.py \
-            --audit frontend/audit.json \
+          pnpm audit --json --registry=https://registry.npmjs.org \
+            > audit.full.json || true
+      - name: Enforce high and critical audit policy
+        run: |
+          python3 tools/check_pnpm_audit_exceptions.py \
+            --production-audit frontend/audit.production.json \
+            --full-audit frontend/audit.full.json \
             --exceptions .github/audit-exceptions.yml

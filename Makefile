@@ -1,4 +1,4 @@
-.PHONY: build build-backend build-frontend test test-backend test-frontend test-frontend-critical
+.PHONY: build build-backend build-frontend test test-backend test-frontend test-frontend-critical verify-frontend-lockfile
 
 FRONTEND_CRITICAL_VITEST := \
 	src/api/__tests__/client.spec.ts \
@@ -32,10 +32,14 @@ test: test-backend test-frontend
 test-backend:
 	@$(MAKE) -C backend test
 
+verify-frontend-lockfile:
+	@pnpm --dir frontend install --frozen-lockfile
+	@git diff --exit-code -- frontend/pnpm-lock.yaml
+
 test-frontend:
 	@pnpm --dir frontend run lint:check
 	@pnpm --dir frontend run typecheck
-	@$(MAKE) test-frontend-critical
+	@pnpm --dir frontend run test:run
 
 test-frontend-critical:
 	@pnpm --dir frontend exec vitest run $(FRONTEND_CRITICAL_VITEST)

@@ -1,16 +1,62 @@
 #!/usr/bin/env python3
+"""Validate pnpm production and full audit reports against short-lived exceptions."""
+
+from __future__ import annotations
+
 import argparse
 import json
+import re
 import sys
+from dataclasses import dataclass
 from datetime import date
-
+from pathlib import Path
+from typing import Any, Iterable
 
 HIGH_SEVERITIES = {"high", "critical"}
-REQUIRED_FIELDS = {"package", "advisory", "severity", "mitigation", "expires_on"}
+ALLOWED_SCOPES = {"production", "development", "all"}
+REQUIRED_FIELDS = {
+    "package",
+    "advisory",
+    "severity",
+    "scope",
+    "reason",
+    "expires_on",
+}
+SEVERITY_RANK = {"low": 1, "moderate": 2, "high": 3, "critical": 4}
+ADVISORY_ID_PATTERN = re.compile(
+    r"\b(GHSA-[0-9A-Za-z-]+|CVE-\d{4}-\d+)\b", re.IGNORECASE
+)
+
+
+@dataclass(frozen=True)
+class AuditIssue:
+    package: str
+    advisory: str
+    severity: str
+    title: str
+
+    @property
+    def key(self) -> tuple[str, str]:
+        return normalize_package(self.package), normalize_advisory(self.advisory)
+
+
+@dataclass(frozen=True)
+class AuditException:
+    package: str
+    advisory: str
+    severity: str
+    scope: str
+    reason: str
+    expires_on: date
+
+    @property
+    def key(self) -> tuple[str, str]:
+        return normalize_package(self.package), normalize_advisory(self.advisory)
 
 
 def split_kv(line: str) -> tuple[str, str]:
-    # 解析 "key: value" 形式的简单 YAML 行，并去除引号。
+    if ":" not in line:
+        raise ValueError(f"Expected 'key: value', got: {line}")
     key, value = line.split(":", 1)
     value = value.strip()
     if (value.startswith('"') and value.endswith('"')) or (
@@ -20,226 +66,324 @@ def split_kv(line: str) -> tuple[str, str]:
     return key.strip(), value
 
 
-def parse_exceptions(path: str) -> list[dict]:
-    # 轻量解析异常清单，避免引入额外依赖。
-    exceptions = []
-    current = None
-    with open(path, "r", encoding="utf-8") as handle:
-        for raw in handle:
+def parse_exception_document(path: Path) -> tuple[int, list[dict[str, str]]]:
+    """Parse the deliberately small YAML schema without adding a CI dependency."""
+    version: int | None = None
+    exceptions: list[dict[str, str]] = []
+    current: dict[str, str] | None = None
+    in_exceptions = False
+
+    with path.open("r", encoding="utf-8-sig") as handle:
+        for line_number, raw in enumerate(handle, start=1):
             line = raw.strip()
             if not line or line.startswith("#"):
                 continue
-            if line.startswith("version:") or line.startswith("exceptions:"):
-                continue
-            if line.startswith("- "):
-                if current:
-                    exceptions.append(current)
-                current = {}
-                line = line[2:].strip()
-                if line:
-                    key, value = split_kv(line)
-                    current[key] = value
-                continue
-            if current is not None and ":" in line:
+            try:
+                if line.startswith("version:"):
+                    _, raw_version = split_kv(line)
+                    version = int(raw_version)
+                    continue
+                if line.startswith("exceptions:"):
+                    _, value = split_kv(line)
+                    if value not in {"", "[]"}:
+                        raise ValueError("exceptions must be a YAML list or []")
+                    in_exceptions = True
+                    continue
+                if not in_exceptions:
+                    raise ValueError("entries must be under exceptions:")
+                if line.startswith("- "):
+                    if current is not None:
+                        exceptions.append(current)
+                    current = {}
+                    remainder = line[2:].strip()
+                    if remainder:
+                        key, value = split_kv(remainder)
+                        current[key] = value
+                    continue
+                if current is None:
+                    raise ValueError("exception field found before a list item")
                 key, value = split_kv(line)
                 current[key] = value
-    if current:
+            except (TypeError, ValueError) as exc:
+                raise ValueError(f"{path}:{line_number}: {exc}") from exc
+
+    if current is not None:
         exceptions.append(current)
-    return exceptions
+    if version is None:
+        raise ValueError(f"{path}: missing version")
+    return version, exceptions
 
 
-def pick_advisory_id(advisory: dict) -> str | None:
-    # 优先使用可稳定匹配的标识（GHSA/URL/CVE），避免误匹配到其他同名漏洞。
-    return (
+def normalize_severity(value: Any) -> str:
+    return str(value or "").strip().lower()
+
+
+def normalize_package(value: Any) -> str:
+    return str(value or "").strip().lower()
+
+
+def normalize_advisory(value: Any) -> str:
+    normalized = str(value or "").strip()
+    match = ADVISORY_ID_PATTERN.search(normalized)
+    if match:
+        return match.group(1).lower()
+    return normalized.lower()
+
+
+def parse_date(value: Any) -> date | None:
+    try:
+        return date.fromisoformat(str(value))
+    except (TypeError, ValueError):
+        return None
+
+
+def pick_advisory_id(advisory: dict[str, Any]) -> str:
+    cves = advisory.get("cves") or []
+    return str(
         advisory.get("github_advisory_id")
         or advisory.get("url")
-        or (advisory.get("cves") or [None])[0]
-        or (str(advisory.get("id")) if advisory.get("id") is not None else None)
-        or advisory.get("title")
-        or advisory.get("advisory")
-        or advisory.get("overview")
+        or (cves[0] if cves else "")
+        or advisory.get("id")
+        or advisory.get("source")
+        or ""
     )
 
 
-def iter_vulns(data: dict):
-    # 兼容 pnpm audit 的不同输出结构（advisories / vulnerabilities），并提取 advisory 标识。
+def iter_report_issues(data: dict[str, Any]) -> Iterable[AuditIssue]:
     advisories = data.get("advisories")
-    if isinstance(advisories, dict):
+    if isinstance(advisories, dict) and advisories:
         for advisory in advisories.values():
-            name = advisory.get("module_name") or advisory.get("name")
-            severity = advisory.get("severity")
-            advisory_id = pick_advisory_id(advisory)
-            title = (
-                advisory.get("title")
-                or advisory.get("advisory")
-                or advisory.get("overview")
-                or advisory.get("url")
+            if not isinstance(advisory, dict):
+                continue
+            yield AuditIssue(
+                package=str(advisory.get("module_name") or advisory.get("name") or ""),
+                advisory=pick_advisory_id(advisory),
+                severity=normalize_severity(advisory.get("severity")),
+                title=str(
+                    advisory.get("title")
+                    or advisory.get("overview")
+                    or advisory.get("url")
+                    or ""
+                ),
             )
-            yield name, severity, advisory_id, title
+        return
 
     vulnerabilities = data.get("vulnerabilities")
-    if isinstance(vulnerabilities, dict):
-        for name, vuln in vulnerabilities.items():
-            severity = vuln.get("severity")
-            via = vuln.get("via", [])
-            titles = []
-            advisories = []
-            if isinstance(via, list):
-                for item in via:
-                    if isinstance(item, dict):
-                        advisories.append(
-                            item.get("github_advisory_id")
-                            or item.get("url")
-                            or item.get("source")
-                            or item.get("title")
-                            or item.get("name")
-                        )
-                        titles.append(
-                            item.get("title")
-                            or item.get("url")
-                            or item.get("advisory")
-                            or item.get("source")
-                        )
-                    elif isinstance(item, str):
-                        advisories.append(item)
-                        titles.append(item)
-            elif isinstance(via, str):
-                advisories.append(via)
-                titles.append(via)
-            title = "; ".join([t for t in titles if t])
-            for advisory_id in [a for a in advisories if a]:
-                yield name, severity, advisory_id, title
+    if not isinstance(vulnerabilities, dict):
+        return
+    for package, vulnerability in vulnerabilities.items():
+        if not isinstance(vulnerability, dict):
+            continue
+        via = vulnerability.get("via") or []
+        if not isinstance(via, list):
+            via = [via]
+        for advisory in via:
+            if not isinstance(advisory, dict):
+                continue
+            yield AuditIssue(
+                package=str(advisory.get("name") or package),
+                advisory=pick_advisory_id(advisory),
+                severity=normalize_severity(
+                    advisory.get("severity") or vulnerability.get("severity")
+                ),
+                title=str(
+                    advisory.get("title")
+                    or advisory.get("url")
+                    or advisory.get("source")
+                    or ""
+                ),
+            )
 
 
-def normalize_severity(severity: str) -> str:
-    # 统一大小写，避免比较失败。
-    return (severity or "").strip().lower()
-
-
-def normalize_package(name: str) -> str:
-    # 包名只去掉首尾空白，保留原始大小写，同时兼容非字符串输入。
-    if name is None:
-        return ""
-    return str(name).strip()
-
-
-def normalize_advisory(advisory: str) -> str:
-    # advisory 统一为小写匹配，避免 GHSA/URL 因大小写差异导致漏匹配。
-    # pnpm 的 source 字段可能是数字，这里统一转为字符串以保证可比较。
-    if advisory is None:
-        return ""
-    return str(advisory).strip().lower()
-
-
-def parse_date(value: str) -> date | None:
-    # 仅接受 ISO8601 日期格式，非法值视为无效。
+def load_audit_report(path: Path, label: str) -> dict[tuple[str, str], AuditIssue]:
     try:
-        return date.fromisoformat(value)
-    except ValueError:
-        return None
+        with path.open("r", encoding="utf-8-sig") as handle:
+            data = json.load(handle)
+    except (OSError, UnicodeError, json.JSONDecodeError) as exc:
+        raise ValueError(f"Unable to read {label} audit report {path}: {exc}") from exc
+
+    if not isinstance(data, dict):
+        raise ValueError(f"{label} audit report must contain a JSON object")
+    if data.get("error"):
+        error = data["error"]
+        if isinstance(error, dict):
+            error = error.get("message") or error.get("code") or json.dumps(error)
+        raise ValueError(f"{label} audit command failed: {error}")
+
+    issues: dict[tuple[str, str], AuditIssue] = {}
+    for issue in iter_report_issues(data):
+        if issue.severity not in HIGH_SEVERITIES:
+            continue
+        if not normalize_package(issue.package):
+            raise ValueError(f"{label} audit contains an issue without a package name")
+        if not normalize_advisory(issue.advisory):
+            raise ValueError(
+                f"{label} audit contains a {issue.severity} issue without an advisory ID: "
+                f"{issue.package}"
+            )
+        existing = issues.get(issue.key)
+        if existing is None or SEVERITY_RANK[issue.severity] > SEVERITY_RANK[existing.severity]:
+            issues[issue.key] = issue
+
+    vulnerability_counts = ((data.get("metadata") or {}).get("vulnerabilities") or {})
+    reported_high = int(vulnerability_counts.get("high") or 0)
+    reported_critical = int(vulnerability_counts.get("critical") or 0)
+    if reported_high + reported_critical > 0 and not issues:
+        raise ValueError(
+            f"{label} audit reports {reported_high} high and {reported_critical} critical "
+            "vulnerabilities but exposes no advisory IDs"
+        )
+    return issues
+
+
+def load_exceptions(path: Path) -> list[AuditException]:
+    version, raw_exceptions = parse_exception_document(path)
+    if version != 1:
+        raise ValueError(f"Unsupported audit exception schema version: {version}")
+
+    parsed: list[AuditException] = []
+    seen: set[tuple[str, str]] = set()
+    errors: list[str] = []
+    for index, raw in enumerate(raw_exceptions, start=1):
+        missing = sorted(field for field in REQUIRED_FIELDS if not raw.get(field))
+        if missing:
+            errors.append(f"Exception #{index} is missing required fields: {', '.join(missing)}")
+            continue
+
+        severity = normalize_severity(raw["severity"])
+        scope = str(raw["scope"]).strip().lower()
+        expires_on = parse_date(raw["expires_on"])
+        item = AuditException(
+            package=str(raw["package"]).strip(),
+            advisory=str(raw["advisory"]).strip(),
+            severity=severity,
+            scope=scope,
+            reason=str(raw["reason"]).strip(),
+            expires_on=expires_on or date.min,
+        )
+        if severity not in HIGH_SEVERITIES:
+            errors.append(
+                f"Exception #{index} has invalid severity {raw['severity']!r}; "
+                "only high or critical can be excepted"
+            )
+        if scope not in ALLOWED_SCOPES:
+            errors.append(
+                f"Exception #{index} has invalid scope {raw['scope']!r}; expected "
+                "production, development, or all"
+            )
+        if expires_on is None:
+            errors.append(
+                f"Exception #{index} has invalid expires_on date {raw['expires_on']!r}; "
+                "expected YYYY-MM-DD"
+            )
+        if not normalize_package(item.package) or not normalize_advisory(item.advisory):
+            errors.append(f"Exception #{index} has an empty package or advisory")
+        if item.key in seen:
+            errors.append(
+                f"Duplicate exception for {item.package} advisory {item.advisory}"
+            )
+        seen.add(item.key)
+        parsed.append(item)
+
+    if errors:
+        raise ValueError("\n".join(errors))
+    return parsed
+
+
+def exception_applies(exception_scope: str, issue_scope: str) -> bool:
+    return exception_scope == "all" or exception_scope == issue_scope
+
+
+def format_issue(issue: AuditIssue, scope: str) -> str:
+    title = f": {issue.title}" if issue.title else ""
+    return (
+        f"- {issue.package} ({issue.severity}, {scope}) "
+        f"[{issue.advisory}]{title}"
+    )
+
+
+def validate(
+    production: dict[tuple[str, str], AuditIssue],
+    full: dict[tuple[str, str], AuditIssue],
+    exceptions: list[AuditException],
+) -> list[str]:
+    errors: list[str] = []
+    missing_from_full = sorted(set(production) - set(full))
+    if missing_from_full:
+        errors.append("Full audit report is missing issues present in the production report:")
+        for key in missing_from_full:
+            errors.append(format_issue(production[key], "production"))
+
+    scoped_issues: dict[tuple[str, str], tuple[AuditIssue, str]] = {}
+    for key, issue in full.items():
+        scoped_issues[key] = (issue, "production" if key in production else "development")
+    for key, issue in production.items():
+        scoped_issues.setdefault(key, (issue, "production"))
+
+    exception_index = {exception.key: exception for exception in exceptions}
+    used_exceptions: set[tuple[str, str]] = set()
+    today = date.today()
+
+    for key in sorted(scoped_issues):
+        issue, scope = scoped_issues[key]
+        exception = exception_index.get(key)
+        if exception is None:
+            errors.append(format_issue(issue, scope))
+            continue
+        used_exceptions.add(key)
+        if exception.severity != issue.severity:
+            errors.append(
+                f"Exception severity mismatch for {issue.package} [{issue.advisory}]: "
+                f"audit={issue.severity}, exception={exception.severity}"
+            )
+        if not exception_applies(exception.scope, scope):
+            errors.append(
+                f"Exception scope mismatch for {issue.package} [{issue.advisory}]: "
+                f"issue={scope}, exception={exception.scope}"
+            )
+        if exception.expires_on < today:
+            errors.append(
+                f"Exception expired for {issue.package} [{issue.advisory}] on "
+                f"{exception.expires_on.isoformat()}"
+            )
+
+    unused = sorted(set(exception_index) - used_exceptions)
+    for key in unused:
+        exception = exception_index[key]
+        errors.append(
+            f"Unused audit exception must be removed: {exception.package} "
+            f"[{exception.advisory}]"
+        )
+    return errors
 
 
 def main() -> int:
     parser = argparse.ArgumentParser()
-    parser.add_argument("--audit", required=True)
-    parser.add_argument("--exceptions", required=True)
+    parser.add_argument("--production-audit", required=True, type=Path)
+    parser.add_argument("--full-audit", required=True, type=Path)
+    parser.add_argument("--exceptions", required=True, type=Path)
     args = parser.parse_args()
 
-    with open(args.audit, "r", encoding="utf-8") as handle:
-        audit = json.load(handle)
+    try:
+        production = load_audit_report(args.production_audit, "production")
+        full = load_audit_report(args.full_audit, "full dependency")
+        exceptions = load_exceptions(args.exceptions)
+    except ValueError as exc:
+        sys.stderr.write(f"{exc}\n")
+        return 1
 
-    # 读取异常清单并建立索引，便于快速匹配包名 + advisory。
-    exceptions = parse_exceptions(args.exceptions)
-    exception_index = {}
-    errors = []
-
-    for exc in exceptions:
-        missing = [field for field in REQUIRED_FIELDS if not exc.get(field)]
-        if missing:
-            errors.append(
-                f"Exception missing required fields {missing}: {exc.get('package', '<unknown>')}"
-            )
-            continue
-        exc_severity = normalize_severity(exc.get("severity"))
-        exc_package = normalize_package(exc.get("package"))
-        exc_advisory = normalize_advisory(exc.get("advisory"))
-        exc_date = parse_date(exc.get("expires_on"))
-        if exc_date is None:
-            errors.append(
-                f"Exception has invalid expires_on date: {exc.get('package', '<unknown>')}"
-            )
-            continue
-        if not exc_package or not exc_advisory:
-            errors.append("Exception missing package or advisory value")
-            continue
-        key = (exc_package, exc_advisory)
-        if key in exception_index:
-            errors.append(
-                f"Duplicate exception for {exc_package} advisory {exc.get('advisory')}"
-            )
-            continue
-        exception_index[key] = {
-            "raw": exc,
-            "severity": exc_severity,
-            "expires_on": exc_date,
-        }
-
-    today = date.today()
-    missing_exceptions = []
-    expired_exceptions = []
-
-    # 去重处理：同一包名 + advisory 可能在不同字段重复出现。
-    seen = set()
-    for name, severity, advisory_id, title in iter_vulns(audit):
-        sev = normalize_severity(severity)
-        if sev not in HIGH_SEVERITIES or not name:
-            continue
-        advisory_key = normalize_advisory(advisory_id)
-        if not advisory_key:
-            errors.append(
-                f"High/Critical vulnerability missing advisory id: {name} ({sev})"
-            )
-            continue
-        key = (normalize_package(name), advisory_key)
-        if key in seen:
-            continue
-        seen.add(key)
-        exc = exception_index.get(key)
-        if exc is None:
-            missing_exceptions.append((name, sev, advisory_id, title))
-            continue
-        if exc["severity"] and exc["severity"] != sev:
-            errors.append(
-                "Exception severity mismatch: "
-                f"{name} ({advisory_id}) expected {sev}, got {exc['severity']}"
-            )
-        if exc["expires_on"] and exc["expires_on"] < today:
-            expired_exceptions.append(
-                (name, sev, advisory_id, exc["expires_on"].isoformat())
-            )
-
-    if missing_exceptions:
-        errors.append("High/Critical vulnerabilities missing exceptions:")
-        for name, sev, advisory_id, title in missing_exceptions:
-            label = f"{name} ({sev})"
-            if advisory_id:
-                label = f"{label} [{advisory_id}]"
-            if title:
-                label = f"{label}: {title}"
-            errors.append(f"- {label}")
-
-    if expired_exceptions:
-        errors.append("Exceptions expired:")
-        for name, sev, advisory_id, expires_on in expired_exceptions:
-            errors.append(
-                f"- {name} ({sev}) [{advisory_id}] expired on {expires_on}"
-            )
-
+    errors = validate(production, full, exceptions)
     if errors:
+        sys.stderr.write("Unapproved high/critical pnpm audit findings:\n")
         sys.stderr.write("\n".join(errors) + "\n")
         return 1
 
-    print("Audit exceptions validated.")
+    development_count = len(set(full) - set(production))
+    print(
+        "pnpm audit gate passed: "
+        f"{len(production)} production and {development_count} development-only "
+        f"high/critical advisories; {len(exceptions)} approved exceptions."
+    )
     return 0
 
 
