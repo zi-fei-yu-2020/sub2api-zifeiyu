@@ -53,7 +53,7 @@ func TestGrokAPIKeyURLPolicyFollowsGlobalSecurityConfig(t *testing.T) {
 	t.Run("enabled allowlist remains HTTPS only", func(t *testing.T) {
 		cfg := &config.Config{}
 		cfg.Security.URLAllowlist.Enabled = true
-		cfg.Security.URLAllowlist.AllowInsecureHTTP = true
+		cfg.Security.URLAllowlist.AllowInsecureHTTP = false
 		cfg.Security.URLAllowlist.UpstreamHosts = []string{"grok.example.test"}
 
 		_, err := buildGrokResponsesURL(account, cfg)

@@ -227,8 +227,9 @@ func (s *emailCacheStub) IncrNotifyCodeUserRate(ctx context.Context, userID int6
 func newAuthService(repo *userRepoStub, settings map[string]string, emailCache EmailCache, quotaRepo UserPlatformQuotaRepository) *AuthService {
 	cfg := &config.Config{
 		JWT: config.JWTConfig{
-			Secret:     "test-secret",
-			ExpireHour: 1,
+			Secret:                 "test-secret",
+			ExpireHour:             1,
+			RefreshTokenExpireDays: 30,
 		},
 		Default: config.DefaultConfig{
 			UserBalance:     3.5,
