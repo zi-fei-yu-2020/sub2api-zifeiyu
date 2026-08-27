@@ -233,6 +233,7 @@ func (s *SettingService) buildSystemSettingsUpdates(ctx context.Context, setting
 	updates[SettingKeyAliyunCaptchaPrefix] = settings.AliyunCaptchaPrefix
 	updates[SettingKeyAliyunCaptchaRegion] = normalizeAliyunCaptchaRegion(settings.AliyunCaptchaRegion)
 	updates[SettingKeyAPIKeyACLTrustForwardedIP] = strconv.FormatBool(settings.APIKeyACLTrustForwardedIP)
+	updates[settingKeyForwardedClientIPModeV2] = "true"
 	forwardedClientIPHeadersJSON, err := json.Marshal(settings.ForwardedClientIPHeaders)
 	if err != nil {
 		return nil, fmt.Errorf("marshal forwarded client IP headers: %w", err)

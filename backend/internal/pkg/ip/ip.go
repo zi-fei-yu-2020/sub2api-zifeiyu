@@ -45,25 +45,22 @@ func requestForwardedIPSettings(c *gin.Context) (forwardedIPSettings, bool) {
 	return settings, ok
 }
 
-func requestUsesLegacyForwardedIPTrust(c *gin.Context) bool {
-	settings, ok := requestForwardedIPSettings(c)
-	return !ok || settings.trustForwarded
-}
-
-// GetClientIP resolves the client address using the legacy forwarding-header
-// precedence used before the trusted-proxy hardening. It remains the
-// compatibility path for request metadata and usage/error logs; security-
-// sensitive callers must use GetTrustedClientIP or GetSecurityClientIP.
+// GetClientIP resolves the request client address. Raw forwarding headers are
+// considered only when the request middleware explicitly snapshots legacy
+// compatibility mode; otherwise Gin's server.trusted_proxies chain is used.
 func GetClientIP(c *gin.Context) string {
 	if c == nil {
 		return ""
 	}
-	if !requestUsesLegacyForwardedIPTrust(c) {
+	settings, ok := requestForwardedIPSettings(c)
+	if !ok || !settings.trustForwarded {
 		return GetTrustedClientIP(c)
 	}
+	return getLegacyForwardedClientIP(c, settings.headers)
+}
 
-	settings, _ := requestForwardedIPSettings(c)
-	customIP, customFallback := resolveCustomForwardedClientIP(c, settings.headers)
+func getLegacyForwardedClientIP(c *gin.Context, headers []string) string {
+	customIP, customFallback := resolveCustomForwardedClientIP(c, headers)
 	if customIP != "" {
 		return customIP
 	}
@@ -162,11 +159,13 @@ func GetTrustedClientIP(c *gin.Context) string {
 // client-IP resolution. When disabled, Gin's server.trusted_proxies chain is
 // authoritative.
 func GetSecurityClientIP(c *gin.Context, trustForwarded bool) string {
+	var headers []string
 	if requestSettings, ok := requestForwardedIPSettings(c); ok {
 		trustForwarded = requestSettings.trustForwarded
+		headers = requestSettings.headers
 	}
 	if trustForwarded {
-		return GetClientIP(c)
+		return getLegacyForwardedClientIP(c, headers)
 	}
 	return GetTrustedClientIP(c)
 }

@@ -570,7 +570,16 @@ func TestSettingService_InitializeDefaultSettingsPersistsConfiguredForwardedClie
 	svc := NewSettingService(repo, cfg)
 
 	require.NoError(t, svc.InitializeDefaultSettings(context.Background()))
+	require.Equal(t, "true", repo.values[SettingKeyAPIKeyACLTrustForwardedIP])
 	require.JSONEq(t, `["X-Cdn-Ip","True-Client-Ip"]`, repo.values[SettingKeyForwardedClientIPHeaders])
+}
+
+func TestSettingService_InitializeDefaultSettingsUsesSafeForwardedIPDefault(t *testing.T) {
+	repo := &forwardedIPMigrationRepoStub{values: map[string]string{}}
+	svc := NewSettingService(repo, &config.Config{})
+
+	require.NoError(t, svc.InitializeDefaultSettings(context.Background()))
+	require.Equal(t, "false", repo.values[SettingKeyAPIKeyACLTrustForwardedIP])
 }
 
 func TestSettingService_UpdateSettings_APIKeyACLTrustForwardedIPRefreshesConfig(t *testing.T) {
@@ -584,6 +593,7 @@ func TestSettingService_UpdateSettings_APIKeyACLTrustForwardedIPRefreshesConfig(
 	})
 	require.NoError(t, err)
 	require.Equal(t, "true", repo.updates[SettingKeyAPIKeyACLTrustForwardedIP])
+	require.Equal(t, "true", repo.updates[settingKeyForwardedClientIPModeV2])
 	require.JSONEq(t, `["X-Cdn-Ip","True-Client-Ip"]`, repo.updates[SettingKeyForwardedClientIPHeaders])
 	runtimeSettings := cfg.ForwardedClientIPSettings()
 	require.True(t, runtimeSettings.TrustForwardedIP)
@@ -678,31 +688,36 @@ func TestSettingService_LoadForwardedClientIPSettingsMigration(t *testing.T) {
 	tests := []struct {
 		name                   string
 		values                 map[string]string
-		trustedProxiesSet      bool
 		configDefault          bool
 		wantEnabled            bool
 		wantForwardedIPUpdate  string
 		wantMigrationMarkerSet bool
 	}{
 		{
-			name:                   "missing setting follows configured default",
+			name:                   "missing setting persists secure default",
 			values:                 map[string]string{},
-			configDefault:          true,
-			wantEnabled:            true,
+			wantEnabled:            false,
+			wantForwardedIPUpdate:  "false",
 			wantMigrationMarkerSet: true,
 		},
 		{
-			name:                   "legacy false without proxy config migrates to compatibility",
-			values:                 map[string]string{SettingKeyAPIKeyACLTrustForwardedIP: "false"},
+			name:                   "missing setting preserves explicit compatibility config",
+			values:                 map[string]string{},
+			configDefault:          true,
 			wantEnabled:            true,
 			wantForwardedIPUpdate:  "true",
 			wantMigrationMarkerSet: true,
 		},
 		{
-			name:                   "legacy false with explicit proxy config stays secure",
+			name:                   "legacy false remains secure",
 			values:                 map[string]string{SettingKeyAPIKeyACLTrustForwardedIP: "false"},
-			trustedProxiesSet:      true,
 			wantEnabled:            false,
+			wantMigrationMarkerSet: true,
+		},
+		{
+			name:                   "legacy explicit true remains compatible",
+			values:                 map[string]string{SettingKeyAPIKeyACLTrustForwardedIP: "true"},
+			wantEnabled:            true,
 			wantMigrationMarkerSet: true,
 		},
 		{
@@ -718,7 +733,7 @@ func TestSettingService_LoadForwardedClientIPSettingsMigration(t *testing.T) {
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
 			repo := &forwardedIPMigrationRepoStub{values: test.values}
-			cfg := &config.Config{Server: config.ServerConfig{TrustedProxiesConfigured: test.trustedProxiesSet}}
+			cfg := &config.Config{}
 			cfg.Security.TrustForwardedIPForAPIKeyACL = test.configDefault
 			svc := NewSettingService(repo, cfg)
 
@@ -800,21 +815,37 @@ func TestSettingService_LoadForwardedClientIPSettingsReadFailureFailsClosed(t *t
 
 func TestSettingService_LoadForwardedClientIPSettingsWriteFailureUsesComputedMode(t *testing.T) {
 	tests := []struct {
-		name              string
-		trustedProxiesSet bool
-		wantEnabled       bool
+		name          string
+		values        map[string]string
+		configDefault bool
+		wantEnabled   bool
 	}{
-		{name: "compatibility migration remains effective", wantEnabled: true},
-		{name: "explicit proxy policy remains secure", trustedProxiesSet: true, wantEnabled: false},
+		{
+			name:        "missing state fails closed by default",
+			values:      map[string]string{},
+			wantEnabled: false,
+		},
+		{
+			name:          "explicit compatibility config remains active",
+			values:        map[string]string{},
+			configDefault: true,
+			wantEnabled:   true,
+		},
+		{
+			name:        "stored false never re-enables",
+			values:      map[string]string{SettingKeyAPIKeyACLTrustForwardedIP: "false"},
+			wantEnabled: false,
+		},
 	}
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
 			repo := &forwardedIPMigrationRepoStub{
-				values:         map[string]string{SettingKeyAPIKeyACLTrustForwardedIP: "false"},
+				values:         test.values,
 				setMultipleErr: errors.New("database unavailable"),
 			}
-			cfg := &config.Config{Server: config.ServerConfig{TrustedProxiesConfigured: test.trustedProxiesSet}}
+			cfg := &config.Config{}
+			cfg.Security.TrustForwardedIPForAPIKeyACL = test.configDefault
 			svc := NewSettingService(repo, cfg)
 
 			err := svc.LoadForwardedClientIPSettings(context.Background())
@@ -823,6 +854,22 @@ func TestSettingService_LoadForwardedClientIPSettingsWriteFailureUsesComputedMod
 			require.Equal(t, test.wantEnabled, cfg.TrustForwardedIPForAPIKeyACL())
 		})
 	}
+}
+
+func TestSettingService_LoadForwardedClientIPSettingsInvalidStoredBoolFailsClosed(t *testing.T) {
+	repo := &forwardedIPMigrationRepoStub{values: map[string]string{
+		SettingKeyAPIKeyACLTrustForwardedIP: "enabled",
+		SettingKeyForwardedClientIPHeaders:  `[]`,
+		settingKeyForwardedClientIPModeV2:   "true",
+	}}
+	cfg := &config.Config{}
+	cfg.SetTrustForwardedIPForAPIKeyACL(true)
+	svc := NewSettingService(repo, cfg)
+
+	err := svc.LoadForwardedClientIPSettings(context.Background())
+
+	require.ErrorContains(t, err, "invalid boolean value")
+	require.False(t, cfg.TrustForwardedIPForAPIKeyACL())
 }
 
 func TestSettingService_GetAntigravityUserAgentVersion_Precedence(t *testing.T) {

@@ -218,6 +218,21 @@ func TestWriteConfigFileUsesStrictURLPolicyForNewInstall(t *testing.T) {
 	}
 }
 
+func TestWriteConfigFileDisablesRawForwardedIPTrustForNewInstall(t *testing.T) {
+	t.Setenv("DATA_DIR", t.TempDir())
+
+	if err := writeConfigFile(&SetupConfig{}); err != nil {
+		t.Fatalf("writeConfigFile() error = %v", err)
+	}
+	data, err := os.ReadFile(GetConfigFilePath())
+	if err != nil {
+		t.Fatalf("ReadFile() error = %v", err)
+	}
+	if !strings.Contains(string(data), "trust_forwarded_ip_for_api_key_acl: false") {
+		t.Fatalf("config enables raw forwarded IP trust, got:\n%s", string(data))
+	}
+}
+
 func TestWriteConfigFileIncludesRedisUsername(t *testing.T) {
 	t.Setenv("DATA_DIR", t.TempDir())
 

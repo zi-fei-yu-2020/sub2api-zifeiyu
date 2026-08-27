@@ -56,6 +56,48 @@ func TestSessionBindingContextFollowsForwardedIPSwitch(t *testing.T) {
 	}
 }
 
+func TestSecuritySensitiveClientIPConsumersShareTrustedProxyResolution(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+
+	tests := []struct {
+		name           string
+		trustedProxies []string
+		wantIP         string
+	}{
+		{name: "direct origin ignores spoofed headers", wantIP: "127.0.0.1"},
+		{name: "listed proxy forwards client address", trustedProxies: []string{"127.0.0.1"}, wantIP: "1.2.3.4"},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			cfg := &config.Config{}
+			cfg.SetTrustForwardedIPForAPIKeyACL(false)
+
+			r := gin.New()
+			require.NoError(t, r.SetTrustedProxies(test.trustedProxies))
+			r.Use(SessionBindingContext(cfg))
+			r.GET("/t", func(c *gin.Context) {
+				binding := service.SessionBindingFromContext(c.Request.Context())
+				require.NotNil(t, binding)
+				require.Equal(t, test.wantIP, binding.IP)
+				require.Equal(t, test.wantIP, SecurityClientIP(c))
+				require.Equal(t, test.wantIP, invalidAuthClientKey(c))
+				require.Equal(t, test.wantIP, ip.GetSecurityClientIP(c, cfg.TrustForwardedIPForAPIKeyACL()))
+				c.Status(200)
+			})
+
+			w := httptest.NewRecorder()
+			req := httptest.NewRequest("GET", "/t", nil)
+			req.RemoteAddr = "127.0.0.1:54321"
+			req.Header.Set("X-Forwarded-For", "1.2.3.4")
+			req.Header.Set("X-Real-IP", "2.2.2.2")
+			req.Header.Set("CF-Connecting-IP", "3.3.3.3")
+			r.ServeHTTP(w, req)
+			require.Equal(t, 200, w.Code)
+		})
+	}
+}
+
 func TestSessionBindingContextSnapshotsForwardedModeAndHeaders(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 

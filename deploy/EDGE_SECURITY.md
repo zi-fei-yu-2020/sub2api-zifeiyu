@@ -29,15 +29,20 @@ the application's responsibility.
 
 ## Trusted client IPs
 
-`security.trust_forwarded_ip_for_api_key_acl` is enabled by default for upgrade
-compatibility. While enabled, raw forwarding headers take over client-IP
-resolution for logs and security-sensitive paths. Custom headers from
+`security.trust_forwarded_ip_for_api_key_acl` is disabled by default. In this
+secure mode, Gin's `server.trusted_proxies` chain is the only authority for
+forwarded client addresses: requests that connect directly to the origin, or
+through an unlisted proxy, cannot replace the TCP peer address with
+`CF-Connecting-IP`, `X-Real-IP`, `X-Forwarded-For`, or a custom header.
+
+Setting the switch to `true` is an explicit legacy-compatibility choice. While
+enabled, raw forwarding headers take over client-IP resolution for logs and
+security-sensitive paths. Custom headers from
 `security.forwarded_client_ip_headers` are checked in configured order before
-the built-in `CF-Connecting-IP`, `X-Real-IP`, and `X-Forwarded-For` fallback.
-Header names are case-insensitive, normalized when loaded, de-duplicated, and
-limited to 16 unique valid HTTP field names. Header values must contain IP
-literals; comma-separated values are supported, invalid entries are skipped,
-and public addresses are preferred over private fallback addresses.
+the built-in headers. Header names are case-insensitive, normalized when loaded,
+de-duplicated, and limited to 16 unique valid HTTP field names. Header values
+must contain IP literals; comma-separated values are supported, invalid entries
+are skipped, and public addresses are preferred over private fallback addresses.
 
 The list can be supplied in YAML or with the comma-separated environment
 variable `SECURITY_FORWARDED_CLIENT_IP_HEADERS`; an explicitly empty environment
@@ -49,16 +54,20 @@ headers are ignored completely when the switch is disabled. In that mode Gin's
 CIDR/IP addresses that connect directly to Sub2API. An explicit empty list
 trusts no forwarded client IPs.
 
-On the first upgrade to this mode, a legacy `false` value is changed to `true`
-only when `server.trusted_proxies` was not explicitly configured; explicit
-proxy policies remain in secure mode. New installations persist the configured
-custom header list during database initialization. Existing installations
-backfill a missing database value from the YAML configuration. A hidden
-migration marker prevents later administrator changes from being overwritten.
-If settings cannot be read or the persisted custom-header list is malformed,
-the process fails closed to trusted-proxy mode with no custom headers. If a
-migration write fails, the computed mode remains active for the current process
-and startup records a warning.
+Upgrades never turn a stored `false` value back to `true`. A stored `true` value
+is preserved as an explicit legacy choice. If the database setting is missing,
+the process persists the loaded configuration value; because the configuration
+default is `false`, an old installation cannot silently regain raw-header trust.
+An operator who still needs compatibility must explicitly set the YAML/environment
+option or enable it in the admin security settings.
+
+New setup-generated configuration explicitly writes `false`. Existing
+installations backfill a missing database value and custom-header list from the
+loaded configuration. A hidden migration marker prevents later administrator
+changes from being overwritten. If settings cannot be read, the stored boolean
+is invalid, or the custom-header list is malformed, the process fails closed to
+trusted-proxy mode. If a migration write fails, the safely computed mode remains
+active for the current process and startup records a warning.
 
 Compatibility takeover accepts forwarded headers without validating the direct
 peer, including any configured custom header. Protect the origin from direct

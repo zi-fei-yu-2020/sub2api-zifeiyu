@@ -489,6 +489,7 @@ func writeConfigFile(cfg *SetupConfig) error {
 			URLPolicy struct {
 				Profile string `yaml:"profile"`
 			} `yaml:"url_policy"`
+			TrustForwardedIPForAPIKeyACL bool `yaml:"trust_forwarded_ip_for_api_key_acl"`
 		} `yaml:"security"`
 		Timezone string `yaml:"timezone"`
 	}{
@@ -524,10 +525,12 @@ func writeConfigFile(cfg *SetupConfig) error {
 			URLPolicy struct {
 				Profile string `yaml:"profile"`
 			} `yaml:"url_policy"`
+			TrustForwardedIPForAPIKeyACL bool `yaml:"trust_forwarded_ip_for_api_key_acl"`
 		}{
 			URLPolicy: struct {
 				Profile string `yaml:"profile"`
 			}{Profile: config.URLPolicyProfileStrict},
+			TrustForwardedIPForAPIKeyACL: false,
 		},
 		Timezone: tz,
 	}

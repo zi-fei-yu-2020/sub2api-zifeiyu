@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"strconv"
 	"strings"
 	"sync/atomic"
 
@@ -317,48 +318,58 @@ func (s *SettingService) LoadForwardedClientIPSettings(ctx context.Context) erro
 	enabled := s.cfg.Security.TrustForwardedIPForAPIKeyACL
 	headers := s.cfg.ForwardedClientIPSettings().Headers
 	storedValue, hasStoredValue := values[SettingKeyAPIKeyACLTrustForwardedIP]
+	var loadErr error
 	if hasStoredValue {
-		enabled = storedValue == "true"
+		switch strings.ToLower(strings.TrimSpace(storedValue)) {
+		case "true":
+			enabled = true
+		case "false":
+			enabled = false
+		default:
+			enabled = false
+			loadErr = fmt.Errorf("load forwarded client ip trust: invalid boolean value %q", storedValue)
+		}
 	}
 
-	var headersErr error
 	if storedHeaders, ok := values[SettingKeyForwardedClientIPHeaders]; ok {
-		headers, headersErr = parseForwardedClientIPHeadersSetting(storedHeaders)
+		parsedHeaders, headersErr := parseForwardedClientIPHeadersSetting(storedHeaders)
 		if headersErr != nil {
 			enabled = false
 			headers = []string{}
-			headersErr = fmt.Errorf("load forwarded client ip headers: %w", headersErr)
+			loadErr = errors.Join(loadErr, fmt.Errorf("load forwarded client ip headers: %w", headersErr))
+		} else {
+			headers = parsedHeaders
 		}
 	}
 
 	updates := make(map[string]string)
+	if !hasStoredValue {
+		// Missing legacy state inherits only the explicitly loaded configuration.
+		// The safe config default is false, so upgrades never silently re-enable
+		// raw forwarding-header takeover.
+		updates[SettingKeyAPIKeyACLTrustForwardedIP] = strconv.FormatBool(enabled)
+	}
 	if _, hasStoredHeaders := values[SettingKeyForwardedClientIPHeaders]; !hasStoredHeaders {
 		headersJSON, marshalErr := json.Marshal(headers)
 		if marshalErr != nil {
 			headers = []string{}
-			headersErr = errors.Join(headersErr, fmt.Errorf("marshal forwarded client ip headers: %w", marshalErr))
+			loadErr = errors.Join(loadErr, fmt.Errorf("marshal forwarded client ip headers: %w", marshalErr))
 			headersJSON = []byte("[]")
 		}
 		updates[SettingKeyForwardedClientIPHeaders] = string(headersJSON)
 	}
 	if values[settingKeyForwardedClientIPModeV2] != "true" {
 		updates[settingKeyForwardedClientIPModeV2] = "true"
-		// Before this migration, new installations persisted false by default.
-		// Restore compatibility only when no trusted-proxy policy was configured.
-		if headersErr == nil && hasStoredValue && !enabled && !s.cfg.Server.TrustedProxiesConfigured {
-			enabled = true
-			updates[SettingKeyAPIKeyACLTrustForwardedIP] = "true"
-		}
 	}
 	if len(updates) > 0 {
 		if err := s.settingRepo.SetMultiple(ctx, updates); err != nil {
 			s.cfg.SetForwardedClientIPSettings(enabled, headers)
-			return errors.Join(headersErr, fmt.Errorf("migrate forwarded client ip setting: %w", err))
+			return errors.Join(loadErr, fmt.Errorf("migrate forwarded client ip setting: %w", err))
 		}
 	}
 
 	s.cfg.SetForwardedClientIPSettings(enabled, headers)
-	return headersErr
+	return loadErr
 }
 
 // GetAllSettings 获取所有系统设置
