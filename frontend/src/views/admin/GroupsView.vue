@@ -113,352 +113,23 @@
       </template>
 
       <template #table>
-        <DataTable
+        <GroupTable
           :columns="columns"
-          :data="groups"
+          :groups="groups"
           :loading="loading"
-          :server-side-sort="true"
-          default-sort-key="sort_order"
-          default-sort-order="asc"
+          :usage-loading="usageLoading"
+          :usage-map="usageMap"
+          :capacity-map="capacityMap"
+          :duplicating-group-ids="duplicatingGroupIds"
           @sort="handleSort"
-        >
-          <template #cell-name="{ row, value }">
-            <div class="flex items-center gap-3 py-1">
-              <div class="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-gradient-to-br from-blue-50 to-indigo-50/70 text-primary-600 font-bold text-sm shadow-sm ring-1 ring-blue-100/80 dark:from-blue-950/40 dark:to-dark-800 dark:text-primary-400 dark:ring-dark-700">
-                <Icon name="grid" size="sm" />
-              </div>
-              <div class="flex flex-col min-w-0">
-                <span class="font-semibold text-slate-900 dark:text-white truncate max-w-[220px]" :title="value">
-                  {{ value }}
-                </span>
-                <span v-if="row.description" class="text-xs text-slate-400 dark:text-slate-400 truncate max-w-[240px]" :title="row.description">
-                  {{ row.description }}
-                </span>
-              </div>
-            </div>
-          </template>
-
-          <template #cell-id="{ value }">
-            <span class="font-mono text-xs text-slate-400 dark:text-slate-400"
-              >#{{ value }}</span
-            >
-          </template>
-
-          <template #cell-platform="{ value }">
-            <span
-              :class="[
-                'inline-flex items-center gap-1.5 rounded-full px-2.5 py-0.5 text-xs font-medium',
-                value === 'anthropic'
-                  ? 'bg-orange-100 text-orange-700 dark:bg-orange-900/30 dark:text-orange-400'
-                  : value === 'openai'
-                    ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400'
-                    : value === 'antigravity'
-                      ? 'bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-400'
-                      : value === 'grok'
-                        ? 'bg-zinc-200 text-zinc-800 dark:bg-zinc-700 dark:text-zinc-100'
-                        : value === 'kimi'
-                          ? 'bg-pink-100 text-pink-700 dark:bg-pink-900/30 dark:text-pink-400'
-                          : value === 'zhipu'
-                            ? 'bg-indigo-100 text-indigo-700 dark:bg-indigo-900/30 dark:text-indigo-400'
-                            : value === 'deepseek'
-                              ? 'bg-teal-100 text-teal-700 dark:bg-teal-900/30 dark:text-teal-400'
-                              : 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400',
-              ]"
-            >
-              <PlatformIcon :platform="value" size="xs" />
-              {{ t("admin.groups.platforms." + value) }}
-            </span>
-          </template>
-
-          <template #cell-billing_type="{ row }">
-            <div class="space-y-1">
-              <!-- Type Badge -->
-              <span
-                :class="[
-                  'inline-block rounded-full px-2 py-0.5 text-xs font-medium',
-                  row.subscription_type === 'subscription'
-                    ? 'bg-violet-100 text-violet-700 dark:bg-violet-900/30 dark:text-violet-400'
-                    : 'bg-slate-100 text-slate-600 dark:bg-gray-700 dark:text-gray-300',
-                ]"
-              >
-                {{
-                  row.subscription_type === "subscription"
-                    ? t("admin.groups.subscription.subscription")
-                    : t("admin.groups.subscription.standard")
-                }}
-              </span>
-              <!-- Subscription Limits - compact single line -->
-              <div
-                v-if="row.subscription_type === 'subscription'"
-                class="space-y-0.5 text-xs text-slate-400 dark:text-slate-400"
-              >
-                <div
-                  v-if="
-                    row.daily_limit_usd ||
-                    row.weekly_limit_usd ||
-                    row.monthly_limit_usd
-                  "
-                  class="flex flex-wrap items-center gap-x-1 gap-y-0.5"
-                >
-                  <span v-if="row.daily_limit_usd" class="whitespace-nowrap">
-                    <span
-                      v-if="usageLoading"
-                      class="font-medium text-slate-400 dark:text-slate-400"
-                      >—</span
-                    >
-                    <span
-                      v-else
-                      :class="
-                        getQuotaUsageClass(
-                          usageMap.get(row.id)?.today_cost ?? 0,
-                          row.daily_limit_usd
-                        )
-                      "
-                      >{{
-                        formatUsd(usageMap.get(row.id)?.today_cost ?? 0)
-                      }}</span
-                    >
-                    <span class="text-slate-400 dark:text-slate-400">
-                      / {{ formatUsd(row.daily_limit_usd) }}/{{
-                        t("admin.groups.limitDay")
-                      }}</span
-                    >
-                  </span>
-                  <span
-                    v-if="
-                      row.daily_limit_usd &&
-                      (row.weekly_limit_usd || row.monthly_limit_usd)
-                    "
-                    class="mx-1 text-gray-300 dark:text-slate-600"
-                    >·</span
-                  >
-                  <span v-if="row.weekly_limit_usd" class="whitespace-nowrap"
-                    >{{ formatUsd(row.weekly_limit_usd) }}/{{
-                      t("admin.groups.limitWeek")
-                    }}</span
-                  >
-                  <span
-                    v-if="row.weekly_limit_usd && row.monthly_limit_usd"
-                    class="mx-1 text-gray-300 dark:text-slate-600"
-                    >·</span
-                  >
-                  <span v-if="row.monthly_limit_usd" class="whitespace-nowrap"
-                    >{{ formatUsd(row.monthly_limit_usd) }}/{{
-                      t("admin.groups.limitMonth")
-                    }}</span
-                  >
-                </div>
-                <span v-else class="text-slate-400 dark:text-slate-400">{{
-                  t("admin.groups.subscription.noLimit")
-                }}</span>
-                <div class="text-slate-400 dark:text-slate-400">
-                  {{ t("admin.groups.usageTotal") }}
-                  <span class="ml-1 font-medium text-slate-600 dark:text-gray-300"
-                    >{{
-                      usageLoading
-                        ? "—"
-                        : formatUsd(usageMap.get(row.id)?.total_cost ?? 0)
-                    }}</span
-                  >
-                </div>
-              </div>
-            </div>
-          </template>
-
-          <template #cell-rate_multiplier="{ value }">
-            <span class="font-bold text-primary-600 dark:text-primary-400 font-mono text-sm">
-              {{ (value || 1).toFixed(2) }}x
-            </span>
-          </template>
-
-          <template #cell-is_exclusive="{ value }">
-            <span :class="['badge', value ? 'badge-primary' : 'badge-gray']">
-              {{
-                value ? t("admin.groups.exclusive") : t("admin.groups.public")
-              }}
-            </span>
-          </template>
-
-          <template #cell-account_count="{ row }">
-            <div class="space-y-0.5 text-xs">
-              <div>
-                <span class="text-slate-400 dark:text-slate-400">{{
-                  t("admin.groups.accountsAvailable")
-                }}</span>
-                <span
-                  class="ml-1 font-medium text-blue-600 dark:text-emerald-400"
-                  >{{ row.active_account_count || 0 }}</span
-                >
-                <span
-                  class="ml-1 inline-flex items-center rounded bg-slate-100 px-1.5 py-0.5 font-medium text-gray-800 dark:bg-dark-600 dark:text-gray-300"
-                  >{{ t("admin.groups.accountsUnit") }}</span
-                >
-              </div>
-              <div v-if="row.rate_limited_account_count">
-                <span class="text-slate-400 dark:text-slate-400">{{
-                  t("admin.groups.accountsRateLimited")
-                }}</span>
-                <span
-                  class="ml-1 font-medium text-amber-600 dark:text-amber-400"
-                  >{{ row.rate_limited_account_count }}</span
-                >
-                <span
-                  class="ml-1 inline-flex items-center rounded bg-slate-100 px-1.5 py-0.5 font-medium text-gray-800 dark:bg-dark-600 dark:text-gray-300"
-                  >{{ t("admin.groups.accountsUnit") }}</span
-                >
-              </div>
-              <div>
-                <span class="text-slate-400 dark:text-slate-400">{{
-                  t("admin.groups.accountsTotal")
-                }}</span>
-                <span
-                  class="ml-1 font-medium text-slate-700 dark:text-gray-300"
-                  >{{ row.account_count || 0 }}</span
-                >
-                <span
-                  class="ml-1 inline-flex items-center rounded bg-slate-100 px-1.5 py-0.5 font-medium text-gray-800 dark:bg-dark-600 dark:text-gray-300"
-                  >{{ t("admin.groups.accountsUnit") }}</span
-                >
-              </div>
-            </div>
-          </template>
-
-          <template #cell-capacity="{ row }">
-            <GroupCapacityBadge
-              v-if="capacityMap.get(row.id)"
-              :concurrency-used="capacityMap.get(row.id)!.concurrencyUsed"
-              :concurrency-max="capacityMap.get(row.id)!.concurrencyMax"
-              :sessions-used="capacityMap.get(row.id)!.sessionsUsed"
-              :sessions-max="capacityMap.get(row.id)!.sessionsMax"
-              :rpm-used="capacityMap.get(row.id)!.rpmUsed"
-              :rpm-max="capacityMap.get(row.id)!.rpmMax"
-            />
-            <span v-else class="text-xs text-slate-400">—</span>
-          </template>
-
-          <template #cell-usage="{ row }">
-            <div v-if="usageLoading" class="text-xs text-slate-400">—</div>
-            <div v-else class="space-y-0.5 text-xs">
-              <div class="text-slate-400 dark:text-slate-400">
-                <span class="text-slate-400 dark:text-slate-400">{{
-                  t("admin.groups.usageToday")
-                }}</span>
-                <span class="ml-1 font-medium text-slate-700 dark:text-gray-300"
-                  >${{
-                    formatCost(usageMap.get(row.id)?.today_cost ?? 0)
-                  }}</span
-                >
-              </div>
-              <div class="text-slate-400 dark:text-slate-400">
-                <span class="text-slate-400 dark:text-slate-400">{{
-                  t("admin.groups.usageYesterday")
-                }}</span>
-                <span class="ml-1 font-medium text-slate-700 dark:text-gray-300"
-                  >${{
-                    formatCost(usageMap.get(row.id)?.yesterday_cost ?? 0)
-                  }}</span
-                >
-              </div>
-              <div class="text-slate-400 dark:text-slate-400">
-                <span class="text-slate-400 dark:text-slate-400">{{
-                  t("admin.groups.usageTotal")
-                }}</span>
-                <span class="ml-1 font-medium text-slate-700 dark:text-gray-300"
-                  >${{
-                    formatCost(usageMap.get(row.id)?.total_cost ?? 0)
-                  }}</span
-                >
-              </div>
-            </div>
-          </template>
-
-          <template #cell-status="{ value }">
-            <span
-              :class="[
-                'badge',
-                value === 'active' ? 'badge-success' : 'badge-danger',
-              ]"
-            >
-              {{ t("admin.accounts.status." + value) }}
-            </span>
-          </template>
-
-          <template #cell-actions="{ row }">
-            <div class="flex items-center gap-1">
-              <button
-                @click="handleEdit(row)"
-                class="flex flex-col items-center gap-0.5 rounded-xl p-1.5 text-slate-400 transition-colors hover:bg-slate-100 hover:text-primary-600 dark:hover:bg-dark-700 dark:hover:text-primary-400"
-              >
-                <Icon name="edit" size="sm" />
-                <span class="text-xs">{{ t("common.edit") }}</span>
-              </button>
-              <button
-                data-testid="group-duplicate"
-                :title="
-                  duplicatingGroupIds.has(row.id)
-                    ? t('admin.groups.duplicating')
-                    : t('admin.groups.duplicate')
-                "
-                :disabled="duplicatingGroupIds.has(row.id)"
-                @click="handleDuplicate(row)"
-                class="flex flex-col items-center gap-0.5 rounded-xl p-1.5 text-slate-400 transition-colors hover:bg-slate-100 hover:text-primary-600 disabled:cursor-not-allowed disabled:opacity-50 dark:hover:bg-dark-700 dark:hover:text-primary-400"
-              >
-                <Icon name="copy" size="sm" />
-                <span class="text-xs">
-                  {{
-                    duplicatingGroupIds.has(row.id)
-                      ? t("admin.groups.duplicating")
-                      : t("admin.groups.duplicate")
-                  }}
-                </span>
-              </button>
-              <button
-                v-if="row.platform === 'composite'"
-                @click="handleCompositeRoutes(row)"
-                class="flex flex-col items-center gap-0.5 rounded-xl p-1.5 text-slate-400 transition-colors hover:bg-slate-100 hover:text-cyan-600 dark:hover:bg-dark-700 dark:hover:text-cyan-400"
-              >
-                <Icon name="swap" size="sm" />
-                <span class="text-xs">{{
-                  t("admin.groups.compositeRoutes.action")
-                }}</span>
-              </button>
-              <button
-                @click="handleRateMultipliers(row)"
-                class="flex flex-col items-center gap-0.5 rounded-xl p-1.5 text-slate-400 transition-colors hover:bg-slate-100 hover:text-purple-600 dark:hover:bg-dark-700 dark:hover:text-purple-400"
-              >
-                <Icon name="dollar" size="sm" />
-                <span class="text-xs">{{
-                  t("admin.groups.rateMultipliers")
-                }}</span>
-              </button>
-              <button
-                @click="handleRPMOverrides(row)"
-                class="flex flex-col items-center gap-0.5 rounded-xl p-1.5 text-slate-400 transition-colors hover:bg-slate-100 hover:text-orange-600 dark:hover:bg-dark-700 dark:hover:text-orange-400"
-              >
-                <Icon name="bolt" size="sm" />
-                <span class="text-xs">{{
-                  t("admin.groups.rpmOverrides")
-                }}</span>
-              </button>
-              <button
-                @click="handleDelete(row)"
-                class="flex flex-col items-center gap-0.5 rounded-xl p-1.5 text-slate-400 transition-colors hover:bg-red-50 hover:text-red-600 dark:hover:bg-red-900/20 dark:hover:text-red-400"
-              >
-                <Icon name="trash" size="sm" />
-                <span class="text-xs">{{ t("common.delete") }}</span>
-              </button>
-            </div>
-          </template>
-
-          <template #empty>
-            <EmptyState
-              :title="t('admin.groups.noGroupsYet')"
-              :description="t('admin.groups.createFirstGroup')"
-              :action-text="t('admin.groups.createGroup')"
-              @action="openCreateModal"
-            />
-          </template>
-        </DataTable>
+          @edit="handleEdit"
+          @duplicate="handleDuplicate"
+          @composite-routes="handleCompositeRoutes"
+          @rate-multipliers="handleRateMultipliers"
+          @rpm-overrides="handleRPMOverrides"
+          @delete="handleDelete"
+          @create="openCreateModal"
+        />
       </template>
 
       <template #pagination>
@@ -887,288 +558,11 @@
           </div>
         </div>
 
-        <!-- 图片生成计费配置 -->
-        <div
-          v-if="supportsImagePricingPlatform(createForm.platform)"
-          class="border-t pt-4"
-        >
-          <label
-            class="block mb-2 font-medium text-slate-700 dark:text-gray-300"
-          >
-            {{ t(imagePricingI18nKey(createForm.platform, "title")) }}
-          </label>
-          <p class="text-xs text-slate-400 dark:text-slate-400 mb-3">
-            {{ t(imagePricingI18nKey(createForm.platform, "description")) }}
-          </p>
-          <div class="mb-4 grid grid-cols-1 gap-3 md:grid-cols-2">
-            <label class="flex items-center gap-2 text-sm text-slate-700 dark:text-gray-300">
-              <input
-                v-model="createForm.allow_image_generation"
-                type="checkbox"
-                class="rounded border-slate-300 text-blue-600 focus:ring-blue-500"
-              />
-              {{ t(imagePricingI18nKey(createForm.platform, "allowImageGeneration")) }}
-            </label>
-            <label class="flex items-center gap-2 text-sm text-slate-700 dark:text-gray-300">
-              <input
-                v-model="createForm.image_rate_independent"
-                type="checkbox"
-                class="rounded border-slate-300 text-blue-600 focus:ring-blue-500"
-              />
-              {{ t(imagePricingI18nKey(createForm.platform, "independentMultiplier")) }}
-            </label>
-          </div>
-          <div
-            v-if="createForm.image_rate_independent"
-            class="mb-4"
-          >
-            <label class="input-label">{{
-              t(imagePricingI18nKey(createForm.platform, "imageMultiplier"))
-            }}</label>
-            <input
-              v-model.number="createForm.image_rate_multiplier"
-              type="number"
-              step="0.0001"
-              min="0"
-              class="input"
-              placeholder="1"
-            />
-          </div>
-          <div class="grid grid-cols-3 gap-3">
-            <div>
-              <label class="input-label">1K ($)</label>
-              <input
-                v-model.number="createForm.image_price_1k"
-                type="number"
-                step="0.001"
-                min="0"
-                class="input"
-                :placeholder="getImagePricePlaceholder(createForm.platform, 'image_price_1k')"
-              />
-            </div>
-            <div>
-              <label class="input-label">2K ($)</label>
-              <input
-                v-model.number="createForm.image_price_2k"
-                type="number"
-                step="0.001"
-                min="0"
-                class="input"
-                :placeholder="getImagePricePlaceholder(createForm.platform, 'image_price_2k')"
-              />
-            </div>
-            <div>
-              <label class="input-label">4K ($)</label>
-              <input
-                v-model.number="createForm.image_price_4k"
-                type="number"
-                step="0.001"
-                min="0"
-                class="input"
-                :placeholder="getImagePricePlaceholder(createForm.platform, 'image_price_4k')"
-              />
-            </div>
-          </div>
-          <p class="mt-3 text-xs text-slate-400 dark:text-slate-400">
-            {{ t(imagePricingI18nKey(createForm.platform, "modeHint")) }}
-          </p>
-          <div class="mt-2 rounded-xl bg-slate-50 p-3 text-xs text-slate-700 dark:bg-gray-800 dark:text-gray-300">
-            <div class="mb-1 font-medium">
-              {{ t(imagePricingI18nKey(createForm.platform, "finalPricePreview")) }}
-            </div>
-            <div class="grid grid-cols-3 gap-2">
-              <div
-                v-for="item in createImageFinalPricePreview"
-                :key="item.label"
-              >
-                {{ item.label }}: {{ item.value }}
-              </div>
-            </div>
-          </div>
-          <div v-if="createForm.platform === 'gemini' && createForm.allow_image_generation" class="mt-4 border-t border-dashed border-slate-200 pt-4 dark:border-slate-800">
-            <label
-              class="flex items-center gap-2 text-sm font-medium text-slate-700 dark:text-gray-300"
-            >
-              <input
-                v-model="createForm.allow_batch_image_generation"
-                type="checkbox"
-                class="rounded border-slate-300 text-blue-600 focus:ring-blue-500"
-              />
-              {{ t("admin.groups.imagePricing.allowBatchImageGeneration") }}
-            </label>
-            <p class="mt-2 text-xs text-slate-400 dark:text-slate-400">
-              {{ t("admin.groups.imagePricing.batchSectionHint") }}
-            </p>
-            <div
-              v-if="createForm.allow_batch_image_generation"
-              class="mt-3 grid grid-cols-1 gap-3 md:grid-cols-2"
-            >
-              <div>
-                <label class="input-label">{{
-                  t("admin.groups.imagePricing.batchDiscountMultiplier")
-                }}</label>
-                <input
-                  v-model.number="createForm.batch_image_discount_multiplier"
-                  type="number"
-                  step="0.0001"
-                  min="0"
-                  class="input"
-                  placeholder="0.5"
-                />
-              </div>
-              <div>
-                <label class="input-label">{{
-                  t("admin.groups.imagePricing.batchHoldMultiplier")
-                }}</label>
-                <input
-                  v-model.number="createForm.batch_image_hold_multiplier"
-                  type="number"
-                  step="0.0001"
-                  min="0"
-                  class="input"
-                  placeholder="0.6"
-                />
-              </div>
-            </div>
-          </div>
-          <p
-            v-else-if="createForm.platform !== 'gemini'"
-            class="mt-4 border-t border-dashed border-slate-200 pt-4 text-xs text-slate-400 dark:border-slate-800 dark:text-slate-400"
-          >
-            {{ t("admin.groups.imagePricing.batchGeminiOnlyHint") }}
-          </p>
-        </div>
-
-        <!-- 视频生成计费配置（仅 Grok 平台） -->
-        <div
-          v-if="supportsVideoPricingPlatform(createForm.platform)"
-          class="border-t pt-4"
-        >
-          <label
-            class="block mb-2 font-medium text-slate-700 dark:text-gray-300"
-          >
-            {{ t(videoPricingI18nKey("title")) }}
-          </label>
-          <p class="text-xs text-slate-400 dark:text-slate-400 mb-3">
-            {{ t(videoPricingI18nKey("description")) }}
-          </p>
-          <div class="mb-4">
-            <label class="flex items-center gap-2 text-sm text-slate-700 dark:text-gray-300">
-              <input
-                v-model="createForm.video_rate_independent"
-                type="checkbox"
-                class="rounded border-slate-300 text-blue-600 focus:ring-blue-500"
-              />
-              {{ t(videoPricingI18nKey("independentMultiplier")) }}
-            </label>
-          </div>
-          <div
-            v-if="createForm.video_rate_independent"
-            class="mb-4"
-          >
-            <label class="input-label">{{
-              t(videoPricingI18nKey("videoMultiplier"))
-            }}</label>
-            <input
-              v-model.number="createForm.video_rate_multiplier"
-              type="number"
-              step="0.0001"
-              min="0"
-              class="input"
-              placeholder="1"
-            />
-          </div>
-          <div class="grid grid-cols-3 gap-3">
-            <div>
-              <label class="input-label">480p ($/s)</label>
-              <input
-                v-model.number="createForm.video_price_480p"
-                type="number"
-                step="0.001"
-                min="0"
-                class="input"
-                :placeholder="getVideoPricePlaceholder(createForm.platform, 'video_price_480p')"
-              />
-            </div>
-            <div>
-              <label class="input-label">720p ($/s)</label>
-              <input
-                v-model.number="createForm.video_price_720p"
-                type="number"
-                step="0.001"
-                min="0"
-                class="input"
-                :placeholder="getVideoPricePlaceholder(createForm.platform, 'video_price_720p')"
-              />
-            </div>
-            <div>
-              <label class="input-label">1080p ($/s)</label>
-              <input
-                v-model.number="createForm.video_price_1080p"
-                type="number"
-                step="0.001"
-                min="0"
-                class="input"
-                :placeholder="getVideoPricePlaceholder(createForm.platform, 'video_price_1080p')"
-              />
-            </div>
-          </div>
-          <div
-            class="mt-4 border-t border-dashed border-slate-200 pt-4 dark:border-slate-800"
-            data-testid="create-grok-video-model-prices"
-          >
-            <p class="text-sm font-medium text-slate-700 dark:text-gray-300">
-              {{ t("admin.groups.videoPricing.modelOverridesTitle") }}
-            </p>
-            <p class="mt-1 text-xs text-slate-400 dark:text-slate-400">
-              {{ t("admin.groups.videoPricing.modelOverridesDescription") }}
-            </p>
-            <div class="mt-3 space-y-3">
-              <div
-                v-for="family in videoModelPriceFamilyRows(createForm.video_model_prices)"
-                :key="family.key"
-                class="grid gap-2 sm:grid-cols-[minmax(0,1fr)_repeat(3,minmax(0,7rem))] sm:items-end"
-              >
-                <div class="min-w-0 pb-1 font-mono text-xs text-slate-700 dark:text-gray-300">
-                  {{ family.label }}
-                </div>
-                <label
-                  v-for="resolution in grokVideoPriceResolutions"
-                  :key="resolution.key"
-                  class="block"
-                >
-                  <span class="mb-1 block text-xs text-slate-400 dark:text-slate-400">
-                    {{ resolution.label }} ($/s)
-                  </span>
-                  <input
-                    v-model.number="createForm.video_model_prices[family.key][resolution.key]"
-                    type="number"
-                    step="0.001"
-                    min="0"
-                    class="input"
-                    :data-testid="`create-grok-video-price-${family.key}-${resolution.key}`"
-                  />
-                </label>
-              </div>
-            </div>
-          </div>
-          <p class="mt-3 text-xs text-slate-400 dark:text-slate-400">
-            {{ t(videoPricingI18nKey("modeHint")) }}
-          </p>
-          <div class="mt-2 rounded-xl bg-slate-50 p-3 text-xs text-slate-700 dark:bg-gray-800 dark:text-gray-300">
-            <div class="mb-1 font-medium">
-              {{ t(videoPricingI18nKey("finalPricePreview")) }}
-            </div>
-            <div class="grid grid-cols-3 gap-2">
-              <div
-                v-for="item in createVideoFinalPricePreview"
-                :key="item.label"
-              >
-                {{ item.label }}: {{ item.value }}
-              </div>
-            </div>
-          </div>
-        </div>
+        <GroupMediaPricingFields
+          :model-value="createForm"
+          :image-final-price-preview="createImageFinalPricePreview"
+          :video-final-price-preview="createVideoFinalPricePreview"
+        />
 
         <!-- 高峰时段倍率配置（仅订阅类型分组） -->
         <div v-if="createForm.subscription_type === 'subscription'" class="border-t pt-4">
@@ -2619,288 +2013,11 @@
           </div>
         </div>
 
-        <!-- 图片生成计费配置 -->
-        <div
-          v-if="supportsImagePricingPlatform(editForm.platform)"
-          class="border-t pt-4"
-        >
-          <label
-            class="block mb-2 font-medium text-slate-700 dark:text-gray-300"
-          >
-            {{ t(imagePricingI18nKey(editForm.platform, "title")) }}
-          </label>
-          <p class="text-xs text-slate-400 dark:text-slate-400 mb-3">
-            {{ t(imagePricingI18nKey(editForm.platform, "description")) }}
-          </p>
-          <div class="mb-4 grid grid-cols-1 gap-3 md:grid-cols-2">
-            <label class="flex items-center gap-2 text-sm text-slate-700 dark:text-gray-300">
-              <input
-                v-model="editForm.allow_image_generation"
-                type="checkbox"
-                class="rounded border-slate-300 text-blue-600 focus:ring-blue-500"
-              />
-              {{ t(imagePricingI18nKey(editForm.platform, "allowImageGeneration")) }}
-            </label>
-            <label class="flex items-center gap-2 text-sm text-slate-700 dark:text-gray-300">
-              <input
-                v-model="editForm.image_rate_independent"
-                type="checkbox"
-                class="rounded border-slate-300 text-blue-600 focus:ring-blue-500"
-              />
-              {{ t(imagePricingI18nKey(editForm.platform, "independentMultiplier")) }}
-            </label>
-          </div>
-          <div
-            v-if="editForm.image_rate_independent"
-            class="mb-4"
-          >
-            <label class="input-label">{{
-              t(imagePricingI18nKey(editForm.platform, "imageMultiplier"))
-            }}</label>
-            <input
-              v-model.number="editForm.image_rate_multiplier"
-              type="number"
-              step="0.0001"
-              min="0"
-              class="input"
-              placeholder="1"
-            />
-          </div>
-          <div class="grid grid-cols-3 gap-3">
-            <div>
-              <label class="input-label">1K ($)</label>
-              <input
-                v-model.number="editForm.image_price_1k"
-                type="number"
-                step="0.001"
-                min="0"
-                class="input"
-                :placeholder="getImagePricePlaceholder(editForm.platform, 'image_price_1k')"
-              />
-            </div>
-            <div>
-              <label class="input-label">2K ($)</label>
-              <input
-                v-model.number="editForm.image_price_2k"
-                type="number"
-                step="0.001"
-                min="0"
-                class="input"
-                :placeholder="getImagePricePlaceholder(editForm.platform, 'image_price_2k')"
-              />
-            </div>
-            <div>
-              <label class="input-label">4K ($)</label>
-              <input
-                v-model.number="editForm.image_price_4k"
-                type="number"
-                step="0.001"
-                min="0"
-                class="input"
-                :placeholder="getImagePricePlaceholder(editForm.platform, 'image_price_4k')"
-              />
-            </div>
-          </div>
-          <p class="mt-3 text-xs text-slate-400 dark:text-slate-400">
-            {{ t(imagePricingI18nKey(editForm.platform, "modeHint")) }}
-          </p>
-          <div class="mt-2 rounded-xl bg-slate-50 p-3 text-xs text-slate-700 dark:bg-gray-800 dark:text-gray-300">
-            <div class="mb-1 font-medium">
-              {{ t(imagePricingI18nKey(editForm.platform, "finalPricePreview")) }}
-            </div>
-            <div class="grid grid-cols-3 gap-2">
-              <div
-                v-for="item in editImageFinalPricePreview"
-                :key="item.label"
-              >
-                {{ item.label }}: {{ item.value }}
-              </div>
-            </div>
-          </div>
-          <div v-if="editForm.platform === 'gemini' && editForm.allow_image_generation" class="mt-4 border-t border-dashed border-slate-200 pt-4 dark:border-slate-800">
-            <label
-              class="flex items-center gap-2 text-sm font-medium text-slate-700 dark:text-gray-300"
-            >
-              <input
-                v-model="editForm.allow_batch_image_generation"
-                type="checkbox"
-                class="rounded border-slate-300 text-blue-600 focus:ring-blue-500"
-              />
-              {{ t("admin.groups.imagePricing.allowBatchImageGeneration") }}
-            </label>
-            <p class="mt-2 text-xs text-slate-400 dark:text-slate-400">
-              {{ t("admin.groups.imagePricing.batchSectionHint") }}
-            </p>
-            <div
-              v-if="editForm.allow_batch_image_generation"
-              class="mt-3 grid grid-cols-1 gap-3 md:grid-cols-2"
-            >
-              <div>
-                <label class="input-label">{{
-                  t("admin.groups.imagePricing.batchDiscountMultiplier")
-                }}</label>
-                <input
-                  v-model.number="editForm.batch_image_discount_multiplier"
-                  type="number"
-                  step="0.0001"
-                  min="0"
-                  class="input"
-                  placeholder="0.5"
-                />
-              </div>
-              <div>
-                <label class="input-label">{{
-                  t("admin.groups.imagePricing.batchHoldMultiplier")
-                }}</label>
-                <input
-                  v-model.number="editForm.batch_image_hold_multiplier"
-                  type="number"
-                  step="0.0001"
-                  min="0"
-                  class="input"
-                  placeholder="0.6"
-                />
-              </div>
-            </div>
-          </div>
-          <p
-            v-else-if="editForm.platform !== 'gemini'"
-            class="mt-4 border-t border-dashed border-slate-200 pt-4 text-xs text-slate-400 dark:border-slate-800 dark:text-slate-400"
-          >
-            {{ t("admin.groups.imagePricing.batchGeminiOnlyHint") }}
-          </p>
-        </div>
-
-        <!-- 视频生成计费配置（仅 Grok 平台） -->
-        <div
-          v-if="supportsVideoPricingPlatform(editForm.platform)"
-          class="border-t pt-4"
-        >
-          <label
-            class="block mb-2 font-medium text-slate-700 dark:text-gray-300"
-          >
-            {{ t(videoPricingI18nKey("title")) }}
-          </label>
-          <p class="text-xs text-slate-400 dark:text-slate-400 mb-3">
-            {{ t(videoPricingI18nKey("description")) }}
-          </p>
-          <div class="mb-4">
-            <label class="flex items-center gap-2 text-sm text-slate-700 dark:text-gray-300">
-              <input
-                v-model="editForm.video_rate_independent"
-                type="checkbox"
-                class="rounded border-slate-300 text-blue-600 focus:ring-blue-500"
-              />
-              {{ t(videoPricingI18nKey("independentMultiplier")) }}
-            </label>
-          </div>
-          <div
-            v-if="editForm.video_rate_independent"
-            class="mb-4"
-          >
-            <label class="input-label">{{
-              t(videoPricingI18nKey("videoMultiplier"))
-            }}</label>
-            <input
-              v-model.number="editForm.video_rate_multiplier"
-              type="number"
-              step="0.0001"
-              min="0"
-              class="input"
-              placeholder="1"
-            />
-          </div>
-          <div class="grid grid-cols-3 gap-3">
-            <div>
-              <label class="input-label">480p ($/s)</label>
-              <input
-                v-model.number="editForm.video_price_480p"
-                type="number"
-                step="0.001"
-                min="0"
-                class="input"
-                :placeholder="getVideoPricePlaceholder(editForm.platform, 'video_price_480p')"
-              />
-            </div>
-            <div>
-              <label class="input-label">720p ($/s)</label>
-              <input
-                v-model.number="editForm.video_price_720p"
-                type="number"
-                step="0.001"
-                min="0"
-                class="input"
-                :placeholder="getVideoPricePlaceholder(editForm.platform, 'video_price_720p')"
-              />
-            </div>
-            <div>
-              <label class="input-label">1080p ($/s)</label>
-              <input
-                v-model.number="editForm.video_price_1080p"
-                type="number"
-                step="0.001"
-                min="0"
-                class="input"
-                :placeholder="getVideoPricePlaceholder(editForm.platform, 'video_price_1080p')"
-              />
-            </div>
-          </div>
-          <div
-            class="mt-4 border-t border-dashed border-slate-200 pt-4 dark:border-slate-800"
-            data-testid="edit-grok-video-model-prices"
-          >
-            <p class="text-sm font-medium text-slate-700 dark:text-gray-300">
-              {{ t("admin.groups.videoPricing.modelOverridesTitle") }}
-            </p>
-            <p class="mt-1 text-xs text-slate-400 dark:text-slate-400">
-              {{ t("admin.groups.videoPricing.modelOverridesDescription") }}
-            </p>
-            <div class="mt-3 space-y-3">
-              <div
-                v-for="family in videoModelPriceFamilyRows(editForm.video_model_prices)"
-                :key="family.key"
-                class="grid gap-2 sm:grid-cols-[minmax(0,1fr)_repeat(3,minmax(0,7rem))] sm:items-end"
-              >
-                <div class="min-w-0 pb-1 font-mono text-xs text-slate-700 dark:text-gray-300">
-                  {{ family.label }}
-                </div>
-                <label
-                  v-for="resolution in grokVideoPriceResolutions"
-                  :key="resolution.key"
-                  class="block"
-                >
-                  <span class="mb-1 block text-xs text-slate-400 dark:text-slate-400">
-                    {{ resolution.label }} ($/s)
-                  </span>
-                  <input
-                    v-model.number="editForm.video_model_prices[family.key][resolution.key]"
-                    type="number"
-                    step="0.001"
-                    min="0"
-                    class="input"
-                    :data-testid="`edit-grok-video-price-${family.key}-${resolution.key}`"
-                  />
-                </label>
-              </div>
-            </div>
-          </div>
-          <p class="mt-3 text-xs text-slate-400 dark:text-slate-400">
-            {{ t(videoPricingI18nKey("modeHint")) }}
-          </p>
-          <div class="mt-2 rounded-xl bg-slate-50 p-3 text-xs text-slate-700 dark:bg-gray-800 dark:text-gray-300">
-            <div class="mb-1 font-medium">
-              {{ t(videoPricingI18nKey("finalPricePreview")) }}
-            </div>
-            <div class="grid grid-cols-3 gap-2">
-              <div
-                v-for="item in editVideoFinalPricePreview"
-                :key="item.label"
-              >
-                {{ item.label }}: {{ item.value }}
-              </div>
-            </div>
-          </div>
-        </div>
+        <GroupMediaPricingFields
+          :model-value="editForm"
+          :image-final-price-preview="editImageFinalPricePreview"
+          :video-final-price-preview="editVideoFinalPricePreview"
+        />
 
         <!-- 高峰时段倍率配置（仅订阅类型分组） -->
         <div v-if="editForm.subscription_type === 'subscription'" class="border-t pt-4">
@@ -3952,462 +3069,34 @@
       @cancel="cancelUnsupportedLive"
     />
 
-    <!-- Sort Order Modal -->
-    <BaseDialog
+    <GroupSortOrderModal
+      v-model:groups="sortableGroups"
       :show="showSortModal"
-      :title="t('admin.groups.sortOrder')"
-      width="normal"
+      :submitting="sortSubmitting"
       @close="closeSortModal"
-    >
-      <div class="space-y-4">
-        <p class="text-sm text-slate-400 dark:text-slate-400">
-          {{ t("admin.groups.sortOrderHint") }}
-        </p>
-        <VueDraggable
-          v-model="sortableGroups"
-          :animation="200"
-          class="space-y-2"
-        >
-          <div
-            v-for="group in sortableGroups"
-            :key="group.id"
-            class="flex cursor-grab items-center gap-3 rounded-xl border border-slate-200 bg-white p-3 transition-shadow hover:shadow-md active:cursor-grabbing dark:border-slate-700 dark:bg-slate-800"
-          >
-            <div class="text-slate-400">
-              <Icon name="menu" size="md" />
-            </div>
-            <div class="flex-1">
-              <div class="font-medium text-slate-900 dark:text-white">
-                {{ group.name }}
-              </div>
-              <div class="text-xs text-slate-400 dark:text-slate-400">
-                <span
-                  :class="[
-                    'inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-xs font-medium',
-                    group.platform === 'anthropic'
-                      ? 'bg-orange-100 text-orange-700 dark:bg-orange-900/30 dark:text-orange-400'
-                      : group.platform === 'openai'
-                        ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400'
-                        : group.platform === 'antigravity'
-                          ? 'bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-400'
-                          : group.platform === 'grok'
-                            ? 'bg-zinc-200 text-zinc-800 dark:bg-zinc-700 dark:text-zinc-100'
-                            : group.platform === 'kimi'
-                              ? 'bg-pink-100 text-pink-700 dark:bg-pink-900/30 dark:text-pink-400'
-                              : group.platform === 'zhipu'
-                                ? 'bg-indigo-100 text-indigo-700 dark:bg-indigo-900/30 dark:text-indigo-400'
-                                : group.platform === 'deepseek'
-                                  ? 'bg-teal-100 text-teal-700 dark:bg-teal-900/30 dark:text-teal-400'
-                                  : 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400',
-                  ]"
-                >
-                  {{ t("admin.groups.platforms." + group.platform) }}
-                </span>
-              </div>
-            </div>
-            <div class="text-sm text-slate-400">#{{ group.id }}</div>
-          </div>
-        </VueDraggable>
-      </div>
+      @save="saveSortOrder"
+    />
 
-      <template #footer>
-        <div class="flex justify-end gap-3 pt-4">
-          <button
-            @click="closeSortModal"
-            type="button"
-            class="btn btn-secondary"
-          >
-            {{ t("common.cancel") }}
-          </button>
-          <button
-            @click="saveSortOrder"
-            :disabled="sortSubmitting"
-            class="btn btn-primary"
-          >
-            <svg
-              v-if="sortSubmitting"
-              class="-ml-1 mr-2 h-4 w-4 animate-spin"
-              fill="none"
-              viewBox="0 0 24 24"
-            >
-              <circle
-                class="opacity-25"
-                cx="12"
-                cy="12"
-                r="10"
-                stroke="currentColor"
-                stroke-width="4"
-              ></circle>
-              <path
-                class="opacity-75"
-                fill="currentColor"
-                d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
-              ></path>
-            </svg>
-            {{ sortSubmitting ? t("common.saving") : t("common.save") }}
-          </button>
-        </div>
-      </template>
-    </BaseDialog>
-
-    <!-- Composite Routes Modal -->
-    <BaseDialog
+    <CompositeRoutesModal
+      v-model:form="compositeRouteFormModel"
+      v-model:preview-model="compositePreviewModel"
+      v-model:preview-endpoint="compositePreviewEndpoint"
       :show="showCompositeRoutesModal"
-      :title="
-        compositeRoutesGroup
-          ? t('admin.groups.compositeRoutes.titleWithGroup', {
-              name: compositeRoutesGroup.name,
-            })
-          : t('admin.groups.compositeRoutes.title')
-      "
-      width="wide"
+      :group="compositeRoutesGroup"
+      :routes="compositeRoutes"
+      :loading="compositeRoutesLoading"
+      :saving="compositeRouteSaving"
+      :editing-id="compositeRouteEditingId"
+      :preview-loading="compositePreviewLoading"
+      :preview-decision="compositePreviewDecision"
       @close="closeCompositeRoutesModal"
-    >
-      <div class="grid gap-5 lg:grid-cols-[minmax(0,1.15fr)_minmax(320px,0.85fr)]">
-        <section class="min-w-0">
-          <div class="mb-3 flex items-center justify-between gap-3">
-            <h3 class="text-sm font-semibold text-slate-900 dark:text-white">
-              {{ t("admin.groups.compositeRoutes.routes") }}
-            </h3>
-            <button
-              type="button"
-              class="btn btn-secondary btn-sm"
-              :disabled="compositeRoutesLoading"
-              @click="loadCompositeRoutes"
-            >
-              <Icon
-                name="refresh"
-                size="sm"
-                :class="compositeRoutesLoading ? 'animate-spin' : ''"
-              />
-            </button>
-          </div>
-
-          <div
-            class="overflow-hidden rounded-xl border border-slate-200 dark:border-slate-700"
-          >
-            <div
-              v-if="compositeRoutesLoading"
-              class="flex h-36 items-center justify-center text-sm text-slate-400 dark:text-slate-400"
-            >
-              {{ t("common.loading") }}
-            </div>
-            <div
-              v-else-if="compositeRoutes.length === 0"
-              class="flex h-36 items-center justify-center text-sm text-slate-400 dark:text-slate-400"
-            >
-              {{ t("admin.groups.compositeRoutes.empty") }}
-            </div>
-            <div v-else class="overflow-x-auto">
-              <table class="min-w-full divide-y divide-gray-200 text-sm dark:divide-dark-600">
-                <thead class="bg-slate-50 text-left text-xs font-medium uppercase tracking-wide text-slate-400 dark:bg-slate-900 dark:text-slate-400">
-                  <tr>
-                    <th class="px-3 py-2">
-                      {{ t("admin.groups.compositeRoutes.publicModel") }}
-                    </th>
-                    <th class="px-3 py-2">
-                      {{ t("admin.groups.compositeRoutes.target") }}
-                    </th>
-                    <th class="px-3 py-2">
-                      {{ t("admin.groups.compositeRoutes.scope") }}
-                    </th>
-                    <th class="px-3 py-2 text-right">
-                      {{ t("admin.groups.columns.actions") }}
-                    </th>
-                  </tr>
-                </thead>
-                <tbody class="divide-y divide-gray-100 bg-white dark:divide-dark-700 dark:bg-dark-900">
-                  <tr
-                    v-for="route in compositeRoutes"
-                    :key="route.id"
-                    :class="!route.enabled && 'opacity-60'"
-                  >
-                    <td class="max-w-[15rem] px-3 py-2">
-                      <div class="break-all font-medium text-slate-900 dark:text-white">
-                        {{ route.public_model }}
-                      </div>
-                      <div class="mt-1 flex flex-wrap items-center gap-1.5">
-                        <span class="badge badge-gray">{{
-                          compositeRouteMatchLabel(route.match_type)
-                        }}</span>
-                        <span
-                          v-if="!route.enabled"
-                          class="badge badge-danger"
-                        >
-                          {{ t("admin.accounts.status.inactive") }}
-                        </span>
-                      </div>
-                    </td>
-                    <td class="px-3 py-2">
-                      <div class="flex items-center gap-1.5 text-slate-900 dark:text-white">
-                        <PlatformIcon :platform="route.target_platform" size="xs" />
-                        <span>{{ formatCompositePlatform(route.target_platform) }}</span>
-                      </div>
-                      <div class="mt-1 break-all text-xs text-slate-400 dark:text-slate-400">
-                        {{ route.upstream_model || route.public_model }}
-                      </div>
-                    </td>
-                    <td class="px-3 py-2">
-                      <div class="text-slate-700 dark:text-gray-300">
-                        {{ formatCompositeEndpoint(route.endpoint) }}
-                      </div>
-                      <div class="text-xs text-slate-400 dark:text-slate-400">
-                        {{ t("admin.groups.compositeRoutes.priority") }}:
-                        {{ route.priority }}
-                      </div>
-                    </td>
-                    <td class="px-3 py-2">
-                      <div class="flex justify-end gap-1">
-                        <button
-                          type="button"
-                          class="rounded p-1.5 text-slate-400 hover:bg-slate-100 hover:text-primary-600 dark:hover:bg-dark-700 dark:hover:text-primary-400"
-                          :title="t('common.edit')"
-                          @click="editCompositeRoute(route)"
-                        >
-                          <Icon name="edit" size="sm" />
-                        </button>
-                        <button
-                          type="button"
-                          class="rounded p-1.5 text-slate-400 hover:bg-red-50 hover:text-red-600 dark:hover:bg-red-900/20 dark:hover:text-red-400"
-                          :title="t('common.delete')"
-                          @click="deleteCompositeRoute(route)"
-                        >
-                          <Icon name="trash" size="sm" />
-                        </button>
-                      </div>
-                    </td>
-                  </tr>
-                </tbody>
-              </table>
-            </div>
-          </div>
-        </section>
-
-        <section class="space-y-5">
-          <form class="space-y-3" @submit.prevent="saveCompositeRoute">
-            <div class="flex items-center justify-between gap-3">
-              <h3 class="text-sm font-semibold text-slate-900 dark:text-white">
-                {{
-                  compositeRouteEditingId
-                    ? t("admin.groups.compositeRoutes.editRoute")
-                    : t("admin.groups.compositeRoutes.addRoute")
-                }}
-              </h3>
-              <button
-                v-if="compositeRouteEditingId"
-                type="button"
-                class="text-xs font-medium text-slate-400 hover:text-slate-700 dark:text-slate-400 dark:hover:text-gray-200"
-                @click="resetCompositeRouteForm"
-              >
-                {{ t("common.cancel") }}
-              </button>
-            </div>
-
-            <div>
-              <label class="input-label">{{
-                t("admin.groups.compositeRoutes.publicModel")
-              }}</label>
-              <input
-                v-model.trim="compositeRouteForm.public_model"
-                type="text"
-                class="input"
-                required
-                placeholder="openrouter/gpt-5"
-              />
-            </div>
-
-            <div class="grid grid-cols-1 gap-3 sm:grid-cols-2">
-              <div>
-                <label class="input-label">{{
-                  t("admin.groups.compositeRoutes.matchType")
-                }}</label>
-                <Select
-                  v-model="compositeRouteForm.match_type"
-                  :options="compositeRouteMatchOptions"
-                />
-              </div>
-              <div>
-                <label class="input-label">{{
-                  t("admin.groups.compositeRoutes.endpoint")
-                }}</label>
-                <Select
-                  v-model="compositeRouteForm.endpoint"
-                  :options="compositeRouteEndpointOptions"
-                />
-              </div>
-            </div>
-
-            <div class="grid grid-cols-1 gap-3 sm:grid-cols-2">
-              <div>
-                <label class="input-label">{{
-                  t("admin.groups.compositeRoutes.targetPlatform")
-                }}</label>
-                <Select
-                  v-model="compositeRouteForm.target_platform"
-                  :options="compositeRoutePlatformOptions"
-                />
-              </div>
-              <div>
-                <label class="input-label">{{
-                  t("admin.groups.compositeRoutes.priority")
-                }}</label>
-                <input
-                  v-model.number="compositeRouteForm.priority"
-                  type="number"
-                  min="1"
-                  step="1"
-                  class="input"
-                />
-              </div>
-            </div>
-
-            <div>
-              <label class="input-label">{{
-                t("admin.groups.compositeRoutes.upstreamModel")
-              }}</label>
-              <input
-                v-model.trim="compositeRouteForm.upstream_model"
-                type="text"
-                class="input"
-                placeholder="gpt-5"
-              />
-              <p class="mt-1 text-xs text-slate-400 dark:text-slate-400">
-                {{ t("admin.groups.compositeRoutes.upstreamModelHint") }}
-              </p>
-            </div>
-
-            <div>
-              <label class="input-label">{{
-                t("admin.groups.compositeRoutes.notes")
-              }}</label>
-              <textarea
-                v-model.trim="compositeRouteForm.notes"
-                rows="2"
-                class="input"
-              ></textarea>
-            </div>
-
-            <div class="flex items-center justify-between gap-3">
-              <label class="flex items-center gap-2 text-sm text-slate-700 dark:text-gray-300">
-                <input
-                  v-model="compositeRouteForm.enabled"
-                  type="checkbox"
-                  class="h-4 w-4 rounded border-slate-300 text-primary-600 focus:ring-primary-500 dark:border-slate-700 dark:bg-slate-800"
-                />
-                {{ t("admin.groups.compositeRoutes.enabled") }}
-              </label>
-              <button
-                type="submit"
-                class="btn btn-primary"
-                :disabled="compositeRouteSaving"
-              >
-                <Icon
-                  v-if="!compositeRouteSaving"
-                  name="check"
-                  size="sm"
-                  class="mr-2"
-                />
-                {{ compositeRouteEditingId ? t("common.update") : t("common.create") }}
-              </button>
-            </div>
-          </form>
-
-          <div class="border-t border-slate-200 pt-4 dark:border-slate-700">
-            <h3 class="mb-3 text-sm font-semibold text-slate-900 dark:text-white">
-              {{ t("admin.groups.compositeRoutes.preview") }}
-            </h3>
-            <div class="space-y-3">
-              <input
-                v-model.trim="compositePreviewModel"
-                type="text"
-                class="input"
-                placeholder="openrouter/gpt-5"
-                @keyup.enter="previewCompositeRoute"
-              />
-              <div class="flex gap-2">
-                <Select
-                  v-model="compositePreviewEndpoint"
-                  :options="compositeRouteEndpointOptions"
-                  class="min-w-0 flex-1"
-                />
-                <button
-                  type="button"
-                  class="btn btn-secondary"
-                  :disabled="compositePreviewLoading || !compositePreviewModel"
-                  @click="previewCompositeRoute"
-                >
-                  <Icon name="play" size="sm" />
-                </button>
-              </div>
-
-              <div
-                v-if="compositePreviewDecision"
-                class="rounded-xl border border-slate-200 bg-slate-50 p-3 text-sm dark:border-slate-700 dark:bg-slate-900"
-              >
-                <div class="mb-2 flex items-center gap-2">
-                  <span
-                    :class="[
-                      'badge',
-                      compositePreviewDecision.matched
-                        ? 'badge-success'
-                        : 'badge-danger',
-                    ]"
-                  >
-                    {{
-                      compositePreviewDecision.matched
-                        ? t("admin.groups.compositeRoutes.matched")
-                        : t("admin.groups.compositeRoutes.notMatched")
-                    }}
-                  </span>
-                  <span class="badge badge-gray">
-                    {{
-                      compositeRouteSourceLabel(
-                        compositePreviewDecision.source,
-                      )
-                    }}
-                  </span>
-                </div>
-                <div
-                  v-if="compositePreviewDecision.matched"
-                  class="space-y-1 text-slate-700 dark:text-gray-300"
-                >
-                  <div>
-                    {{ t("admin.groups.compositeRoutes.targetPlatform") }}:
-                    {{
-                      formatCompositePlatform(
-                        compositePreviewDecision.target_platform,
-                      )
-                    }}
-                  </div>
-                  <div class="break-all">
-                    {{ t("admin.groups.compositeRoutes.upstreamModel") }}:
-                    {{ compositePreviewDecision.upstream_model }}
-                  </div>
-                </div>
-                <div
-                  v-else
-                  class="text-slate-400 dark:text-slate-400"
-                >
-                  {{ compositePreviewDecision.reason }}
-                </div>
-              </div>
-            </div>
-          </div>
-        </section>
-      </div>
-
-      <template #footer>
-        <div class="flex justify-end pt-4">
-          <button
-            type="button"
-            class="btn btn-secondary"
-            @click="closeCompositeRoutesModal"
-          >
-            {{ t("common.close") }}
-          </button>
-        </div>
-      </template>
-    </BaseDialog>
+      @reload="loadCompositeRoutes"
+      @edit="editCompositeRoute"
+      @delete="deleteCompositeRoute"
+      @reset="resetCompositeRouteForm"
+      @save="saveCompositeRoute"
+      @preview="previewCompositeRoute"
+    />
 
     <!-- Group Rate Multipliers Modal -->
     <GroupRateMultipliersModal
@@ -4439,28 +3128,25 @@ import type {
   CompositeModelRouteInput,
   CompositeRouteDecision,
   CompositeRouteEndpoint,
-  CompositeRouteMatchType,
   GroupPlatform,
   SubscriptionType,
 } from "@/types";
-import {
-  CONCRETE_PLATFORM_OPTIONS,
-  GROUP_PLATFORM_OPTIONS,
-} from "@/constants/platforms";
+import { GROUP_PLATFORM_OPTIONS } from "@/constants/platforms";
 import type { Column } from "@/components/common/types";
 import AppLayout from "@/components/layout/AppLayout.vue";
 import TablePageLayout from "@/components/layout/TablePageLayout.vue";
-import DataTable from "@/components/common/DataTable.vue";
 import Pagination from "@/components/common/Pagination.vue";
 import BaseDialog from "@/components/common/BaseDialog.vue";
 import ConfirmDialog from "@/components/common/ConfirmDialog.vue";
-import EmptyState from "@/components/common/EmptyState.vue";
 import Select from "@/components/common/Select.vue";
-import PlatformIcon from "@/components/common/PlatformIcon.vue";
 import Icon from "@/components/icons/Icon.vue";
 import GroupRateMultipliersModal from "@/components/admin/group/GroupRateMultipliersModal.vue";
 import GroupRPMOverridesModal from "@/components/admin/group/GroupRPMOverridesModal.vue";
-import GroupCapacityBadge from "@/components/common/GroupCapacityBadge.vue";
+import CompositeRoutesModal from "@/components/admin/group/CompositeRoutesModal.vue";
+import GroupMediaPricingFields from "@/components/admin/group/GroupMediaPricingFields.vue";
+import GroupSortOrderModal from "@/components/admin/group/GroupSortOrderModal.vue";
+import GroupTable from "@/components/admin/group/GroupTable.vue";
+import type { CompositeRouteFormState } from "@/components/admin/group/groupCompositeRoutes";
 import ReasoningEffortPolicyFields from "@/components/admin/group/ReasoningEffortPolicyFields.vue";
 import PricingEntryCard from "@/components/admin/channel/PricingEntryCard.vue";
 import type { PricingFormEntry } from "@/components/admin/channel/types";
@@ -4473,7 +3159,6 @@ import {
   toNullableNumber,
 } from "@/components/admin/channel/types";
 import type { ChannelModelPricing } from "@/api/admin/channels";
-import { VueDraggable } from "vue-draggable-plus";
 import { createStableObjectKeyResolver } from "@/utils/stableObjectKey";
 import { extractApiErrorMessage } from "@/utils/apiError";
 import { useKeyedDebouncedSearch } from "@/composables/useKeyedDebouncedSearch";
@@ -4513,18 +3198,10 @@ import {
 import {
   getDefaultImagePreviewPrice,
   getDefaultVideoPreviewPrice,
-  getImagePricePlaceholder,
-  getVideoPricePlaceholder,
-  imagePricingI18nKey,
-  supportsImagePricingPlatform,
-  supportsVideoPricingPlatform,
-  videoPricingI18nKey,
 } from "./groupsImagePricing";
 import {
   createVideoModelPricesForm,
-  grokVideoPriceResolutions,
   serializeVideoModelPrices,
-  videoModelPriceFamilyRows,
 } from "./groupsVideoModelPricing";
 
 const supportsLivePlatform = (platform: string): boolean =>
@@ -4773,41 +3450,6 @@ const platformFilterOptions = computed(() => [
   ...GROUP_PLATFORM_OPTIONS,
 ]);
 
-const compositeRoutePlatformOptions = computed(() => [
-  ...CONCRETE_PLATFORM_OPTIONS,
-]);
-
-const compositeRouteEndpointOptions = computed(() => [
-  { value: "any", label: t("admin.groups.compositeRoutes.endpoints.any") },
-  {
-    value: "messages",
-    label: t("admin.groups.compositeRoutes.endpoints.messages"),
-  },
-  {
-    value: "count_tokens",
-    label: t("admin.groups.compositeRoutes.endpoints.countTokens"),
-  },
-  {
-    value: "responses",
-    label: t("admin.groups.compositeRoutes.endpoints.responses"),
-  },
-  {
-    value: "chat_completions",
-    label: t("admin.groups.compositeRoutes.endpoints.chatCompletions"),
-  },
-  {
-    value: "embeddings",
-    label: t("admin.groups.compositeRoutes.endpoints.embeddings"),
-  },
-  { value: "images", label: t("admin.groups.compositeRoutes.endpoints.images") },
-  { value: "gemini", label: t("admin.groups.compositeRoutes.endpoints.gemini") },
-]);
-
-const compositeRouteMatchOptions = computed(() => [
-  { value: "exact", label: t("admin.groups.compositeRoutes.match.exact") },
-  { value: "prefix", label: t("admin.groups.compositeRoutes.match.prefix") },
-]);
-
 const editStatusOptions = computed(() => [
   { value: "active", label: t("admin.accounts.status.active") },
   { value: "inactive", label: t("admin.accounts.status.inactive") },
@@ -4994,18 +3636,6 @@ const rateMultipliersGroup = ref<AdminGroup | null>(null);
 const showRPMOverridesModal = ref(false);
 const rpmOverridesGroup = ref<AdminGroup | null>(null);
 const sortableGroups = ref<AdminGroup[]>([]);
-type ConcreteGroupPlatform = Exclude<GroupPlatform, "composite">;
-type CompositeRouteFormState = {
-  public_model: string;
-  match_type: CompositeRouteMatchType;
-  target_platform: ConcreteGroupPlatform;
-  upstream_model: string;
-  endpoint: CompositeRouteEndpoint;
-  priority: number;
-  enabled: boolean;
-  notes: string;
-};
-
 const showCompositeRoutesModal = ref(false);
 const compositeRoutesGroup = ref<AdminGroup | null>(null);
 const compositeRoutes = ref<CompositeModelRoute[]>([]);
@@ -5025,6 +3655,10 @@ const compositeRouteForm = reactive<CompositeRouteFormState>({
   priority: 100,
   enabled: true,
   notes: "",
+});
+const compositeRouteFormModel = computed<CompositeRouteFormState>({
+  get: () => compositeRouteForm,
+  set: (value) => Object.assign(compositeRouteForm, value),
 });
 const createMessagesDispatchDefaults = createDefaultMessagesDispatchFormState();
 const editMessagesDispatchDefaults = createDefaultMessagesDispatchFormState();
@@ -5746,32 +4380,6 @@ const loadGroups = async () => {
   }
 };
 
-const formatCost = (cost: number): string => {
-  if (cost >= 1000) return cost.toFixed(0);
-  if (cost >= 100) return cost.toFixed(1);
-  return cost.toFixed(2);
-};
-
-const formatUsd = (cost: number | null | undefined): string =>
-  `$${formatCost(cost ?? 0)}`;
-
-const getQuotaUsageClass = (
-  used: number,
-  limit: number | null | undefined,
-): string => {
-  if (!limit || limit <= 0) {
-    return "font-medium text-slate-700 dark:text-gray-300";
-  }
-  const ratio = used / limit;
-  if (ratio >= 1) {
-    return "font-semibold text-red-600 dark:text-red-400";
-  }
-  if (ratio >= 0.8) {
-    return "font-semibold text-amber-600 dark:text-amber-400";
-  }
-  return "font-medium text-slate-700 dark:text-gray-300";
-};
-
 const loadUsageSummary = async () => {
   if (!hasVisibleUsageSummaryConsumer.value) {
     usageLoading.value = false;
@@ -6427,27 +5035,6 @@ const handleDuplicate = async (group: AdminGroup) => {
   } finally {
     duplicatingGroupIds.delete(group.id);
   }
-};
-
-const compositeRouteMatchLabel = (matchType: CompositeRouteMatchType) =>
-  compositeRouteMatchOptions.value.find((option) => option.value === matchType)
-    ?.label || matchType;
-
-const formatCompositeEndpoint = (endpoint: CompositeRouteEndpoint) =>
-  compositeRouteEndpointOptions.value.find((option) => option.value === endpoint)
-    ?.label || endpoint;
-
-const formatCompositePlatform = (platform: string) => {
-  if (!platform) return "—";
-  return t(`admin.groups.platforms.${platform}`);
-};
-
-const compositeRouteSourceLabel = (source: string) => {
-  if (source === "route") return t("admin.groups.compositeRoutes.sources.route");
-  if (source === "detector") {
-    return t("admin.groups.compositeRoutes.sources.detector");
-  }
-  return source || "—";
 };
 
 const resetCompositeRouteForm = () => {

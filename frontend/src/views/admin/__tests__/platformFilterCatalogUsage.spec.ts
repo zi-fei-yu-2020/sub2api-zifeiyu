@@ -13,10 +13,12 @@ describe('admin platform filters', () => {
     expect(source).toMatch(/const platformFilterOptions[\s\S]*?\.\.\.GROUP_PLATFORM_OPTIONS/)
   })
 
-  it('uses the shared catalogs on the groups page', () => {
-    const source = readSource('src/views/admin/GroupsView.vue')
-    expect(source).toContain('...GROUP_PLATFORM_OPTIONS')
-    expect(source).toContain('...CONCRETE_PLATFORM_OPTIONS')
+  it('uses the shared catalogs across the groups page and extracted composite routes modal', () => {
+    const groupsSource = readSource('src/views/admin/GroupsView.vue')
+    const compositeSource = readSource('src/components/admin/group/CompositeRoutesModal.vue')
+    expect(groupsSource).toContain('...GROUP_PLATFORM_OPTIONS')
+    expect(compositeSource).toContain('CONCRETE_PLATFORM_OPTIONS')
+    expect(compositeSource).toMatch(/compositeRoutePlatformOptions[\s\S]*?CONCRETE_PLATFORM_OPTIONS/)
   })
 
   it('uses the concrete platform catalog wherever concrete platforms are selected', () => {
