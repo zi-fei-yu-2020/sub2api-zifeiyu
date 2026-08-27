@@ -4,6 +4,10 @@ import { flushPromises, mount } from '@vue/test-utils'
 import type { DOMWrapper, VueWrapper } from '@vue/test-utils'
 
 import RiskControlView from '../RiskControlView.vue'
+import RiskControlAuditRecords from '@/components/admin/risk-control/RiskControlAuditRecords.vue'
+import RiskControlInputDetailDialog from '@/components/admin/risk-control/RiskControlInputDetailDialog.vue'
+import RiskControlRuntimePanel from '@/components/admin/risk-control/RiskControlRuntimePanel.vue'
+import RiskControlSettingsDialog from '@/components/admin/risk-control/RiskControlSettingsDialog.vue'
 import type { ContentModerationConfig, UpdateContentModerationConfig } from '@/api/admin/riskControl'
 
 const {
@@ -215,6 +219,30 @@ describe('admin RiskControlView', () => {
       api_key_masks: [],
       api_key_statuses: [],
     }))
+  })
+
+  it('composes the page from dedicated runtime, records, settings, and detail regions', async () => {
+    const wrapper = mount(RiskControlView, {
+      global: {
+        stubs: {
+          AppLayout: AppLayoutStub,
+          BaseDialog: BaseDialogStub,
+          Icon: true,
+          Select: true,
+          Toggle: true,
+          Pagination: true,
+          ModelWhitelistSelector: ModelWhitelistSelectorStub,
+          ProxySelector: true,
+        },
+      },
+    })
+
+    await flushPromises()
+
+    expect(wrapper.findComponent(RiskControlRuntimePanel).exists()).toBe(true)
+    expect(wrapper.findComponent(RiskControlAuditRecords).exists()).toBe(true)
+    expect(wrapper.findComponent(RiskControlSettingsDialog).exists()).toBe(true)
+    expect(wrapper.findComponent(RiskControlInputDetailDialog).exists()).toBe(true)
   })
 
   it('saves the selected model filter mode and models', async () => {
