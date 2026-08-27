@@ -13,3 +13,9 @@ func TestAccountEntityToServiceNormalizesLegacyAPIKeyType(t *testing.T) {
 	require.NotNil(t, account)
 	require.Equal(t, service.AccountTypeAPIKey, account.Type)
 }
+
+func TestAccountEntityToServiceNormalizesLegacyInactiveStatus(t *testing.T) {
+	account := accountEntityToService(&dbent.Account{Status: "inactive"})
+	require.NotNil(t, account)
+	require.Equal(t, service.StatusDisabled, account.Status)
+}

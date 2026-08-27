@@ -68,11 +68,12 @@ function mountModal(account: Record<string, unknown> = {
   platform: 'gemini',
   type: 'apikey',
   status: 'active'
-}) {
+}, accounts: Record<string, unknown>[] = []) {
   return mount(AccountTestModal, {
     props: {
       show: false,
-      account
+      account,
+      accounts
     } as any,
     global: {
       stubs: {
@@ -220,4 +221,35 @@ describe('AccountTestModal', () => {
       mode: 'compact'
     })
   })
+
+  it('reloads account-specific models and resets test context when switching accounts', async () => {
+    const openAI = { id: 1, name: 'OpenAI', platform: 'openai', type: 'apikey', status: 'active' }
+    const gemini = { id: 2, name: 'Gemini', platform: 'gemini', type: 'apikey', status: 'active' }
+    getAvailableModels.mockImplementation(async (accountID: number) =>
+      accountID === 1
+        ? [{ id: 'gpt-5.4', display_name: 'GPT-5.4' }]
+        : [{ id: 'gemini-3.1-flash-image', display_name: 'Gemini 3.1 Flash Image' }],
+    )
+    const wrapper = mountModal(openAI, [openAI, gemini])
+    await wrapper.setProps({ show: true })
+    await flushPromises()
+    expect((wrapper.vm as any).selectedModelId).toBe('gpt-5.4')
+
+    ;(wrapper.vm as any).testMode = 'compact'
+    ;(wrapper.vm as any).testPrompt = 'old prompt'
+    ;(wrapper.vm as any).status = 'success'
+    ;(wrapper.vm as any).outputLines = [{ text: 'old output', class: '' }]
+    ;(wrapper.vm as any).goToNext()
+    expect(wrapper.emitted('selectAccount')?.at(-1)?.[0]).toMatchObject({ id: 2 })
+
+    await wrapper.setProps({ account: gemini })
+    await flushPromises()
+    expect(getAvailableModels).toHaveBeenLastCalledWith(2)
+    expect((wrapper.vm as any).selectedModelId).toBe('gemini-3.1-flash-image')
+    expect((wrapper.vm as any).testMode).toBe('default')
+    expect((wrapper.vm as any).testPrompt).toBe('')
+    expect((wrapper.vm as any).status).toBe('idle')
+    expect((wrapper.vm as any).outputLines).toEqual([])
+  })
+
 })

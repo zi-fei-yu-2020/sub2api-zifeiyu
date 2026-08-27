@@ -477,23 +477,23 @@ const scrollToFocused = () => {
   })
 }
 
-const handleClickOutside = (event: MouseEvent) => {
-  const target = event.target as HTMLElement
-  // Check if click is inside THIS specific instance's dropdown or trigger
-  const isInDropdown = !!target.closest(`.${instanceId}`)
-  const isInTrigger = containerRef.value?.contains(target)
-
-  if (!isInDropdown && !isInTrigger && isOpen.value) {
+const handlePointerDownOutside = (event: PointerEvent) => {
+  if (!isOpen.value) return
+  const path = event.composedPath()
+  const isInDropdown = dropdownRef.value ? path.includes(dropdownRef.value) : false
+  const isInTrigger = containerRef.value ? path.includes(containerRef.value) : false
+  if (!isInDropdown && !isInTrigger) {
     isOpen.value = false
   }
 }
 
 onMounted(() => {
-  document.addEventListener('click', handleClickOutside)
+  // Capture phase cannot be blocked by page-level stopPropagation handlers.
+  document.addEventListener('pointerdown', handlePointerDownOutside, true)
 })
 
 onUnmounted(() => {
-  document.removeEventListener('click', handleClickOutside)
+  document.removeEventListener('pointerdown', handlePointerDownOutside, true)
   window.removeEventListener('scroll', updateTriggerRect, { capture: true })
   window.removeEventListener('resize', calculateDropdownPosition)
   if (remoteSearchTimer) {

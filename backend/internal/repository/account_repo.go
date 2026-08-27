@@ -146,7 +146,7 @@ func createAccountRecord(ctx context.Context, client *dbent.Client, account *ser
 		SetExtra(normalizeJSONMap(account.Extra)).
 		SetConcurrency(account.Concurrency).
 		SetPriority(account.Priority).
-		SetStatus(account.Status).
+		SetStatus(service.NormalizeAccountStatus(account.Status)).
 		SetErrorMessage(account.ErrorMessage).
 		SetSchedulable(account.Schedulable).
 		SetAutoPauseOnExpired(account.AutoPauseOnExpired)
@@ -535,7 +535,7 @@ func (r *accountRepository) updateLockedAccount(
 		SetExtra(extra).
 		SetConcurrency(account.Concurrency).
 		SetPriority(account.Priority).
-		SetStatus(account.Status).
+		SetStatus(service.NormalizeAccountStatus(account.Status)).
 		SetErrorMessage(account.ErrorMessage).
 		SetSchedulable(schedulable).
 		SetAutoPauseOnExpired(account.AutoPauseOnExpired)
@@ -3374,6 +3374,7 @@ func accountEntityToService(m *dbent.Account) *service.Account {
 		Notes:                   m.Notes,
 		Platform:                m.Platform,
 		Type:                    service.NormalizeAccountType(m.Type),
+		Status:                  service.NormalizeAccountStatus(m.Status),
 		Credentials:             copyJSONMap(m.Credentials),
 		Extra:                   copyJSONMap(m.Extra),
 		ProxyID:                 m.ProxyID,
@@ -3382,7 +3383,6 @@ func accountEntityToService(m *dbent.Account) *service.Account {
 		Priority:                m.Priority,
 		RateMultiplier:          &rateMultiplier,
 		LoadFactor:              m.LoadFactor,
-		Status:                  m.Status,
 		ErrorMessage:            derefString(m.ErrorMessage),
 		LastUsedAt:              m.LastUsedAt,
 		ExpiresAt:               m.ExpiresAt,

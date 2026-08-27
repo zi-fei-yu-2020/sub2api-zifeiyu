@@ -217,3 +217,39 @@ describe('Select remote search', () => {
     expect(labels).toEqual(['Alpha account'])
   })
 })
+
+
+describe('Select outside interaction', () => {
+  it('closes on an outside pointerdown even when the page stops bubbling', async () => {
+    const wrapper = mount(Select, {
+      props: { modelValue: null, options: [{ value: 'one', label: 'One' }] },
+    })
+    unmountWrapper = () => wrapper.unmount()
+    await wrapper.get('button').trigger('click')
+    await nextTick()
+    expect(document.body.querySelector('.select-dropdown-portal')).not.toBeNull()
+
+    const outside = document.createElement('button')
+    outside.addEventListener('pointerdown', event => event.stopPropagation())
+    document.body.appendChild(outside)
+    outside.dispatchEvent(new Event('pointerdown', { bubbles: true, composed: true }))
+    await nextTick()
+
+    expect(wrapper.get('button').attributes('aria-expanded')).toBe('false')
+  })
+
+  it('does not close when pointerdown happens inside the teleported dropdown', async () => {
+    const wrapper = mount(Select, {
+      props: { modelValue: null, options: [{ value: 'one', label: 'One' }] },
+    })
+    unmountWrapper = () => wrapper.unmount()
+    await wrapper.get('button').trigger('click')
+    await nextTick()
+    const dropdown = document.body.querySelector<HTMLElement>('.select-dropdown-portal')
+    expect(dropdown).not.toBeNull()
+
+    dropdown!.dispatchEvent(new Event('pointerdown', { bubbles: true, composed: true }))
+    await nextTick()
+    expect(document.body.querySelector('.select-dropdown-portal')).not.toBeNull()
+  })
+})

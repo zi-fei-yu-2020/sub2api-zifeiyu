@@ -152,6 +152,15 @@ func NormalizeAccountType(value string) string {
 	return trimmed
 }
 
+// NormalizeAccountStatus accepts the legacy inactive alias but persists one canonical disabled state.
+func NormalizeAccountStatus(value string) string {
+	trimmed := strings.TrimSpace(value)
+	if strings.EqualFold(trimmed, "inactive") {
+		return StatusDisabled
+	}
+	return trimmed
+}
+
 // Redeem type constants
 const (
 	RedeemTypeBalance          = domain.RedeemTypeBalance

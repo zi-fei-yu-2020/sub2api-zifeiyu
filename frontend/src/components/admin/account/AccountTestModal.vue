@@ -472,6 +472,7 @@ const selectedModelId = ref('')
 const testPrompt = ref('')
 const loadingModels = ref(false)
 let abortController: AbortController | null = null
+let modelLoadSequence = 0
 const generatedImages = ref<PreviewMedia[]>([])
 const generatedAudios = ref<PreviewMedia[]>([])
 const generatedVideos = ref<PreviewMedia[]>([])
@@ -796,20 +797,34 @@ const pickDefaultModelForMode = () => {
   selectedModelId.value = opts[0].id
 }
 
+const initializeAccountContext = async () => {
+  abortStream()
+  testPrompt.value = ''
+  testMode.value = 'default'
+  grokTestMode.value = 'text'
+  clearMediaUploads()
+  resetState()
+  availableModels.value = []
+  selectedModelId.value = ''
+
+  const account = props.account
+  if (!props.show || !account) return
+  const sequence = ++modelLoadSequence
+  await loadAvailableModels(account, sequence)
+  if (sequence !== modelLoadSequence || props.account?.id !== account.id) return
+  if (isGrokAccount.value) {
+    pickDefaultModelForMode()
+    applyDefaultPromptForMode()
+  }
+}
+
 watch(
-  () => props.show,
-  async (newVal) => {
-    if (newVal && props.account) {
-      testPrompt.value = ''
-      testMode.value = 'default'
-      grokTestMode.value = 'text'
-      resetState()
-      await loadAvailableModels()
-      if (isGrokAccount.value) {
-        pickDefaultModelForMode()
-        applyDefaultPromptForMode()
-      }
-    } else {
+  [() => props.show, () => props.account?.id],
+  ([show, accountID], [previousShow, previousAccountID]) => {
+    if (show && accountID != null && (!previousShow || accountID !== previousAccountID)) {
+      void initializeAccountContext()
+    } else if (!show) {
+      modelLoadSequence++
       abortStream()
     }
   }
@@ -823,33 +838,30 @@ watch(grokTestMode, () => {
   applyDefaultPromptForMode()
 })
 
-const loadAvailableModels = async () => {
-  if (!props.account) return
-
+const loadAvailableModels = async (account: Account, sequence: number) => {
   loadingModels.value = true
-  selectedModelId.value = '' // Reset selection before loading
+  selectedModelId.value = ''
   try {
-    const models = await adminAPI.accounts.getAvailableModels(props.account.id)
-    availableModels.value = props.account.platform === 'gemini' || props.account.platform === 'antigravity'
+    const models = await adminAPI.accounts.getAvailableModels(account.id)
+    if (sequence !== modelLoadSequence || props.account?.id !== account.id) return
+    availableModels.value = account.platform === 'gemini' || account.platform === 'antigravity'
       ? sortTestModels(models)
       : models
-    // Default selection by platform
     if (availableModels.value.length > 0) {
-      if (props.account.platform === 'gemini') {
+      if (account.platform === 'gemini') {
         selectedModelId.value = availableModels.value[0].id
       } else {
-        // Try to select Sonnet as default, otherwise use first model
         const sonnetModel = availableModels.value.find((m) => m.id.includes('sonnet'))
         selectedModelId.value = sonnetModel?.id || availableModels.value[0].id
       }
     }
   } catch (error) {
+    if (sequence !== modelLoadSequence || props.account?.id !== account.id) return
     console.error('Failed to load available models:', error)
-    // Fallback to empty list
     availableModels.value = []
     selectedModelId.value = ''
   } finally {
-    loadingModels.value = false
+    if (sequence === modelLoadSequence) loadingModels.value = false
   }
 }
 

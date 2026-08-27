@@ -779,7 +779,7 @@ func (s *adminServiceImpl) UpdateAccount(ctx context.Context, id int64, input *U
 		}
 	}
 	if input.Status != "" {
-		account.Status = input.Status
+		account.Status = NormalizeAccountStatus(input.Status)
 	}
 	if input.ExpiresAt != nil {
 		if *input.ExpiresAt <= 0 {
@@ -1096,7 +1096,8 @@ func (s *adminServiceImpl) BulkUpdateAccounts(ctx context.Context, input *BulkUp
 		}
 	}
 	if input.Status != "" {
-		repoUpdates.Status = &input.Status
+		normalizedStatus := NormalizeAccountStatus(input.Status)
+		repoUpdates.Status = &normalizedStatus
 	}
 	if input.Schedulable != nil {
 		repoUpdates.Schedulable = input.Schedulable
