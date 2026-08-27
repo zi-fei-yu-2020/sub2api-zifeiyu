@@ -765,7 +765,7 @@ const batchExpiryModeOptions = computed(() => [
 ])
 
 const codes = ref<RedeemCode[]>([])
-const loading = ref(false)
+const loading = ref(true)
 const generating = ref(false)
 const batchUpdating = ref(false)
 const searchQuery = ref('')

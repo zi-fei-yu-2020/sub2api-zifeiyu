@@ -6,39 +6,74 @@
     @close="handleClose"
   >
     <div class="space-y-4">
-      <!-- Account Info Card -->
+      <!-- Account Info & Context Header -->
       <div
         v-if="account"
-        class="flex items-center justify-between rounded-xl border border-slate-200 bg-gradient-to-r from-gray-50 to-gray-100 p-3 dark:border-dark-500 dark:from-dark-700 dark:to-dark-600"
+        class="flex flex-col gap-2 rounded-xl border border-blue-100 bg-gradient-to-r from-blue-50/60 via-slate-50 to-slate-100 p-3.5 shadow-sm dark:border-slate-800 dark:from-slate-900 dark:via-slate-900/80 dark:to-slate-800"
       >
-        <div class="flex items-center gap-3">
-          <div
-            class="flex h-10 w-10 items-center justify-center rounded-xl bg-gradient-to-br from-primary-500 to-primary-600"
-          >
-            <Icon name="play" size="md" class="text-white" :stroke-width="2" />
-          </div>
-          <div>
-            <div class="font-semibold text-slate-900 dark:text-gray-100">{{ account.name }}</div>
-            <div class="flex items-center gap-1.5 text-xs text-slate-400 dark:text-slate-400">
-              <span
-                class="rounded bg-gray-200 px-1.5 py-0.5 text-[10px] font-medium uppercase dark:bg-dark-500"
-              >
-                {{ account.type }}
-              </span>
-              <span>{{ t('admin.accounts.account') }}</span>
+        <div class="flex items-center justify-between gap-3">
+          <div class="flex items-center gap-3 min-w-0 flex-1">
+            <div
+              class="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-primary-600 text-white shadow-sm shadow-primary-500/20"
+            >
+              <Icon name="play" size="md" :stroke-width="2" />
+            </div>
+            <div class="min-w-0 flex-1">
+              <div class="flex items-center gap-2 flex-wrap">
+                <span class="font-bold text-base text-slate-900 dark:text-white truncate">
+                  {{ account.name }}
+                </span>
+                <span class="font-mono text-xs text-slate-400 dark:text-slate-500">
+                  #{{ account.id }}
+                </span>
+              </div>
+              <div class="flex items-center gap-1.5 text-xs text-slate-500 dark:text-slate-400 mt-0.5 flex-wrap">
+                <span class="rounded bg-white/80 border border-slate-200 px-1.5 py-0.5 text-[11px] font-semibold text-slate-700 uppercase dark:bg-slate-800 dark:border-slate-700 dark:text-slate-300">
+                  {{ account.platform }}
+                </span>
+                <span class="rounded bg-primary-50 border border-primary-200/60 px-1.5 py-0.5 text-[11px] font-medium text-primary-700 uppercase dark:bg-primary-950/50 dark:border-primary-800 dark:text-primary-300">
+                  {{ account.type }}
+                </span>
+                <span
+                  v-if="account.status"
+                  :class="[
+                    'rounded-full px-2 py-0.5 text-[11px] font-semibold',
+                    account.status === 'active'
+                      ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-500/20 dark:text-emerald-300'
+                      : 'bg-slate-200/80 text-slate-600 dark:bg-slate-700 dark:text-slate-300'
+                  ]"
+                >
+                  {{ account.status === 'active' ? (t('common.active') || '启用') : account.status }}
+                </span>
+              </div>
             </div>
           </div>
+
+          <!-- Fast Account Switcher in modal -->
+          <div v-if="accounts && accounts.length > 1 && currentIndex !== -1" class="flex items-center gap-1 shrink-0 bg-white dark:bg-slate-800 rounded-lg p-1 border border-slate-200 dark:border-slate-700 shadow-xs">
+            <span class="text-[11px] font-mono font-medium text-slate-400 px-1.5">
+              {{ currentIndex + 1 }}/{{ accounts.length }}
+            </span>
+            <button
+              type="button"
+              :disabled="!hasPrev || status === 'connecting'"
+              @click="goToPrev"
+              class="p-1 rounded text-slate-500 hover:bg-slate-100 hover:text-primary-600 disabled:opacity-30 disabled:cursor-not-allowed transition-colors dark:text-slate-400 dark:hover:bg-slate-700"
+              :title="t('common.previous') || '上一个账号'"
+            >
+              <Icon name="chevronLeft" size="sm" />
+            </button>
+            <button
+              type="button"
+              :disabled="!hasNext || status === 'connecting'"
+              @click="goToNext"
+              class="p-1 rounded text-slate-500 hover:bg-slate-100 hover:text-primary-600 disabled:opacity-30 disabled:cursor-not-allowed transition-colors dark:text-slate-400 dark:hover:bg-slate-700"
+              :title="t('common.next') || '下一个账号'"
+            >
+              <Icon name="chevronRight" size="sm" />
+            </button>
+          </div>
         </div>
-        <span
-          :class="[
-            'rounded-full px-2.5 py-1 text-xs font-semibold',
-            account.status === 'active'
-              ? 'bg-green-100 text-green-700 dark:bg-green-500/20 dark:text-green-400'
-              : 'bg-slate-100 text-slate-600 dark:bg-gray-700 dark:text-slate-400'
-          ]"
-        >
-          {{ account.status }}
-        </span>
       </div>
 
       <!-- Grok: mode first, then optional model / mode params -->
@@ -390,14 +425,42 @@ interface PreviewMedia {
   mimeType?: string
 }
 
-const props = defineProps<{
-  show: boolean
-  account: Account | null
-}>()
+const props = withDefaults(
+  defineProps<{
+    show: boolean
+    account: Account | null
+    accounts?: Account[]
+  }>(),
+  {
+    accounts: () => []
+  }
+)
 
 const emit = defineEmits<{
   (e: 'close'): void
+  (e: 'selectAccount', account: Account): void
 }>()
+
+
+const currentIndex = computed(() => {
+  if (!props.account || !props.accounts || props.accounts.length === 0) return -1
+  return props.accounts.findIndex((a) => a.id === props.account?.id)
+})
+
+const hasPrev = computed(() => currentIndex.value > 0)
+const hasNext = computed(() => currentIndex.value !== -1 && currentIndex.value < props.accounts.length - 1)
+
+const goToPrev = () => {
+  if (hasPrev.value && props.accounts) {
+    emit('selectAccount', props.accounts[currentIndex.value - 1])
+  }
+}
+
+const goToNext = () => {
+  if (hasNext.value && props.accounts) {
+    emit('selectAccount', props.accounts[currentIndex.value + 1])
+  }
+}
 
 const terminalRef = ref<HTMLElement | null>(null)
 const status = ref<'idle' | 'connecting' | 'success' | 'error'>('idle')

@@ -223,32 +223,43 @@
             <span class="font-mono text-xs text-slate-400 dark:text-slate-400">#{{ value }}</span>
           </template>
           <template #cell-name="{ row, value }">
-            <div class="flex flex-col">
-              <HelpTooltip
-                v-if="accountHomepageUrl(row)"
-                :content="accountHomepageUrl(row)"
-                width-class="w-max max-w-sm break-all"
-                class="-ml-1 self-start"
+            <div class="flex items-center justify-between gap-2 min-w-0">
+              <div class="flex flex-col min-w-0 flex-1">
+                <HelpTooltip
+                  v-if="accountHomepageUrl(row)"
+                  :content="accountHomepageUrl(row)"
+                  width-class="w-max max-w-sm break-all"
+                  class="-ml-1 self-start"
+                >
+                  <template #trigger>
+                    <a
+                      :href="accountHomepageUrl(row)"
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      class="border-b border-dotted border-slate-300 font-medium text-slate-900 hover:text-primary-600 dark:border-slate-700 dark:text-white dark:hover:text-primary-400 transition-colors truncate max-w-[170px] sm:max-w-xs inline-block"
+                    >
+                      {{ value }}
+                    </a>
+                  </template>
+                </HelpTooltip>
+                <span v-else class="font-medium text-slate-900 dark:text-white truncate max-w-[170px] sm:max-w-xs">{{ value }}</span>
+                <span
+                  v-if="accountDisplayEmail(row)"
+                  class="text-xs text-slate-400 dark:text-slate-400 truncate max-w-[170px] sm:max-w-xs"
+                  :title="accountDisplayEmail(row) + (row.parent_chatgpt_account_id ? ' · ' + row.parent_chatgpt_account_id : '')"
+                >
+                  {{ accountDisplayEmail(row) }}
+                </span>
+              </div>
+              <button
+                type="button"
+                @click.stop="handleTest(row)"
+                class="inline-flex items-center gap-1 shrink-0 rounded-lg px-2 py-1 text-xs font-medium text-primary-600 bg-primary-50 border border-primary-200/70 hover:bg-primary-600 hover:text-white transition-all shadow-2xs dark:bg-primary-950/40 dark:border-primary-800/60 dark:text-primary-300 dark:hover:bg-primary-600 dark:hover:text-white"
+                :title="t('admin.accounts.testConnection')"
               >
-                <template #trigger>
-                  <a
-                    :href="accountHomepageUrl(row)"
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    class="border-b border-dotted border-slate-300 font-medium text-slate-900 dark:border-slate-700 dark:text-white"
-                  >
-                    {{ value }}
-                  </a>
-                </template>
-              </HelpTooltip>
-              <span v-else class="font-medium text-slate-900 dark:text-white">{{ value }}</span>
-              <span
-                v-if="accountDisplayEmail(row)"
-                class="text-xs text-slate-400 dark:text-slate-400 truncate max-w-[200px]"
-                :title="accountDisplayEmail(row) + (row.parent_chatgpt_account_id ? ' · ' + row.parent_chatgpt_account_id : '')"
-              >
-                {{ accountDisplayEmail(row) }}
-              </span>
+                <Icon name="play" size="xs" :stroke-width="2.2" />
+                <span>{{ t('admin.accounts.testConnection') || '测试' }}</span>
+              </button>
             </div>
           </template>
           <template #cell-notes="{ value }">
@@ -453,7 +464,7 @@
     <CreateAccountModal :show="showCreate" :proxies="proxies" :groups="groups" @close="showCreate = false" @created="reload" />
     <EditAccountModal :show="showEdit" :account="edAcc" :proxies="proxies" :groups="groups" @close="showEdit = false" @updated="handleAccountUpdated" />
     <ReAuthAccountModal :show="showReAuth" :account="reAuthAcc" @close="closeReAuthModal" @reauthorized="handleAccountUpdated" />
-    <AccountTestModal :show="showTest" :account="testingAcc" @close="closeTestModal" />
+    <AccountTestModal :show="showTest" :account="testingAcc" :accounts="accounts" @close="closeTestModal" @select-account="handleTest" />
     <AccountStatsModal :show="showStats" :account="statsAcc" @close="closeStatsModal" />
     <ScheduledTestsPanel :show="showSchedulePanel" :account-id="scheduleAcc?.id ?? null" :model-options="scheduleModelOptions" @close="closeSchedulePanel" />
     <AccountActionMenu :show="menu.show" :account="menu.acc" :position="menu.pos" @close="menu.show = false" @test="handleTest" @stats="handleViewStats" @schedule="handleSchedule" @duplicate="handleDuplicateAccount" @reauth="handleReAuth" @refresh-token="handleRefresh" @recover-state="handleRecoverState" @reset-quota="handleResetQuota" @set-privacy="handleSetPrivacy" @create-spark-shadow="handleCreateSparkShadow" />

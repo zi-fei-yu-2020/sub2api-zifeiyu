@@ -438,7 +438,7 @@
               </div>
               <button
                 @click.stop="handleDeposit(row)"
-                class="rounded px-2 py-0.5 text-xs font-medium text-blue-600 transition-colors hover:bg-emerald-50 dark:text-emerald-400 dark:hover:bg-emerald-900/20"
+                class="rounded px-2 py-0.5 text-xs font-medium text-blue-600 transition-colors hover:bg-blue-50 dark:text-emerald-400 dark:hover:bg-blue-900/20"
                 :title="t('admin.users.deposit')"
               >
                 {{ t('admin.users.deposit') }}
@@ -618,7 +618,7 @@
                   'flex flex-col items-center gap-0.5 rounded-md p-1.5 text-slate-400 transition-colors',
                   row.status === 'active'
                     ? 'hover:bg-orange-50 hover:text-orange-600 dark:hover:bg-orange-900/20 dark:hover:text-orange-400'
-                    : 'hover:bg-green-50 hover:text-primary-600 dark:hover:bg-green-900/20 dark:hover:text-green-400'
+                    : 'hover:bg-blue-50 hover:text-primary-600 dark:hover:bg-blue-900/20 dark:hover:text-green-400'
                 ]"
               >
                 <Icon v-if="row.status === 'active'" name="ban" size="sm" />

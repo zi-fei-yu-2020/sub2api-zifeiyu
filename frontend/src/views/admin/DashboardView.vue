@@ -245,7 +245,7 @@
             </button>
             <button
               type="button"
-              class="group flex items-center gap-3 rounded-xl bg-slate-50 p-3 text-left transition-colors hover:bg-emerald-50 dark:bg-slate-900/50 dark:hover:bg-emerald-900/20"
+              class="group flex items-center gap-3 rounded-xl bg-slate-50 p-3 text-left transition-colors hover:bg-blue-50 dark:bg-slate-900/50 dark:hover:bg-blue-900/20"
               @click="router.push('/admin/groups')"
             >
               <span class="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-xl bg-emerald-50 text-blue-600 dark:bg-emerald-900/30 dark:text-emerald-400">
@@ -259,7 +259,7 @@
                   {{ t('admin.dashboard.groupPricingDesc') }}
                 </span>
               </span>
-              <Icon name="chevronRight" size="sm" class="text-slate-400 group-hover:text-emerald-500" />
+              <Icon name="chevronRight" size="sm" class="text-slate-400 group-hover:text-primary-600" />
             </button>
           </div>
         </div>

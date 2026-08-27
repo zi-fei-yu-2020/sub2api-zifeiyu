@@ -281,9 +281,7 @@ import Icon from '@/components/icons/Icon.vue'
 const { t } = useI18n()
 
 const desktopViewportQuery = '(min-width: 768px)'
-const isDesktopViewport = ref(
-  typeof window === 'undefined' ? true : window.matchMedia(desktopViewportQuery).matches
-)
+const isDesktopViewport = ref(true)
 
 const emit = defineEmits<{
   sort: [key: string, order: 'asc' | 'desc']
@@ -484,8 +482,8 @@ interface Props {
 
 const props = withDefaults(defineProps<Props>(), {
   loading: false,
-  stickyFirstColumn: true,
-  stickyActionsColumn: true,
+  stickyFirstColumn: false,
+  stickyActionsColumn: false,
   expandableActions: true,
   defaultSortOrder: 'asc',
   serverSideSort: false,

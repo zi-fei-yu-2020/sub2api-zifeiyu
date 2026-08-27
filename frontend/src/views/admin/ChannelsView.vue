@@ -57,8 +57,20 @@
           default-sort-order="desc"
           @sort="handleSort"
         >
-          <template #cell-name="{ value }">
-            <span class="font-medium text-slate-900 dark:text-white">{{ value }}</span>
+          <template #cell-name="{ row, value }">
+            <div class="flex items-center gap-3 py-1">
+              <div class="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-gradient-to-br from-blue-50 to-indigo-50/70 text-primary-600 font-bold text-sm shadow-sm ring-1 ring-blue-100/80 dark:from-blue-950/40 dark:to-dark-800 dark:text-primary-400 dark:ring-dark-700">
+                <Icon name="link" size="sm" />
+              </div>
+              <div class="flex flex-col min-w-0">
+                <span class="font-semibold text-slate-900 dark:text-white truncate max-w-[220px]" :title="value">
+                  {{ value }}
+                </span>
+                <span v-if="row.description" class="text-xs text-slate-400 dark:text-slate-400 truncate max-w-[240px]" :title="row.description">
+                  {{ row.description }}
+                </span>
+              </div>
+            </div>
           </template>
 
           <template #cell-description="{ value }">
@@ -721,7 +733,7 @@ const billingModelSourceOptions = computed(() => [
 
 // ── State ──
 const channels = ref<Channel[]>([])
-const loading = ref(false)
+const loading = ref(true)
 const searchQuery = ref('')
 const filters = reactive({ status: '' })
 const pagination = reactive({

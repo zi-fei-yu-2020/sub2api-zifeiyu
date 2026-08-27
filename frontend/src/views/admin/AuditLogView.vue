@@ -370,7 +370,7 @@ import { useAppStore } from '@/stores'
 const { t } = useI18n()
 const appStore = useAppStore()
 
-const loading = ref(false)
+const loading = ref(true)
 const logs = ref<AuditLog[]>([])
 const total = ref(0)
 const page = ref(1)

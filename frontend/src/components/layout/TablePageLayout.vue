@@ -1,5 +1,5 @@
 <template>
-  <div class="table-page-layout space-y-5" :class="{ 'mobile-mode': isMobile }">
+  <div class="table-page-layout space-y-6 w-full" :class="{ 'mobile-mode': isMobile }">
     <!-- 操作按钮与工具栏 -->
     <div v-if="$slots.actions || $slots.filters" class="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
       <div v-if="$slots.filters" class="flex flex-1 flex-wrap items-center gap-3">
@@ -11,7 +11,7 @@
     </div>
 
     <!-- 表格区域 (Blue-White SaaS Table Container) -->
-    <div class="table-scroll-container overflow-hidden rounded-2xl border border-slate-200/90 bg-white shadow-sm shadow-slate-200/40 dark:border-slate-800 dark:bg-slate-900">
+    <div class="table-scroll-container overflow-hidden rounded-2xl border border-slate-200/80 bg-white shadow-sm shadow-blue-500/5 transition-all dark:border-slate-800 dark:bg-slate-900">
       <slot name="table" />
     </div>
 
