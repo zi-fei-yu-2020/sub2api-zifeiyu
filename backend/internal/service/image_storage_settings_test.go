@@ -68,11 +68,15 @@ func (s *recordingStorage) Save(_ context.Context, key, _ string, _ []byte) (str
 	return "https://cdn.example.com/" + key, nil
 }
 
-func newImageStorageFixture(t *testing.T, fallback config.ImageStorageConfig) (*ImageStorageSettingService, *stubSettingRepo, *[]config.ImageStorageConfig) {
-	return newImageStorageFixtureWithKey(t, fallback, true)
+func newImageStorageFixture(t *testing.T, fallback config.ImageStorageConfig, policy config.URLAllowlistConfig) (*ImageStorageSettingService, *stubSettingRepo, *[]config.ImageStorageConfig) {
+	return newImageStorageFixtureWithPolicyAndKey(t, fallback, policy, true)
 }
 
 func newImageStorageFixtureWithKey(t *testing.T, fallback config.ImageStorageConfig, encryptionKeyConfigured bool) (*ImageStorageSettingService, *stubSettingRepo, *[]config.ImageStorageConfig) {
+	return newImageStorageFixtureWithPolicyAndKey(t, fallback, config.URLAllowlistConfig{}, encryptionKeyConfigured)
+}
+
+func newImageStorageFixtureWithPolicyAndKey(t *testing.T, fallback config.ImageStorageConfig, policy config.URLAllowlistConfig, encryptionKeyConfigured bool) (*ImageStorageSettingService, *stubSettingRepo, *[]config.ImageStorageConfig) {
 	t.Helper()
 	repo := newStubSettingRepo()
 	encryptor := reversibleEncryptor{}
@@ -85,7 +89,7 @@ func newImageStorageFixtureWithKey(t *testing.T, fallback config.ImageStorageCon
 		built = append(built, *cfg)
 		return &recordingStorage{}, nil
 	}
-	return NewImageStorageSettingService(repo, encryptor, backup, factory, fallback, config.URLAllowlistConfig{}), repo, &built
+	return NewImageStorageSettingService(repo, encryptor, backup, factory, fallback, policy), repo, &built
 }
 
 func seedBackupS3(t *testing.T, repo *stubSettingRepo, cfg BackupS3Config) {
@@ -240,7 +244,7 @@ func TestImageStorageSettingsFallBackToConfigFile(t *testing.T) {
 		Enabled: true, Endpoint: "https://acct.r2.cloudflarestorage.com", Region: "auto",
 		Bucket: "yaml-bucket", AccessKeyID: "yaml-ak", SecretAccessKey: "yaml-sk",
 		Prefix: "images/", MaxDownloadByte: 1024,
-	})
+	}, config.URLAllowlistConfig{})
 
 	_, enabled := svc.resolve()
 	require.True(t, enabled, "config.yaml still enables the feature when nothing is stored yet")
