@@ -508,8 +508,8 @@ export default {
 
     // Usage Records
     usage: {
-      title: 'System Usage Records',
-      description: 'View and manage system-wide user request and billing records',
+      title: 'Sitewide Usage',
+      description: 'View and manage sitewide user request and billing records',
       userFilter: 'User',
       searchUserPlaceholder: 'Search user by email...',
       searchApiKeyPlaceholder: 'Search API key by name...',

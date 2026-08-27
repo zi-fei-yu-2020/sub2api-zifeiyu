@@ -505,7 +505,7 @@ export default {
 
     // Usage Records
     usage: {
-      title: '系统使用记录',
+      title: '全站用量',
       description: '查看和管理全站所有用户的调用与计费记录',
       userFilter: '用户',
       searchUserPlaceholder: '按邮箱搜索用户...',

@@ -317,6 +317,7 @@ export default {
     reasoningEffort: '推理强度',
     endpoint: '端点',
     endpointDistribution: '端点分布',
+    historicalUnknown: '历史未知',
     inbound: '入站',
     upstream: '上游',
     mapping: '映射',

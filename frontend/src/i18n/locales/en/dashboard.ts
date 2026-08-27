@@ -312,6 +312,7 @@ export default {
     reasoningEffort: 'Reasoning Effort',
     endpoint: 'Endpoint',
     endpointDistribution: 'Endpoint Distribution',
+    historicalUnknown: 'Historical Unknown',
     inbound: 'Inbound',
     upstream: 'Upstream',
     mapping: 'Mapping',

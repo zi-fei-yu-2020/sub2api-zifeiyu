@@ -14,15 +14,15 @@ const sidebarSource = readFileSync(resolve(here, '../AppSidebar.vue'), 'utf8')
 const routerSource = readFileSync(resolve(here, '../../../router/index.ts'), 'utf8')
 
 describe('admin overview navigation distinctions', () => {
-  it('uses a system-wide name for admin usage while keeping personal usage unchanged', () => {
+  it('uses a sitewide name for admin usage while keeping personal usage unchanged', () => {
     expect(zhCommon.nav.usage).toBe('\u4f7f\u7528\u8bb0\u5f55')
-    expect(zhCommon.nav.adminUsage).toBe('\u7cfb\u7edf\u4f7f\u7528\u8bb0\u5f55')
+    expect(zhCommon.nav.adminUsage).toBe('\u5168\u7ad9\u7528\u91cf')
     expect(enCommon.nav.usage).toBe('Usage')
-    expect(enCommon.nav.adminUsage).toBe('System Usage Records')
-    expect(zhAdmin.usage.title).toBe('\u7cfb\u7edf\u4f7f\u7528\u8bb0\u5f55')
-    expect(enAdmin.usage.title).toBe('System Usage Records')
+    expect(enCommon.nav.adminUsage).toBe('Sitewide Usage')
+    expect(zhAdmin.usage.title).toBe('\u5168\u7ad9\u7528\u91cf')
+    expect(enAdmin.usage.title).toBe('Sitewide Usage')
     expect(sidebarSource).toContain("path: '/admin/usage', label: t('nav.adminUsage')")
-    expect(routerSource).toContain("title: 'System Usage Records'")
+    expect(routerSource).toContain("title: 'Sitewide Usage'")
   })
 
   it('uses a dedicated terminal-style icon for ops monitoring', () => {
