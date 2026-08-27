@@ -441,6 +441,7 @@ interface Props {
   data: any[]
   loading?: boolean
   stickyFirstColumn?: boolean
+  stickyColumnKey?: string
   stickyActionsColumn?: boolean
   expandableActions?: boolean
   actionsCount?: number // 操作按钮总数，用于判断是否需要展开功能
@@ -483,6 +484,7 @@ interface Props {
 const props = withDefaults(defineProps<Props>(), {
   loading: false,
   stickyFirstColumn: false,
+  stickyColumnKey: '',
   stickyActionsColumn: false,
   expandableActions: true,
   defaultSortOrder: 'asc',
@@ -863,7 +865,9 @@ const hasSelectColumn = computed(() => {
 const getStickyColumnClass = (column: Column, index: number) => {
   const classes: string[] = []
 
-  if (props.stickyFirstColumn) {
+  if (props.stickyColumnKey && column.key === props.stickyColumnKey) {
+    classes.push('sticky-col sticky-col-left')
+  } else if (props.stickyFirstColumn) {
     if (props.selectable) {
       // Keep the built-in checkbox column at the far left and the first data column beside it.
       if (index === 0) {

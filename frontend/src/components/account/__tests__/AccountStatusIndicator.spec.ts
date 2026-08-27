@@ -222,4 +222,28 @@ describe('AccountStatusIndicator', () => {
     // AICredits 积分耗尽状态应显示
     expect(wrapper.text()).toContain('admin.accounts.status.creditsExhausted')
   })
+
+  it('hides normal active/disabled badges while preserving error details', () => {
+    const active = mount(AccountStatusIndicator, {
+      props: { account: makeAccount({}), hideNormalStatus: true },
+    })
+    expect(active.text()).not.toContain('admin.accounts.status.active')
+
+    const disabled = mount(AccountStatusIndicator, {
+      props: {
+        account: makeAccount({ status: 'disabled', schedulable: true }),
+        hideNormalStatus: true,
+      },
+    })
+    expect(disabled.text()).not.toContain('admin.accounts.status.disabled')
+
+    const error = mount(AccountStatusIndicator, {
+      props: {
+        account: makeAccount({ status: 'error', error_message: 'upstream failed' }),
+        hideNormalStatus: true,
+      },
+    })
+    expect(error.text()).toContain('admin.accounts.status.error')
+  })
+
 })

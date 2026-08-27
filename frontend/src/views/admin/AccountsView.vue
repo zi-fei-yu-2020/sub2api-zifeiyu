@@ -193,8 +193,7 @@
         />
         <div ref="accountTableRef" class="flex min-h-0 flex-1 flex-col overflow-hidden">
         <DataTable
-          :sticky-first-column="true"
-          :sticky-actions-column="true"
+          sticky-column-key="name"
           ref="dataTableRef"
           :columns="cols"
           :data="accounts"
@@ -300,8 +299,17 @@
             <AccountCapacityCell :account="row" />
           </template>
           <template #cell-status="{ row }">
-            <div class="flex items-center gap-1.5">
-              <AccountStatusIndicator :account="row" @show-temp-unsched="handleShowTempUnsched" />
+            <div class="flex items-center gap-2">
+              <AccountStatusToggle
+                :account="row"
+                :loading="togglingStatus === row.id"
+                @toggle="handleToggleStatus(row)"
+              />
+              <AccountStatusIndicator
+                :account="row"
+                hide-normal-status
+                @show-temp-unsched="handleShowTempUnsched"
+              />
             </div>
           </template>
           <template #cell-schedulable="{ row }">
@@ -530,6 +538,7 @@ import AccountStatsModal from '@/components/admin/account/AccountStatsModal.vue'
 import ScheduledTestsPanel from '@/components/admin/account/ScheduledTestsPanel.vue'
 import type { SelectOption } from '@/components/common/Select.vue'
 import AccountStatusIndicator from '@/components/account/AccountStatusIndicator.vue'
+import AccountStatusToggle from '@/components/account/AccountStatusToggle.vue'
 import AccountSchedulableToggle from '@/components/account/AccountSchedulableToggle.vue'
 import AccountUsageCell from '@/components/account/AccountUsageCell.vue'
 import AccountTodayStatsCell from '@/components/account/AccountTodayStatsCell.vue'
@@ -624,6 +633,7 @@ const showSchedulePanel = ref(false)
 const scheduleAcc = ref<Account | null>(null)
 const scheduleModelOptions = ref<SelectOption[]>([])
 const togglingSchedulable = ref<number | null>(null)
+const togglingStatus = ref<number | null>(null)
 const menu = reactive<{show:boolean, acc:Account|null, pos:{top:number, left:number}|null}>({ show: false, acc: null, pos: null })
 const exportingData = ref(false)
 const probingUpstreamBilling = reactive(new Set<number>())
@@ -2386,6 +2396,29 @@ const confirmCreateSparkShadow = async () => {
 }
 const handleDelete = (a: Account) => { deletingAcc.value = a; showDeleteDialog.value = true }
 const confirmDelete = async () => { if(!deletingAcc.value) return; try { await adminAPI.accounts.delete(deletingAcc.value.id); showDeleteDialog.value = false; deletingAcc.value = null; reload() } catch (error) { console.error('Failed to delete account:', error) } }
+const handleToggleStatus = async (a: Account) => {
+  togglingStatus.value = a.id
+  try {
+    const updated = a.status === 'error'
+      ? await adminAPI.accounts.recoverState(a.id)
+      : await adminAPI.accounts.update(a.id, {
+          status: a.status === 'active' ? 'disabled' : 'active',
+        })
+    patchAccountInList(updated)
+    enterAutoRefreshSilentWindow()
+    appStore.showSuccess(
+      updated.status === 'active'
+        ? t('admin.accounts.statusEnabledSuccess')
+        : t('admin.accounts.statusDisabledSuccess'),
+    )
+  } catch (error) {
+    console.error('Failed to toggle account status:', error)
+    appStore.showError(t('admin.accounts.failedToToggleStatus'))
+  } finally {
+    togglingStatus.value = null
+  }
+}
+
 const handleToggleSchedulable = async (a: Account) => {
   if (a.status !== 'active') return
   const nextSchedulable = !a.schedulable

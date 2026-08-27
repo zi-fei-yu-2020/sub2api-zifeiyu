@@ -384,4 +384,29 @@ describe('DataTable', () => {
     expect(cells[1].classes()).toEqual(expect.arrayContaining(['sticky-col', 'sticky-col-left-second']))
   })
 
+
+  it('pins only the requested named column without pinning select or actions', () => {
+    const wrapper = mount(DataTable, {
+      props: {
+        columns: [
+          { key: 'select', label: '' },
+          { key: 'name', label: 'Name' },
+          { key: 'actions', label: 'Actions' }
+        ],
+        data: [{ id: 1, select: '', name: 'One', actions: '' }],
+        rowKey: 'id',
+        stickyColumnKey: 'name'
+      }
+    })
+
+    const headers = wrapper.findAll('thead th')
+    const cells = wrapper.findAll('tbody tr').at(-1)!.findAll('td')
+    expect(headers[0].classes()).not.toContain('sticky-col')
+    expect(headers[1].classes()).toEqual(expect.arrayContaining(['sticky-col', 'sticky-col-left']))
+    expect(headers[2].classes()).not.toContain('sticky-col-right')
+    expect(cells[0].classes()).not.toContain('sticky-col')
+    expect(cells[1].classes()).toEqual(expect.arrayContaining(['sticky-col', 'sticky-col-left']))
+    expect(cells[2].classes()).not.toContain('sticky-col-right')
+  })
+
 })

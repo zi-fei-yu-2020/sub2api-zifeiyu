@@ -3488,7 +3488,7 @@ const form = reactive({
   load_factor: null as number | null,
   priority: 1,
   rate_multiplier: 1,
-  status: 'active' as 'active' | 'inactive' | 'error',
+  status: 'active' as 'active' | 'disabled' | 'error',
   group_ids: [] as number[],
   expires_at: null as number | null
 })
@@ -3510,7 +3510,7 @@ const handleUpstreamBillingAutoProbeChange = (enabled: boolean) => {
 const statusOptions = computed(() => {
   const options = [
     { value: 'active', label: t('common.active') },
-    { value: 'inactive', label: t('common.inactive') }
+    { value: 'disabled', label: t('admin.accounts.status.disabled') }
   ]
   if (form.status === 'error') {
     options.push({ value: 'error', label: t('admin.accounts.status.error') })
@@ -3596,7 +3596,7 @@ const syncFormFromAccount = (newAccount: Account | null) => {
   form.load_factor = newAccount.load_factor ?? null
   form.priority = newAccount.priority
   form.rate_multiplier = newAccount.rate_multiplier ?? 1
-  form.status = (newAccount.status === 'active' || newAccount.status === 'inactive' || newAccount.status === 'error')
+  form.status = (newAccount.status === 'active' || newAccount.status === 'disabled' || newAccount.status === 'error')
     ? newAccount.status
     : 'active'
   form.group_ids = newAccount.group_ids || []
@@ -4514,7 +4514,7 @@ const handleSubmit = async () => {
   if (!props.account) return
   const accountID = props.account.id
 
-  if (form.status !== 'active' && form.status !== 'inactive' && form.status !== 'error') {
+  if (form.status !== 'active' && form.status !== 'disabled' && form.status !== 'error') {
     appStore.showError(t('admin.accounts.pleaseSelectStatus'))
     return
   }

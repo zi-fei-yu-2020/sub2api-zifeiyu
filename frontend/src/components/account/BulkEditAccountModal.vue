@@ -1689,7 +1689,7 @@ const concurrency = ref(1)
 const loadFactor = ref<number | null>(null)
 const priority = ref(1)
 const rateMultiplier = ref(1)
-const status = ref<'active' | 'inactive'>('active')
+const status = ref<'active' | 'disabled'>('active')
 const groupIds = ref<number[]>([])
 const openaiPassthroughEnabled = ref(false)
 // Codex namespace 工具摊平兼容开关（仅 OAuth），缺省关闭即原样保留
@@ -1740,7 +1740,7 @@ const commonErrorCodes = [
 
 const statusOptions = computed(() => [
   { value: 'active', label: t('common.active') },
-  { value: 'inactive', label: t('common.inactive') }
+  { value: 'disabled', label: t('admin.accounts.status.disabled') }
 ])
 const upstreamBillingAutoProbeOptions = computed(() => [
   { value: 'enabled', label: t('common.enabled') },

@@ -264,8 +264,6 @@
       <!-- Users Table -->
       <template #table>
         <DataTable
-          :sticky-first-column="true"
-          :sticky-actions-column="true"
           :columns="columns"
           :data="sortedUsers"
           :loading="loading"

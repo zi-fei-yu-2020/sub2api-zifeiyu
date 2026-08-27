@@ -114,8 +114,6 @@
 
       <template #table>
         <DataTable
-          :sticky-first-column="true"
-          :sticky-actions-column="true"
           :columns="columns"
           :data="groups"
           :loading="loading"

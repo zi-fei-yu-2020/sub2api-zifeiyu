@@ -13,7 +13,7 @@
     </div>
 
     <!-- Main Status Badge (shown when not rate limited/overloaded) -->
-    <template v-else>
+    <template v-else-if="!hideBaseStatus || shouldShowBaseStatus">
       <div v-if="isTempUnschedulable" class="flex flex-col items-center gap-1">
         <button
           type="button"
@@ -167,9 +167,14 @@ import { formatCountdown, formatDateTime, formatDateTimeToMinute, formatCountdow
 
 const { t } = useI18n()
 
-const props = defineProps<{
+const props = withDefaults(defineProps<{
   account: Account
-}>()
+  hideNormalStatus?: boolean
+}>(), {
+  hideNormalStatus: false,
+})
+
+const hideBaseStatus = computed(() => props.hideNormalStatus)
 
 const emit = defineEmits<{
   (e: 'show-temp-unsched', account: Account): void
@@ -311,6 +316,15 @@ const tempUnschedRecoveryText = computed(() => {
   return t('admin.accounts.status.tempUnschedulableUntil', {
     time: formatDateTime(props.account.temp_unschedulable_until)
   })
+})
+
+const shouldShowBaseStatus = computed(() => {
+  return (
+    hasError.value ||
+    isTempUnschedulable.value ||
+    isQuotaExceeded.value ||
+    (props.account.status === 'active' && !props.account.schedulable)
+  )
 })
 
 // Computed: status badge class

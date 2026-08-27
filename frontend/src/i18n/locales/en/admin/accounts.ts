@@ -98,6 +98,12 @@ export default {
       schedulableUnavailable: 'This account is not active and is currently excluded from scheduling',
       schedulableUnavailableWillResume: 'This account is not active and is currently excluded from scheduling; scheduling will resume when the account becomes active',
       failedToToggleSchedulable: 'Failed to toggle scheduling status',
+      statusToggleDisable: 'Account enabled; click to disable',
+      statusToggleEnable: 'Account disabled; click to enable',
+      statusToggleRecover: 'Account is in an error state; click to recover it',
+      statusEnabledSuccess: 'Account enabled',
+      statusDisabledSuccess: 'Account disabled',
+      failedToToggleStatus: 'Failed to toggle account status',
       groupCountTotal: '{count} groups total',
       platforms: {
         anthropic: 'Anthropic',

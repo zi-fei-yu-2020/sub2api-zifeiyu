@@ -96,6 +96,12 @@ export default {
       schedulableUnavailable: '账号当前不是正常状态，暂不参与调度',
       schedulableUnavailableWillResume: '账号当前不是正常状态，暂不参与调度；恢复正常后将自动恢复调度',
       failedToToggleSchedulable: '切换调度状态失败',
+      statusToggleDisable: '账号已启用，点击禁用',
+      statusToggleEnable: '账号已禁用，点击启用',
+      statusToggleRecover: '账号状态异常，点击恢复为正常状态',
+      statusEnabledSuccess: '账号已启用',
+      statusDisabledSuccess: '账号已禁用',
+      failedToToggleStatus: '切换账号状态失败',
       groupCountTotal: '共 {count} 个分组',
       columns: {
         name: '名称',
