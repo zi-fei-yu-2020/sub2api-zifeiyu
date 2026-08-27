@@ -1,5 +1,6 @@
 import { mount } from '@vue/test-utils'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { nextTick } from 'vue'
 
 import DataTable from '../DataTable.vue'
 
@@ -309,7 +310,7 @@ describe('DataTable', () => {
     expect(wrapper.emitted('selectionChange')?.at(-1)?.[0]).toEqual([99, 2])
   })
 
-  it('keeps the single usage field shrinkable in a 320px mobile card', () => {
+  it('keeps the single usage field shrinkable in a 320px mobile card', async () => {
     stubMobileMatchMedia()
     const viewport = document.createElement('div')
     viewport.style.width = '320px'
@@ -325,6 +326,7 @@ describe('DataTable', () => {
         'cell-usage': '<div data-test="usage-cell">snapshot</div>'
       }
     })
+    await nextTick()
 
     expect(viewport.style.width).toBe('320px')
     expect(wrapper.findAll('[data-field="usage"]')).toHaveLength(1)
@@ -352,6 +354,7 @@ describe('DataTable', () => {
         selectedKeys: [99]
       }
     })
+    await nextTick()
 
     await wrapper.get('[data-test="select-all-mobile"]').setValue(true)
 
@@ -367,7 +370,8 @@ describe('DataTable', () => {
         ],
         data: [{ id: 1, email: 'user@example.com', balance: 10 }],
         rowKey: 'id',
-        selectable: true
+        selectable: true,
+        stickyFirstColumn: true
       }
     })
 

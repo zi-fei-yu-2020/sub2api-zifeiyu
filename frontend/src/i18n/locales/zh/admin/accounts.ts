@@ -93,6 +93,8 @@ export default {
       schedulableHint: '开启后账号参与API请求调度',
       schedulableEnabled: '调度已开启',
       schedulableDisabled: '调度已关闭',
+      schedulableUnavailable: '账号当前不是正常状态，暂不参与调度',
+      schedulableUnavailableWillResume: '账号当前不是正常状态，暂不参与调度；恢复正常后将自动恢复调度',
       failedToToggleSchedulable: '切换调度状态失败',
       groupCountTotal: '共 {count} 个分组',
       columns: {

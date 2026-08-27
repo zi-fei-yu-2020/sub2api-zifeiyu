@@ -95,6 +95,8 @@ export default {
       schedulableHint: 'Enable to include this account in API request scheduling',
       schedulableEnabled: 'Scheduling enabled',
       schedulableDisabled: 'Scheduling disabled',
+      schedulableUnavailable: 'This account is not active and is currently excluded from scheduling',
+      schedulableUnavailableWillResume: 'This account is not active and is currently excluded from scheduling; scheduling will resume when the account becomes active',
       failedToToggleSchedulable: 'Failed to toggle scheduling status',
       groupCountTotal: '{count} groups total',
       platforms: {

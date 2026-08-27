@@ -148,7 +148,7 @@ describe('admin UsersView', () => {
       items: [createAdminUser()],
       total: 1,
       page: 1,
-      page_size: 20,
+      page_size: 10,
       pages: 1
     })
     getAllGroups.mockResolvedValue([])
@@ -204,7 +204,7 @@ describe('admin UsersView', () => {
 
     expect(listUsers).toHaveBeenLastCalledWith(
       1,
-      20,
+      10,
       expect.objectContaining({
         sort_by: 'last_used_at',
         sort_order: 'desc'
@@ -238,7 +238,7 @@ describe('admin UsersView', () => {
       ],
       total: 2,
       page: 1,
-      page_size: 20,
+      page_size: 10,
       pages: 1
     })
     getBatchUsersUsage.mockResolvedValue({
@@ -299,7 +299,7 @@ describe('admin UsersView', () => {
     expect(wrapper.get('[data-test="row-order"]').text()).toBe('last-used-first@example.com,usage-first@example.com')
     expect(listUsers).toHaveBeenLastCalledWith(
       1,
-      20,
+      10,
       expect.objectContaining({
         sort_by: 'last_used_at',
         sort_order: 'desc'
@@ -321,7 +321,7 @@ describe('admin UsersView', () => {
         items: [user],
         total: 2,
         page,
-        page_size: 20,
+        page_size: 10,
         pages: 2
       }
     })
@@ -425,7 +425,7 @@ describe('admin UsersView', () => {
     expect(wrapper.get('[data-test="table-loading"]').text()).toBe('loading')
     expect(wrapper.find('[data-test="empty-state"]').exists()).toBe(false)
 
-    resolveUsers({ items: [createAdminUser()], total: 1, page: 1, page_size: 20, pages: 1 })
+    resolveUsers({ items: [createAdminUser()], total: 1, page: 1, page_size: 10, pages: 1 })
     resolveDefinitions([])
     await flushPromises()
 
@@ -470,7 +470,7 @@ describe('admin UsersView', () => {
     expect(wrapper.get('[data-test="empty-action"]').text()).toBe('admin.users.retryLoad')
 
     listUsers.mockResolvedValueOnce({
-      items: [createAdminUser()], total: 1, page: 1, page_size: 20, pages: 1
+      items: [createAdminUser()], total: 1, page: 1, page_size: 10, pages: 1
     })
     await wrapper.get('[data-test="empty-action"]').trigger('click')
     await flushPromises()
