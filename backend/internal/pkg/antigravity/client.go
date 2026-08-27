@@ -20,6 +20,27 @@ import (
 	"github.com/Wei-Shaw/sub2api/internal/pkg/servertiming"
 )
 
+const (
+	antigravityOAuthResponseMaxBytes int64 = 1 << 20
+	antigravityAPIResponseMaxBytes   int64 = 4 << 20
+)
+
+var errAntigravityResponseTooLarge = errors.New("antigravity response body too large")
+
+func readAntigravityResponseBody(reader io.Reader, maxBytes int64) ([]byte, error) {
+	if reader == nil {
+		return nil, errors.New("response body is nil")
+	}
+	body, err := io.ReadAll(io.LimitReader(reader, maxBytes+1))
+	if err != nil {
+		return nil, err
+	}
+	if int64(len(body)) > maxBytes {
+		return nil, fmt.Errorf("%w: limit=%d", errAntigravityResponseTooLarge, maxBytes)
+	}
+	return body, nil
+}
+
 // ForbiddenError 表示上游返回 403 Forbidden
 type ForbiddenError struct {
 	StatusCode int
@@ -345,7 +366,7 @@ func (c *Client) ExchangeCode(ctx context.Context, code, codeVerifier string) (*
 	}
 	defer func() { _ = resp.Body.Close() }()
 
-	bodyBytes, err := io.ReadAll(resp.Body)
+	bodyBytes, err := readAntigravityResponseBody(resp.Body, antigravityOAuthResponseMaxBytes)
 	if err != nil {
 		return nil, fmt.Errorf("读取响应失败: %w", err)
 	}
@@ -387,7 +408,7 @@ func (c *Client) RefreshToken(ctx context.Context, refreshToken string) (*TokenR
 	}
 	defer func() { _ = resp.Body.Close() }()
 
-	bodyBytes, err := io.ReadAll(resp.Body)
+	bodyBytes, err := readAntigravityResponseBody(resp.Body, antigravityOAuthResponseMaxBytes)
 	if err != nil {
 		return nil, fmt.Errorf("读取响应失败: %w", err)
 	}
@@ -418,7 +439,7 @@ func (c *Client) GetUserInfo(ctx context.Context, accessToken string) (*UserInfo
 	}
 	defer func() { _ = resp.Body.Close() }()
 
-	bodyBytes, err := io.ReadAll(resp.Body)
+	bodyBytes, err := readAntigravityResponseBody(resp.Body, antigravityOAuthResponseMaxBytes)
 	if err != nil {
 		return nil, fmt.Errorf("读取响应失败: %w", err)
 	}
@@ -473,7 +494,7 @@ func (c *Client) LoadCodeAssist(ctx context.Context, accessToken string) (*LoadC
 			return nil, nil, lastErr
 		}
 
-		respBodyBytes, err := io.ReadAll(resp.Body)
+		respBodyBytes, err := readAntigravityResponseBody(resp.Body, antigravityAPIResponseMaxBytes)
 		_ = resp.Body.Close() // 立即关闭，避免循环内 defer 导致的资源泄漏
 		if err != nil {
 			return nil, nil, fmt.Errorf("读取响应失败: %w", err)
@@ -552,7 +573,7 @@ func (c *Client) OnboardUser(ctx context.Context, accessToken, tierID string) (s
 				return "", lastErr
 			}
 
-			respBodyBytes, err := io.ReadAll(resp.Body)
+			respBodyBytes, err := readAntigravityResponseBody(resp.Body, antigravityAPIResponseMaxBytes)
 			_ = resp.Body.Close()
 			if err != nil {
 				return "", fmt.Errorf("读取响应失败: %w", err)
@@ -694,13 +715,13 @@ func (c *Client) FetchAvailableModels(ctx context.Context, accessToken, projectI
 			return nil, nil, lastErr
 		}
 
-		respBodyBytes, err := io.ReadAll(io.LimitReader(resp.Body, bodyLimit+1))
+		respBodyBytes, err := readAntigravityResponseBody(resp.Body, bodyLimit)
 		_ = resp.Body.Close() // 立即关闭，避免循环内 defer 导致的资源泄漏
 		if err != nil {
+			if errors.Is(err, errAntigravityResponseTooLarge) {
+				return nil, nil, fmt.Errorf("响应超过 %d 字节: %w", bodyLimit, err)
+			}
 			return nil, nil, fmt.Errorf("读取响应失败: %w", err)
-		}
-		if int64(len(respBodyBytes)) > bodyLimit {
-			return nil, nil, fmt.Errorf("响应超过 %d 字节", bodyLimit)
 		}
 
 		// 检查是否需要 URL 降级
@@ -849,7 +870,7 @@ func (c *Client) SetUserSettings(ctx context.Context, accessToken string) (*SetU
 	}
 	defer func() { _ = resp.Body.Close() }()
 
-	respBody, err := io.ReadAll(resp.Body)
+	respBody, err := readAntigravityResponseBody(resp.Body, antigravityAPIResponseMaxBytes)
 	if err != nil {
 		return nil, fmt.Errorf("读取响应失败: %w", err)
 	}
@@ -892,7 +913,7 @@ func (c *Client) FetchUserInfo(ctx context.Context, accessToken, projectID strin
 	}
 	defer func() { _ = resp.Body.Close() }()
 
-	respBody, err := io.ReadAll(resp.Body)
+	respBody, err := readAntigravityResponseBody(resp.Body, antigravityAPIResponseMaxBytes)
 	if err != nil {
 		return nil, fmt.Errorf("读取响应失败: %w", err)
 	}

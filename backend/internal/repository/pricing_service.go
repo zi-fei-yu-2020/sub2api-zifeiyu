@@ -4,7 +4,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"io"
 	"log/slog"
 	"net/http"
 	"strings"
@@ -14,6 +13,11 @@ import (
 	"github.com/Wei-Shaw/sub2api/internal/config"
 	"github.com/Wei-Shaw/sub2api/internal/pkg/httpclient"
 	"github.com/Wei-Shaw/sub2api/internal/service"
+)
+
+const (
+	pricingJSONResponseMaxBytes int64 = 32 << 20
+	pricingHashResponseMaxBytes int64 = 64 << 10
 )
 
 type pricingRemoteClient struct {
@@ -130,7 +134,11 @@ func (c *pricingRemoteClient) FetchPricingJSON(ctx context.Context, url string) 
 		return nil, fmt.Errorf("HTTP %d", resp.StatusCode)
 	}
 
-	return io.ReadAll(resp.Body)
+	body, err := readRepositoryResponseBody(resp.Body, pricingJSONResponseMaxBytes)
+	if err != nil {
+		return nil, fmt.Errorf("read pricing JSON response failed: %w", err)
+	}
+	return body, nil
 }
 
 func (c *pricingRemoteClient) FetchHashText(ctx context.Context, url string) (string, error) {
@@ -153,9 +161,9 @@ func (c *pricingRemoteClient) FetchHashText(ctx context.Context, url string) (st
 		return "", fmt.Errorf("HTTP %d", resp.StatusCode)
 	}
 
-	body, err := io.ReadAll(resp.Body)
+	body, err := readRepositoryResponseBody(resp.Body, pricingHashResponseMaxBytes)
 	if err != nil {
-		return "", err
+		return "", fmt.Errorf("read pricing hash response failed: %w", err)
 	}
 
 	// 哈希文件格式：hash  filename 或者纯 hash

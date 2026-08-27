@@ -90,7 +90,10 @@ func (s *AccountTestService) testCNProviderAdaptiveAnthropicConnection(c *gin.Co
 	}
 	defer func() { _ = resp.Body.Close() }()
 	if resp.StatusCode != http.StatusOK {
-		body, _ := io.ReadAll(resp.Body)
+		body, readErr := readAccountTestResponseBody(resp, accountTestJSONResponseMaxBytes)
+		if readErr != nil {
+			return s.sendErrorAndEnd(c, formatAccountTestResponseReadError("upstream error", readErr))
+		}
 		errMsg := fmt.Sprintf("Adaptive Anthropic endpoint returned %d: %s", resp.StatusCode, string(body))
 		if resp.StatusCode == http.StatusUnauthorized && s.accountRepo != nil {
 			_ = s.accountRepo.SetError(ctx, account.ID, errMsg)
@@ -183,7 +186,10 @@ func (s *AccountTestService) testCNProviderAdaptiveResponsesConnection(c *gin.Co
 	}
 	defer func() { _ = resp.Body.Close() }()
 	if resp.StatusCode != http.StatusOK {
-		body, _ := io.ReadAll(resp.Body)
+		body, readErr := readAccountTestResponseBody(resp, accountTestJSONResponseMaxBytes)
+		if readErr != nil {
+			return s.sendErrorAndEnd(c, formatAccountTestResponseReadError("upstream error", readErr))
+		}
 		errMsg := fmt.Sprintf("Adaptive Responses endpoint returned %d: %s", resp.StatusCode, string(body))
 		if resp.StatusCode == http.StatusUnauthorized && s.accountRepo != nil {
 			_ = s.accountRepo.SetError(ctx, account.ID, errMsg)
@@ -269,7 +275,10 @@ func (s *AccountTestService) testCNProviderAnthropicConnection(c *gin.Context, a
 	}
 	defer func() { _ = resp.Body.Close() }()
 	if resp.StatusCode != http.StatusOK {
-		body, _ := io.ReadAll(resp.Body)
+		body, readErr := readAccountTestResponseBody(resp, accountTestJSONResponseMaxBytes)
+		if readErr != nil {
+			return s.sendErrorAndEnd(c, formatAccountTestResponseReadError("upstream error", readErr))
+		}
 		errMsg := fmt.Sprintf("Anthropic endpoint returned %d: %s", resp.StatusCode, string(body))
 		if (resp.StatusCode == http.StatusUnauthorized || resp.StatusCode == http.StatusForbidden) && s.accountRepo != nil {
 			_ = s.accountRepo.SetError(ctx, account.ID, errMsg)

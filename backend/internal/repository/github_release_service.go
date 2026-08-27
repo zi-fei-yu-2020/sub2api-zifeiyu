@@ -16,6 +16,11 @@ import (
 	"github.com/Wei-Shaw/sub2api/internal/service"
 )
 
+const (
+	githubReleaseMetadataMaxBytes int64 = 4 << 20
+	githubChecksumFileMaxBytes    int64 = 1 << 20
+)
+
 type githubReleaseClient struct {
 	httpClient         *http.Client
 	downloadHTTPClient *http.Client
@@ -138,8 +143,12 @@ func (c *githubReleaseClient) FetchLatestRelease(ctx context.Context, repo strin
 		return nil, fmt.Errorf("GitHub API returned %d", resp.StatusCode)
 	}
 
+	body, err := readRepositoryResponseBody(resp.Body, githubReleaseMetadataMaxBytes)
+	if err != nil {
+		return nil, fmt.Errorf("read GitHub release response: %w", err)
+	}
 	var release service.GitHubRelease
-	if err := json.NewDecoder(resp.Body).Decode(&release); err != nil {
+	if err := json.Unmarshal(body, &release); err != nil {
 		return nil, err
 	}
 
@@ -170,8 +179,12 @@ func (c *githubReleaseClient) FetchRecentReleases(ctx context.Context, repo stri
 		return nil, fmt.Errorf("GitHub API returned %d", resp.StatusCode)
 	}
 
+	body, err := readRepositoryResponseBody(resp.Body, githubReleaseMetadataMaxBytes)
+	if err != nil {
+		return nil, fmt.Errorf("read GitHub releases response: %w", err)
+	}
 	var releases []*service.GitHubRelease
-	if err := json.NewDecoder(resp.Body).Decode(&releases); err != nil {
+	if err := json.Unmarshal(body, &releases); err != nil {
 		return nil, err
 	}
 
@@ -242,5 +255,9 @@ func (c *githubReleaseClient) FetchChecksumFile(ctx context.Context, url string)
 		return nil, fmt.Errorf("HTTP %d", resp.StatusCode)
 	}
 
-	return io.ReadAll(resp.Body)
+	body, err := readRepositoryResponseBody(resp.Body, githubChecksumFileMaxBytes)
+	if err != nil {
+		return nil, fmt.Errorf("read checksum file response: %w", err)
+	}
+	return body, nil
 }

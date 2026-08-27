@@ -246,6 +246,19 @@ func (s *GitHubReleaseServiceSuite) TestFetchChecksumFile_Success() {
 	require.Equal(s.T(), "sum", string(body), "checksum body mismatch")
 }
 
+func (s *GitHubReleaseServiceSuite) TestFetchChecksumFile_RejectsOversizedResponse() {
+	s.srv = newLocalTestServer(s.T(), http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusOK)
+		_, _ = w.Write(bytes.Repeat([]byte("a"), int(githubChecksumFileMaxBytes+1)))
+	}))
+
+	s.client = newTestGitHubReleaseClient()
+
+	_, err := s.client.FetchChecksumFile(context.Background(), s.srv.URL)
+	require.ErrorIs(s.T(), err, errRepositoryResponseBodyTooLarge)
+	require.ErrorContains(s.T(), err, "checksum file response")
+}
+
 func (s *GitHubReleaseServiceSuite) TestFetchChecksumFile_Non200() {
 	s.srv = newLocalTestServer(s.T(), http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusInternalServerError)

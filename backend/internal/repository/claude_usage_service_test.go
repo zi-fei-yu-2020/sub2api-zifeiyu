@@ -5,6 +5,7 @@ import (
 	"io"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/require"
@@ -95,6 +96,23 @@ func (s *ClaudeUsageServiceSuite) TestFetchUsage_BadJSON() {
 	_, err := s.fetcher.FetchUsage(context.Background(), "at", "")
 	require.Error(s.T(), err)
 	require.ErrorContains(s.T(), err, "decode response failed")
+}
+
+func (s *ClaudeUsageServiceSuite) TestFetchUsage_RejectsOversizedResponse() {
+	s.srv = newLocalTestServer(s.T(), http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = io.WriteString(w, strings.Repeat("x", int(claudeUsageResponseMaxBytes+1)))
+	}))
+
+	s.fetcher = &claudeUsageService{
+		usageURL:          s.srv.URL,
+		allowPrivateHosts: true,
+		allowInsecureHTTP: true,
+	}
+
+	_, err := s.fetcher.FetchUsage(context.Background(), "at", "")
+	require.ErrorIs(s.T(), err, errRepositoryResponseBodyTooLarge)
+	require.ErrorContains(s.T(), err, "Claude usage response")
 }
 
 func (s *ClaudeUsageServiceSuite) TestFetchUsage_ContextCancel() {

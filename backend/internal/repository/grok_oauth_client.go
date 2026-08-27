@@ -6,7 +6,6 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"io"
 	"net/http"
 	"net/url"
 	"os"
@@ -26,12 +25,13 @@ type grokOAuthClient struct {
 }
 
 const (
-	accountsBaseURL      = "https://accounts.x.ai"
-	loginRPCEndpoint     = accountsBaseURL + "/api/rpc"
-	turnstileWebsiteURL  = accountsBaseURL
-	turnstileWebsiteKey  = "0x4AAAAAAAhr9JGVDZbrZOo0"
-	yesCaptchaCreateTask = "https://api.yescaptcha.com/createTask"
-	yesCaptchaGetResult  = "https://api.yescaptcha.com/getTaskResult"
+	accountsBaseURL                 = "https://accounts.x.ai"
+	loginRPCEndpoint                = accountsBaseURL + "/api/rpc"
+	turnstileWebsiteURL             = accountsBaseURL
+	turnstileWebsiteKey             = "0x4AAAAAAAhr9JGVDZbrZOo0"
+	yesCaptchaCreateTask            = "https://api.yescaptcha.com/createTask"
+	yesCaptchaGetResult             = "https://api.yescaptcha.com/getTaskResult"
+	grokOAuthResponseMaxBytes int64 = 1 << 20
 )
 
 func NewGrokOAuthClient() service.GrokOAuthClient {
@@ -292,7 +292,11 @@ func solveTurnstile(ctx context.Context) (string, error) {
 		TaskID           string `json:"taskId"`
 		ErrorDescription string `json:"errorDescription"`
 	}
-	if err := json.NewDecoder(resp.Body).Decode(&createResp); err != nil {
+	createRespBody, err := readRepositoryResponseBody(resp.Body, grokOAuthResponseMaxBytes)
+	if err != nil {
+		return "", infraerrors.Newf(http.StatusBadGateway, "GROK_OAUTH_CAPTCHA_FAILED", "read captcha create response failed: %v", err)
+	}
+	if err := json.Unmarshal(createRespBody, &createResp); err != nil {
 		return "", infraerrors.Newf(http.StatusBadGateway, "GROK_OAUTH_CAPTCHA_FAILED", "decode captcha create response failed: %v", err)
 	}
 	if createResp.ErrorID != 0 || strings.TrimSpace(createResp.TaskID) == "" {
@@ -326,9 +330,15 @@ func solveTurnstile(ctx context.Context) (string, error) {
 				Token string `json:"token"`
 			} `json:"solution"`
 		}
-		err = json.NewDecoder(resp.Body).Decode(&pollResp)
+		pollRespBody, readErr := readRepositoryResponseBody(resp.Body, grokOAuthResponseMaxBytes)
 		_ = resp.Body.Close()
-		if err != nil {
+		if readErr != nil {
+			if errors.Is(readErr, errRepositoryResponseBodyTooLarge) {
+				return "", infraerrors.Newf(http.StatusBadGateway, "GROK_OAUTH_CAPTCHA_FAILED", "captcha poll response too large: %v", readErr)
+			}
+			continue
+		}
+		if err := json.Unmarshal(pollRespBody, &pollResp); err != nil {
 			continue
 		}
 		if pollResp.ErrorID != 0 {
@@ -374,7 +384,10 @@ func createGrokPasswordSession(ctx context.Context, client *http.Client, email, 
 		return "", infraerrors.Newf(http.StatusBadGateway, "GROK_OAUTH_PASSWORD_LOGIN_FAILED", "password login request failed: %v", err)
 	}
 	defer func() { _ = resp.Body.Close() }()
-	body, _ := io.ReadAll(resp.Body)
+	body, err := readRepositoryResponseBody(resp.Body, grokOAuthResponseMaxBytes)
+	if err != nil {
+		return "", infraerrors.Newf(http.StatusBadGateway, "GROK_OAUTH_PASSWORD_LOGIN_FAILED", "read password login response failed: %v", err)
+	}
 	if resp.StatusCode != http.StatusOK {
 		return "", infraerrors.Newf(http.StatusBadGateway, "GROK_OAUTH_PASSWORD_LOGIN_FAILED", "password login returned status %d: %s", resp.StatusCode, logredact.RedactText(string(body)))
 	}

@@ -93,6 +93,17 @@ func (s *PricingServiceSuite) TestFetchHashText_NonOKStatus() {
 	require.Error(s.T(), err, "expected error for non-200 status")
 }
 
+func (s *PricingServiceSuite) TestFetchHashText_RejectsOversizedResponse() {
+	s.setupServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusOK)
+		_, _ = w.Write([]byte(strings.Repeat("a", int(pricingHashResponseMaxBytes+1))))
+	}))
+
+	_, err := s.client.FetchHashText(s.ctx, s.srv.URL+"/oversized-hash")
+	require.ErrorIs(s.T(), err, errRepositoryResponseBodyTooLarge)
+	require.ErrorContains(s.T(), err, "pricing hash response")
+}
+
 func (s *PricingServiceSuite) TestFetchPricingJSON_InvalidURL() {
 	_, err := s.client.FetchPricingJSON(s.ctx, "://invalid-url")
 	require.Error(s.T(), err, "expected error for invalid URL")

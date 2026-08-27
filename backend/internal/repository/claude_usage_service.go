@@ -4,7 +4,6 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"io"
 	"net/http"
 	"time"
 
@@ -13,7 +12,10 @@ import (
 	"github.com/Wei-Shaw/sub2api/internal/service"
 )
 
-const defaultClaudeUsageURL = "https://api.anthropic.com/api/oauth/usage"
+const (
+	defaultClaudeUsageURL             = "https://api.anthropic.com/api/oauth/usage"
+	claudeUsageResponseMaxBytes int64 = 1 << 20
+)
 
 // 默认 User-Agent，与用户抓包的请求一致
 const defaultUsageUserAgent = "claude-code/2.1.7"
@@ -95,14 +97,17 @@ func (s *claudeUsageService) FetchUsageWithOptions(ctx context.Context, opts *se
 	}
 	defer func() { _ = resp.Body.Close() }()
 
+	body, err := readRepositoryResponseBody(resp.Body, claudeUsageResponseMaxBytes)
+	if err != nil {
+		return nil, fmt.Errorf("read Claude usage response failed: %w", err)
+	}
 	if resp.StatusCode != http.StatusOK {
-		body, _ := io.ReadAll(resp.Body)
 		msg := fmt.Sprintf("API returned status %d: %s", resp.StatusCode, string(body))
 		return nil, infraerrors.New(http.StatusInternalServerError, "UPSTREAM_ERROR", msg)
 	}
 
 	var usageResp service.ClaudeUsageResponse
-	if err := json.NewDecoder(resp.Body).Decode(&usageResp); err != nil {
+	if err := json.Unmarshal(body, &usageResp); err != nil {
 		return nil, fmt.Errorf("decode response failed: %w", err)
 	}
 

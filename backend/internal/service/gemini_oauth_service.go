@@ -5,7 +5,6 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"io"
 	"net/http"
 	"regexp"
 	"strconv"
@@ -19,6 +18,8 @@ import (
 )
 
 const (
+	geminiOAuthResourceManagerResponseMaxBytes int64 = 1 << 20
+
 	// Canonical tier IDs used by sub2api (2026-aligned).
 	GeminiTierGoogleOneFree    = "google_one_free"
 	GeminiTierGoogleAIPro      = "google_ai_pro"
@@ -1054,8 +1055,11 @@ func fetchProjectIDFromResourceManager(ctx context.Context, accessToken, proxyUR
 	}
 	defer func() { _ = resp.Body.Close() }()
 
-	bodyBytes, err := io.ReadAll(resp.Body)
+	bodyBytes, err := readUpstreamResponseBodyLimited(resp.Body, geminiOAuthResourceManagerResponseMaxBytes)
 	if err != nil {
+		if errors.Is(err, ErrUpstreamResponseBodyTooLarge) {
+			return "", fmt.Errorf("resource manager response exceeds %d-byte limit: %w", geminiOAuthResourceManagerResponseMaxBytes, err)
+		}
 		return "", fmt.Errorf("failed to read resource manager response: %w", err)
 	}
 
