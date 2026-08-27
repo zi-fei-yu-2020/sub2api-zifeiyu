@@ -24,7 +24,7 @@ func TestAdminGroupLivePolicyRequiresExplicitFree(t *testing.T) {
 	}{
 		{name: "disabled by default", cfg: &config.Config{}, allowLive: true, wantCode: "LIVE_BILLING_POLICY_DISABLED"},
 		{name: "nil config fails closed", cfg: nil, allowLive: true, wantCode: "LIVE_BILLING_POLICY_DISABLED"},
-		{name: "explicit free permits enablement", cfg: &config.Config{Gateway: config.GatewayConfig{Live: config.GatewayLiveConfig{BillingPolicy: config.LiveBillingPolicyExplicitFree, BillingPolicyExplicit: true}}}, allowLive: true},
+		{name: "explicit free permits enablement", cfg: explicitFreeLiveConfigForTest(), allowLive: true},
 		{name: "disabling remains allowed", cfg: nil, allowLive: false},
 	}
 	for _, tt := range tests {
