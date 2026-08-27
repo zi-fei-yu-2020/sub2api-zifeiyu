@@ -131,4 +131,23 @@ describe('AirwallexPaymentView', () => {
     expect(airwallexInit).not.toHaveBeenCalled()
     expect(wrapper.text()).toContain('payment.airwallexMissingParams')
   })
+
+  it('rejects an unsafe redirect returned by the Airwallex SDK', async () => {
+    routeState.query = {
+      order_id: '101',
+      out_trade_no: 'sub2_awx_101',
+      resume_token: 'resume-awx',
+    }
+    window.localStorage.setItem(
+      PAYMENT_RECOVERY_STORAGE_KEY,
+      JSON.stringify(airwallexSnapshot()),
+    )
+    redirectToCheckout.mockReturnValue('javascript:alert(1)')
+
+    const wrapper = mountView()
+    await flushPromises()
+    await flushPromises()
+
+    expect(wrapper.text()).toContain('Airwallex returned an invalid redirect URL')
+  })
 })

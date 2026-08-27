@@ -35,6 +35,7 @@ import {
   readPaymentRecoverySnapshot,
   type PaymentRecoverySnapshot,
 } from '@/components/payment/paymentFlow'
+import { normalizePaymentRedirectURL } from '@/components/payment/paymentRedirect'
 
 const { t, locale } = useI18n()
 const route = useRoute()
@@ -121,7 +122,11 @@ onMounted(async () => {
     const redirectResult = result.payments.redirectToCheckout(checkoutOptions)
 
     if (typeof redirectResult === 'string' && redirectResult) {
-      window.location.assign(redirectResult)
+      const safeRedirectURL = normalizePaymentRedirectURL(redirectResult)
+      if (!safeRedirectURL) {
+        throw new Error('Airwallex returned an invalid redirect URL')
+      }
+      window.location.assign(safeRedirectURL)
     }
   } catch (err: unknown) {
     loading.value = false

@@ -457,7 +457,13 @@ func (s *PaymentService) invokeProvider(ctx context.Context, order *dbent.Paymen
 		}
 		return nil, classifyCreatePaymentError(req, sel.ProviderKey, err)
 	}
-	sanitizeCreatePaymentResponseDetails(pr)
+	if err := sanitizeCreatePaymentResponseDetails(pr); err != nil {
+		slog.Error("[PaymentService] provider returned unsafe payment details", "provider", sel.ProviderKey, "instance", sel.InstanceID, "error", err)
+		return nil, infraerrors.ServiceUnavailable(
+			"PAYMENT_GATEWAY_INVALID_REDIRECT",
+			"payment gateway returned an invalid redirect URL",
+		)
+	}
 	_, err = s.entClient.PaymentOrder.UpdateOneID(order.ID).
 		SetNillablePaymentTradeNo(psNilIfEmpty(pr.TradeNo)).
 		SetNillablePayURL(psNilIfEmpty(pr.PayURL)).
@@ -494,13 +500,20 @@ func shouldUseAlipayMobilePrecreate(req CreateOrderRequest, cfg *PaymentConfig, 
 		strings.EqualFold(strings.TrimSpace(sel.ProviderKey), payment.TypeAlipay)
 }
 
-func sanitizeCreatePaymentResponseDetails(pr *payment.CreatePaymentResponse) {
+func sanitizeCreatePaymentResponseDetails(pr *payment.CreatePaymentResponse) error {
 	if pr == nil {
-		return
+		return nil
 	}
 	pr.TradeNo = removePostgresTextNUL(pr.TradeNo)
-	pr.PayURL = removePostgresTextNUL(pr.PayURL)
-	pr.QRCode = removePostgresTextNUL(pr.QRCode)
+
+	payURL, err := payment.NormalizeRedirectURL(removePostgresTextNUL(pr.PayURL))
+	if err != nil {
+		pr.PayURL = ""
+		return fmt.Errorf("validate pay_url: %w", err)
+	}
+	pr.PayURL = payURL
+	pr.QRCode = payment.NormalizeQRCodeContent(pr.QRCode)
+	return nil
 }
 
 func removePostgresTextNUL(value string) string {
@@ -594,6 +607,10 @@ func (s *PaymentService) buildWeChatOAuthRequiredResponse(ctx context.Context, r
 	authorizeURL, err := buildWeChatPaymentOAuthStartURL(req, "snsapi_base")
 	if err != nil {
 		return nil, err
+	}
+	authorizeURL, err = payment.NormalizeRedirectURL(authorizeURL)
+	if err != nil {
+		return nil, fmt.Errorf("validate wechat payment OAuth redirect: %w", err)
 	}
 
 	return &CreateOrderResponse{
@@ -739,7 +756,7 @@ func buildCreateOrderResponse(order *dbent.PaymentOrder, req CreateOrderRequest,
 		ResultType:   resultType,
 		PaymentType:  req.PaymentType,
 		OutTradeNo:   order.OutTradeNo,
-		PayURL:       pr.PayURL,
+		PayURL:       paymentRedirectURLForResponse(pr.PayURL),
 		QRCode:       pr.QRCode,
 		ClientSecret: pr.ClientSecret,
 		IntentID:     pr.IntentID,
@@ -752,6 +769,14 @@ func buildCreateOrderResponse(order *dbent.PaymentOrder, req CreateOrderRequest,
 		ExpiresAt:    order.ExpiresAt,
 		PaymentMode:  sel.PaymentMode,
 	}
+}
+
+func paymentRedirectURLForResponse(value string) string {
+	normalized, err := payment.NormalizeRedirectURL(value)
+	if err != nil {
+		return ""
+	}
+	return normalized
 }
 
 func buildWeChatPaymentOAuthStartURL(req CreateOrderRequest, scope string) (string, error) {

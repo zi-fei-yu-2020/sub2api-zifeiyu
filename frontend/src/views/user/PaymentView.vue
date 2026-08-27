@@ -272,6 +272,7 @@ import AppLayout from '@/components/layout/AppLayout.vue'
 import AmountInput from '@/components/payment/AmountInput.vue'
 import PaymentMethodSelector from '@/components/payment/PaymentMethodSelector.vue'
 import { METHOD_ORDER, getPaymentPopupFeatures, isBuiltInAlipayMethod, isBuiltInWxpayMethod } from '@/components/payment/providerConfig'
+import { normalizePaymentRedirectURL } from '@/components/payment/paymentRedirect'
 import {
   PAYMENT_RECOVERY_STORAGE_KEY,
   buildCreateOrderPayload,
@@ -443,7 +444,7 @@ function buildWechatOAuthAuthorizeUrl(
   authorizeUrl: string,
   context: { paymentType: string; orderType: OrderType; planId?: number; orderAmount: number },
 ): string {
-  const normalizedUrl = authorizeUrl.trim()
+  const normalizedUrl = normalizePaymentRedirectURL(authorizeUrl)
   if (!normalizedUrl || typeof window === 'undefined') {
     return normalizedUrl
   }
@@ -470,10 +471,21 @@ function buildWechatOAuthAuthorizeUrl(
     }
 
     targetUrl.searchParams.set('redirect', `${redirectUrl.pathname}${redirectUrl.search}`)
-    return targetUrl.toString()
+    const result = normalizedUrl.startsWith('/')
+      ? `${targetUrl.pathname}${targetUrl.search}${targetUrl.hash}`
+      : targetUrl.toString()
+    return normalizePaymentRedirectURL(result)
   } catch {
-    return normalizedUrl
+    return ''
   }
+}
+
+function assignPaymentRedirect(url: string): void {
+  const safeURL = normalizePaymentRedirectURL(url)
+  if (!safeURL) {
+    throw new Error('Invalid payment redirect URL')
+  }
+  window.location.href = safeURL
 }
 
 function onPaymentDone() {
@@ -790,9 +802,13 @@ async function createOrder(orderAmount: number, orderType: OrderType, planId?: n
 
     const result = await paymentStore.createOrder(payload) as CreateOrderResult & { resume_token?: string }
     const openWindow = (url: string) => {
-      const win = window.open(url, 'paymentPopup', getPaymentPopupFeatures())
+      const safeURL = normalizePaymentRedirectURL(url)
+      if (!safeURL) {
+        throw new Error('Invalid payment redirect URL')
+      }
+      const win = window.open(safeURL, 'paymentPopup', getPaymentPopupFeatures())
       if (!win || win.closed) {
-        window.location.href = url
+        assignPaymentRedirect(safeURL)
       }
     }
     const visibleMethod = normalizeVisibleMethod(requestType) || requestType
@@ -835,12 +851,12 @@ async function createOrder(orderAmount: number, orderType: OrderType, planId?: n
     })
 
     if (decision.kind === 'wechat_oauth' && decision.oauth?.authorize_url) {
-      window.location.href = buildWechatOAuthAuthorizeUrl(decision.oauth.authorize_url, {
+      assignPaymentRedirect(buildWechatOAuthAuthorizeUrl(decision.oauth.authorize_url, {
         paymentType: visibleMethod,
         orderType,
         planId,
         orderAmount,
-      })
+      }))
       return
     }
 
@@ -858,11 +874,11 @@ async function createOrder(orderAmount: number, orderType: OrderType, planId?: n
       return
     }
     if (decision.kind === 'stripe_route') {
-      window.location.href = decision.paymentState.payUrl
+      assignPaymentRedirect(decision.paymentState.payUrl)
       return
     }
     if (decision.kind === 'airwallex_route') {
-      window.location.href = decision.paymentState.payUrl
+      assignPaymentRedirect(decision.paymentState.payUrl)
       return
     }
     if (decision.kind === 'wechat_jsapi' && decision.jsapi) {
@@ -909,7 +925,7 @@ async function createOrder(orderAmount: number, orderType: OrderType, planId?: n
     }
     if (decision.kind === 'redirect_waiting' && decision.paymentState.payUrl) {
       if (isMobileDevice()) {
-        window.location.href = decision.paymentState.payUrl
+        assignPaymentRedirect(decision.paymentState.payUrl)
         return
       }
       openWindow(decision.paymentState.payUrl)

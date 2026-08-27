@@ -71,6 +71,7 @@ import { extractI18nErrorMessage } from '@/utils/apiError'
 import { paymentAPI } from '@/api/payment'
 import { useAppStore } from '@/stores'
 import { getPaymentPopupFeatures } from '@/components/payment/providerConfig'
+import { normalizePaymentRedirectURL } from '@/components/payment/paymentRedirect'
 import { currencySymbol } from '@/components/payment/currency'
 import type { Stripe, StripeElements } from '@stripe/stripe-js'
 import Icon from '@/components/icons/Icon.vue'
@@ -147,14 +148,18 @@ async function handlePay() {
 
   // Alipay / WeChat Pay: open popup for redirect or QR display
   if (POPUP_METHODS.has(selectedType.value)) {
-    const popupUrl = router.resolve({
+    const popupUrl = normalizePaymentRedirectURL(router.resolve({
       path: '/payment/stripe-popup',
       query: {
         order_id: String(props.orderId),
         method: selectedType.value,
         amount: String(props.payAmount),
       },
-    }).href
+    }).href)
+    if (!popupUrl) {
+      error.value = t('payment.result.failed')
+      return
+    }
     const popup = window.open(popupUrl, 'paymentPopup', getPaymentPopupFeatures())
 
     const onReady = (event: MessageEvent) => {

@@ -103,6 +103,22 @@ func TestBuildCreateOrderResponseDefaultsToOrderCreated(t *testing.T) {
 	}
 }
 
+func TestBuildCreateOrderResponseDoesNotExposeUnsafePayURL(t *testing.T) {
+	t.Parallel()
+
+	resp := buildCreateOrderResponse(
+		&dbent.PaymentOrder{ID: 43, ExpiresAt: time.Now().Add(time.Hour)},
+		CreateOrderRequest{PaymentType: payment.TypeAlipay},
+		10,
+		&payment.InstanceSelection{},
+		&payment.CreatePaymentResponse{PayURL: "javascript:alert(1)"},
+		payment.CreatePaymentResultOrderCreated,
+	)
+	if resp.PayURL != "" {
+		t.Fatalf("unsafe pay_url exposed in response: %q", resp.PayURL)
+	}
+}
+
 func TestBuildCreateOrderResponseCopiesJSAPIPayload(t *testing.T) {
 	t.Parallel()
 
@@ -154,7 +170,9 @@ func TestSanitizeCreatePaymentResponseDetailsRemovesNULBytes(t *testing.T) {
 		ClientSecret: "secret\x00unchanged",
 	}
 
-	sanitizeCreatePaymentResponseDetails(resp)
+	if err := sanitizeCreatePaymentResponseDetails(resp); err != nil {
+		t.Fatalf("sanitizeCreatePaymentResponseDetails() error = %v", err)
+	}
 
 	if strings.ContainsRune(resp.TradeNo, 0) {
 		t.Fatalf("trade_no still contains NUL: %q", resp.TradeNo)
@@ -176,6 +194,53 @@ func TestSanitizeCreatePaymentResponseDetailsRemovesNULBytes(t *testing.T) {
 	}
 	if resp.ClientSecret != "secret\x00unchanged" {
 		t.Fatalf("client_secret = %q, should not be touched by payment detail sanitization", resp.ClientSecret)
+	}
+}
+
+func TestSanitizeCreatePaymentResponseDetailsRejectsUnsafePayURL(t *testing.T) {
+	t.Parallel()
+
+	for _, payURL := range []string{
+		"javascript:alert(1)",
+		"data:text/html,boom",
+		"file:///tmp/payment",
+		"blob:https://merchant.example/id",
+		"//evil.example/checkout",
+		"https:///missing-host",
+		"https://pay.example.com/checkout%0d%0aX-Test",
+	} {
+		payURL := payURL
+		t.Run(payURL, func(t *testing.T) {
+			t.Parallel()
+			resp := &payment.CreatePaymentResponse{
+				PayURL: payURL,
+				QRCode: "weixin://wxpay/bizpayurl?pr=test",
+			}
+			if err := sanitizeCreatePaymentResponseDetails(resp); err == nil {
+				t.Fatalf("sanitizeCreatePaymentResponseDetails(%q) error = nil, want error", payURL)
+			}
+			if resp.PayURL != "" {
+				t.Fatalf("unsafe pay_url remained in response: %q", resp.PayURL)
+			}
+		})
+	}
+}
+
+func TestSanitizeCreatePaymentResponseDetailsAllowsSameSitePathAndDedicatedQRCodeScheme(t *testing.T) {
+	t.Parallel()
+
+	resp := &payment.CreatePaymentResponse{
+		PayURL: "/payment/airwallex?order_id=42",
+		QRCode: "alipays://platformapi/startapp?saId=10000007",
+	}
+	if err := sanitizeCreatePaymentResponseDetails(resp); err != nil {
+		t.Fatalf("sanitizeCreatePaymentResponseDetails() error = %v", err)
+	}
+	if resp.PayURL != "/payment/airwallex?order_id=42" {
+		t.Fatalf("pay_url = %q", resp.PayURL)
+	}
+	if resp.QRCode != "alipays://platformapi/startapp?saId=10000007" {
+		t.Fatalf("qr_code = %q", resp.QRCode)
 	}
 }
 

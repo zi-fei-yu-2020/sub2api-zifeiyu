@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest'
 import type { CreateOrderResult, MethodLimit } from '@/types/payment'
 import {
   buildCreateOrderPayload,
+  createPaymentRecoverySnapshot,
   decidePaymentLaunch,
   getVisibleMethods,
   readPaymentRecoverySnapshot,
@@ -158,6 +159,22 @@ describe('decidePaymentLaunch', () => {
     expect(decision.recovery.paymentMode).toBe('popup')
     expect(decision.recovery.outTradeNo).toBe('sub2_abc')
     expect(decision.recovery.resumeToken).toBe('resume-2')
+  })
+
+  it('rejects unsafe provider pay_url while preserving QR payloads', () => {
+    const decision = decidePaymentLaunch(createOrderResult({
+      pay_url: 'javascript:alert(1)',
+      qr_code: 'weixin://wxpay/bizpayurl?pr=safe-qr',
+      payment_mode: 'redirect',
+    }), {
+      visibleMethod: 'wxpay',
+      orderType: 'balance',
+      isMobile: true,
+    })
+
+    expect(decision.kind).toBe('qr_waiting')
+    expect(decision.paymentState.payUrl).toBe('')
+    expect(decision.paymentState.qrCode).toBe('weixin://wxpay/bizpayurl?pr=safe-qr')
   })
 
   it('prefers redirect on mobile when both pay_url and qr_code are present', () => {
@@ -403,6 +420,31 @@ describe('readPaymentRecoverySnapshot', () => {
     })
 
     expect(restored?.orderId).toBe(33)
+  })
+
+  it('drops unsafe redirect URLs restored from local storage', () => {
+    const snapshot = createPaymentRecoverySnapshot({
+      orderId: 109,
+      amount: 20,
+      qrCode: 'weixin://wxpay/bizpayurl?pr=recovered',
+      expiresAt: '2099-01-01T00:10:00.000Z',
+      paymentType: 'wxpay',
+      payUrl: 'data:text/html,boom',
+      outTradeNo: 'sub2_109',
+      clientSecret: '',
+      intentId: '',
+      currency: 'CNY',
+      countryCode: 'CN',
+      paymentEnv: '',
+      payAmount: 20,
+      orderType: 'balance',
+      paymentMode: 'qrcode',
+      resumeToken: '',
+    }, Date.UTC(2098, 0, 1))
+
+    const restored = readPaymentRecoverySnapshot(JSON.stringify(snapshot), { now: Date.UTC(2098, 0, 2) })
+    expect(restored?.payUrl).toBe('')
+    expect(restored?.qrCode).toBe('weixin://wxpay/bizpayurl?pr=recovered')
   })
 
   it('drops expired or mismatched recovery snapshots', () => {

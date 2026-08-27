@@ -185,6 +185,27 @@ describe('PaymentStatusPanel', () => {
     expect(wrapper.emitted('success')).toHaveLength(1)
   })
 
+  it('hides the reopen action for an unsafe payUrl', async () => {
+    const openSpy = vi.spyOn(window, 'open').mockReturnValue({ closed: false } as Window)
+    const wrapper = mount(PaymentStatusPanel, {
+      props: {
+        orderId: 42,
+        qrCode: 'https://pay.example.com/qr/42',
+        payUrl: 'javascript:alert(1)',
+        expiresAt: '2099-01-01T12:30:00Z',
+        paymentType: 'alipay',
+        orderType: 'balance',
+      },
+      global: { stubs: { Icon: true } },
+    })
+
+    await flushPromises()
+    expect(wrapper.text()).not.toContain('payment.qr.openPayWindow')
+    expect(openSpy).not.toHaveBeenCalled()
+    wrapper.unmount()
+    openSpy.mockRestore()
+  })
+
   it('actively verifies a pending mobile Alipay precreate order', async () => {
     const originalLocation = window.location
     const originalHidden = Object.getOwnPropertyDescriptor(document, 'hidden')
