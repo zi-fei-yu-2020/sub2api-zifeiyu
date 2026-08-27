@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"errors"
 	"io"
 	"net/http"
 	"net/http/httptest"
@@ -660,4 +661,31 @@ func TestAntigravityCompatKeepaliveAfterFirstEvent(t *testing.T) {
 	require.Contains(t, recorder.Body.String(), ": ping\n\n")
 	require.Contains(t, recorder.Header().Get("Content-Type"), "text/event-stream")
 	require.NoError(t, reader.Close())
+}
+
+func TestAntigravityForwardUpstreamRejectsOversizedNonStreamingResponse(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	body := []byte(`{"model":"claude-sonnet-4-5","stream":false,"messages":[{"role":"user","content":"hello"}]}`)
+	recorder := httptest.NewRecorder()
+	c, _ := gin.CreateTestContext(recorder)
+	c.Request = httptest.NewRequest(http.MethodPost, "/v1/messages", bytes.NewReader(body))
+
+	upstream := &httpUpstreamStub{resp: &http.Response{
+		StatusCode: http.StatusOK,
+		Header:     http.Header{"Content-Type": []string{"application/json"}},
+		Body:       io.NopCloser(strings.NewReader("toolong")),
+	}}
+	svc := newAntigravityCompatService(config.GatewayConfig{UpstreamResponseReadMaxBytes: 4}, upstream)
+	account := &Account{
+		ID: 903, Name: "antigravity-upstream", Platform: PlatformAntigravity,
+		Type: AccountTypeAPIKey, Status: StatusActive, Concurrency: 1,
+		Credentials: map[string]any{"base_url": "https://upstream.example", "api_key": "secret"},
+	}
+
+	result, err := svc.ForwardUpstream(context.Background(), c, account, body)
+	require.Nil(t, result)
+	require.Error(t, err)
+	require.True(t, errors.Is(err, ErrUpstreamResponseBodyTooLarge))
+	require.Equal(t, http.StatusBadGateway, recorder.Code)
+	require.Contains(t, recorder.Body.String(), "Upstream response too large")
 }

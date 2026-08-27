@@ -6,12 +6,12 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"io"
 	"net/http"
 	"strings"
 	"sync/atomic"
 	"time"
 
+	"github.com/Wei-Shaw/sub2api/internal/config"
 	"github.com/Wei-Shaw/sub2api/internal/pkg/antigravity"
 	"github.com/Wei-Shaw/sub2api/internal/pkg/logger"
 	"github.com/gin-gonic/gin"
@@ -124,7 +124,11 @@ func (s *AntigravityGatewayService) ForwardUpstream(ctx context.Context, c *gin.
 		clientDisconnect = streamRes.clientDisconnect
 	} else {
 		// 非流式响应：直接透传
-		respBody, err := io.ReadAll(resp.Body)
+		var cfg *config.Config
+		if s.settingService != nil {
+			cfg = s.settingService.cfg
+		}
+		respBody, err := ReadUpstreamResponseBody(resp.Body, cfg, c, anthropicTooLargeError)
 		if err != nil {
 			return nil, fmt.Errorf("read upstream response: %w", err)
 		}

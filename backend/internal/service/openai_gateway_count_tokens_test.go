@@ -407,3 +407,70 @@ func maxLocalInt(a, b int) int {
 	}
 	return b
 }
+
+func TestOpenAIGatewayService_InputTokensRejectsOversizedUpstreamResponses(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+
+	t.Run("native responses input tokens", func(t *testing.T) {
+		body := []byte(`{"model":"gpt-5","input":"hello"}`)
+		recorder := httptest.NewRecorder()
+		c, _ := gin.CreateTestContext(recorder)
+		c.Request = httptest.NewRequest(http.MethodPost, "/v1/responses/input_tokens", bytes.NewReader(body))
+
+		upstream := &httpUpstreamRecorder{resp: &http.Response{
+			StatusCode: http.StatusOK,
+			Header:     http.Header{"Content-Type": []string{"application/json"}},
+			Body:       io.NopCloser(strings.NewReader("toolong")),
+		}}
+		svc := &OpenAIGatewayService{
+			cfg:          &config.Config{Gateway: config.GatewayConfig{UpstreamResponseReadMaxBytes: 4}},
+			httpUpstream: upstream,
+		}
+		account := &Account{
+			ID:          901,
+			Platform:    PlatformOpenAI,
+			Type:        AccountTypeOAuth,
+			Concurrency: 1,
+			Credentials: map[string]any{"access_token": "oauth-token"},
+			Status:      StatusActive,
+			Schedulable: true,
+		}
+
+		err := svc.ForwardResponsesInputTokens(context.Background(), c, account, body)
+		require.ErrorIs(t, err, ErrUpstreamResponseBodyTooLarge)
+		require.Equal(t, http.StatusBadGateway, recorder.Code)
+		require.Contains(t, recorder.Body.String(), "Upstream response too large")
+	})
+
+	t.Run("anthropic count tokens bridge", func(t *testing.T) {
+		body := []byte(`{"model":"claude-sonnet-4-5","messages":[{"role":"user","content":"hello"}]}`)
+		recorder := httptest.NewRecorder()
+		c, _ := gin.CreateTestContext(recorder)
+		c.Request = httptest.NewRequest(http.MethodPost, "/v1/messages/count_tokens", bytes.NewReader(body))
+
+		upstream := &httpUpstreamRecorder{resp: &http.Response{
+			StatusCode: http.StatusOK,
+			Header:     http.Header{"Content-Type": []string{"application/json"}},
+			Body:       io.NopCloser(strings.NewReader("toolong")),
+		}}
+		svc := &OpenAIGatewayService{
+			cfg: &config.Config{
+				Gateway: config.GatewayConfig{UpstreamResponseReadMaxBytes: 4},
+				Security: config.SecurityConfig{URLAllowlist: config.URLAllowlistConfig{
+					Enabled: false, AllowInsecureHTTP: true,
+				}},
+			},
+			httpUpstream: upstream,
+		}
+		account := &Account{
+			ID: 902, Platform: PlatformOpenAI, Type: AccountTypeAPIKey, Concurrency: 1,
+			Credentials: map[string]any{"api_key": "sk-test", "base_url": "http://upstream.example"},
+			Status:      StatusActive, Schedulable: true,
+		}
+
+		err := svc.ForwardCountTokensAsAnthropic(context.Background(), c, account, body, "gpt-5.4")
+		require.ErrorIs(t, err, ErrUpstreamResponseBodyTooLarge)
+		require.Equal(t, http.StatusBadGateway, recorder.Code)
+		require.Contains(t, recorder.Body.String(), "Upstream response too large")
+	})
+}
