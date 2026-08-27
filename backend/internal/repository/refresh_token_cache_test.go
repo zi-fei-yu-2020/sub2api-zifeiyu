@@ -190,7 +190,7 @@ func TestRefreshTokenCacheWrongTypeIndexFailsBeforeConsumption(t *testing.T) {
 	data := testRefreshTokenData(111, "family-wrong-type", time.Now().Add(time.Hour))
 
 	require.NoError(t, cache.StoreRefreshToken(ctx, oldHash, data, time.Hour))
-	server.Set(userRefreshTokensKey(data.UserID), "not-a-set")
+	require.NoError(t, server.Set(userRefreshTokensKey(data.UserID), "not-a-set"))
 
 	result, err := cache.RotateRefreshToken(ctx, oldHash, newHash, data, time.Hour, time.Now())
 	require.Error(t, err)
