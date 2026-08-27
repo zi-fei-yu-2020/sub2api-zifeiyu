@@ -1684,6 +1684,15 @@ type TokenPairWithUser struct {
 	UserRole string
 }
 
+const refreshTokenReuseGracePeriod = 10 * time.Second
+
+type refreshTokenMaterial struct {
+	RawToken  string
+	TokenHash string
+	Data      *RefreshTokenData
+	TTL       time.Duration
+}
+
 // GenerateTokenPair 生成Access Token和Refresh Token对
 // familyID: 可选的Token家族ID，用于Token轮转时保持家族关系
 func (s *AuthService) GenerateTokenPair(ctx context.Context, user *User, familyID string) (*TokenPair, error) {
@@ -1723,119 +1732,107 @@ func (s *AuthService) GenerateTokenPair(ctx context.Context, user *User, familyI
 
 // generateRefreshToken 生成并存储Refresh Token
 func (s *AuthService) generateRefreshToken(ctx context.Context, user *User, familyID string) (string, error) {
-	// 生成随机Token
-	tokenBytes := make([]byte, 32)
-	if _, err := rand.Read(tokenBytes); err != nil {
-		return "", fmt.Errorf("generate random bytes: %w", err)
-	}
-	rawToken := refreshTokenPrefix + hex.EncodeToString(tokenBytes)
-
-	// 计算Token哈希（存储哈希而非原始Token）
-	tokenHash := hashToken(rawToken)
-
-	// 如果没有提供familyID，生成新的
-	if familyID == "" {
-		familyBytes := make([]byte, 16)
-		if _, err := rand.Read(familyBytes); err != nil {
-			return "", fmt.Errorf("generate family id: %w", err)
-		}
-		familyID = hex.EncodeToString(familyBytes)
+	material, err := s.newRefreshTokenMaterial(ctx, user, familyID)
+	if err != nil {
+		return "", err
 	}
 
-	now := time.Now()
-	ttl := time.Duration(s.cfg.JWT.RefreshTokenExpireDays) * 24 * time.Hour
-
-	data := &RefreshTokenData{
-		UserID:       user.ID,
-		TokenVersion: resolvedTokenVersion(user),
-		FamilyID:     familyID,
-		BindingHash:  sessionBindingHashFromContext(ctx),
-		CreatedAt:    now,
-		ExpiresAt:    now.Add(ttl),
-	}
-
-	// 存储Token数据
-	if err := s.refreshTokenCache.StoreRefreshToken(ctx, tokenHash, data, ttl); err != nil {
+	if err := s.refreshTokenCache.StoreRefreshToken(ctx, material.TokenHash, material.Data, material.TTL); err != nil {
 		return "", fmt.Errorf("store refresh token: %w", err)
 	}
 
-	// 添加到用户Token集合
-	if err := s.refreshTokenCache.AddToUserTokenSet(ctx, user.ID, tokenHash, ttl); err != nil {
+	if err := s.refreshTokenCache.AddToUserTokenSet(ctx, user.ID, material.TokenHash, material.TTL); err != nil {
 		logger.LegacyPrintf("service.auth", "[Auth] Failed to add token to user set: %v", err)
-		// 不影响主流程
 	}
-
-	// 添加到家族Token集合
-	if err := s.refreshTokenCache.AddToFamilyTokenSet(ctx, familyID, tokenHash, ttl); err != nil {
+	if err := s.refreshTokenCache.AddToFamilyTokenSet(ctx, material.Data.FamilyID, material.TokenHash, material.TTL); err != nil {
 		logger.LegacyPrintf("service.auth", "[Auth] Failed to add token to family set: %v", err)
-		// 不影响主流程
 	}
 
-	return rawToken, nil
+	return material.RawToken, nil
+}
+
+func (s *AuthService) newRefreshTokenMaterial(ctx context.Context, user *User, familyID string) (*refreshTokenMaterial, error) {
+	if user == nil {
+		return nil, errors.New("refresh token user is required")
+	}
+	if familyID == "" {
+		familyBytes := make([]byte, 16)
+		if _, err := rand.Read(familyBytes); err != nil {
+			return nil, fmt.Errorf("generate family id: %w", err)
+		}
+		familyID = hex.EncodeToString(familyBytes)
+	}
+	tokenBytes := make([]byte, 32)
+	if _, err := rand.Read(tokenBytes); err != nil {
+		return nil, fmt.Errorf("generate random bytes: %w", err)
+	}
+	rawToken := refreshTokenPrefix + hex.EncodeToString(tokenBytes)
+	now := time.Now()
+	ttl := time.Duration(s.cfg.JWT.RefreshTokenExpireDays) * 24 * time.Hour
+	if ttl <= 0 {
+		return nil, errors.New("refresh token ttl must be positive")
+	}
+	return &refreshTokenMaterial{
+		RawToken:  rawToken,
+		TokenHash: hashToken(rawToken),
+		TTL:       ttl,
+		Data: &RefreshTokenData{
+			UserID:       user.ID,
+			TokenVersion: resolvedTokenVersion(user),
+			FamilyID:     familyID,
+			BindingHash:  sessionBindingHashFromContext(ctx),
+			CreatedAt:    now,
+			ExpiresAt:    now.Add(ttl),
+		},
+	}, nil
 }
 
 // RefreshTokenPair 使用Refresh Token刷新Token对
 // 实现Token轮转：每次刷新都会生成新的Refresh Token，旧Token立即失效
 func (s *AuthService) RefreshTokenPair(ctx context.Context, refreshToken string) (*TokenPairWithUser, error) {
-	// 检查 refreshTokenCache 是否可用
 	if s.refreshTokenCache == nil {
 		return nil, ErrRefreshTokenInvalid
 	}
-
-	// 验证Token格式
 	if !strings.HasPrefix(refreshToken, refreshTokenPrefix) {
 		return nil, ErrRefreshTokenInvalid
 	}
 
 	tokenHash := hashToken(refreshToken)
-
-	// 获取Token数据
 	data, err := s.refreshTokenCache.GetRefreshToken(ctx, tokenHash)
 	if err != nil {
 		if errors.Is(err, ErrRefreshTokenNotFound) {
-			// Token不存在，可能是已被使用（Token轮转）或已过期
-			logger.LegacyPrintf("service.auth", "[Auth] Refresh token not found, possible reuse attack")
-			return nil, ErrRefreshTokenInvalid
+			atomicCache, ok := s.refreshTokenCache.(AtomicRefreshTokenCache)
+			if !ok {
+				return nil, ErrRefreshTokenInvalid
+			}
+			return nil, s.consumedRefreshTokenError(ctx, atomicCache, tokenHash, nil)
 		}
 		logger.LegacyPrintf("service.auth", "[Auth] Error getting refresh token: %v", err)
 		return nil, ErrServiceUnavailable
 	}
 
-	// 检查Token是否过期
 	if time.Now().After(data.ExpiresAt) {
-		// 删除过期Token
 		_ = s.refreshTokenCache.DeleteRefreshToken(ctx, tokenHash)
 		return nil, ErrRefreshTokenExpired
 	}
 
-	// 获取用户信息
 	user, err := s.userRepo.GetByID(ctx, data.UserID)
 	if err != nil {
 		if errors.Is(err, ErrUserNotFound) {
-			// 用户已删除，撤销整个Token家族
 			_ = s.refreshTokenCache.DeleteTokenFamily(ctx, data.FamilyID)
 			return nil, ErrRefreshTokenInvalid
 		}
 		logger.LegacyPrintf("service.auth", "[Auth] Database error getting user for token refresh: %v", err)
 		return nil, ErrServiceUnavailable
 	}
-
-	// 检查用户状态
 	if !user.IsActive() {
-		// 用户被禁用，撤销整个Token家族
 		_ = s.refreshTokenCache.DeleteTokenFamily(ctx, data.FamilyID)
 		return nil, ErrUserNotActive
 	}
-
-	// 检查TokenVersion（密码更改后所有Token失效）
 	if data.TokenVersion != resolvedTokenVersion(user) {
-		// TokenVersion不匹配，撤销整个Token家族
 		_ = s.refreshTokenCache.DeleteTokenFamily(ctx, data.FamilyID)
 		return nil, ErrTokenRevoked
 	}
-
-	// 会话绑定检查：IP/UA 任一变化即撤销整个会话家族。
-	// data.BindingHash 为空表示功能开启前签发的旧会话，放行并在轮转时补齐绑定。
 	if s.settingService != nil && s.settingService.IsSessionBindingEnabled(ctx) && data.BindingHash != "" {
 		if current := sessionBindingHashFromContext(ctx); current != "" && current != data.BindingHash {
 			_ = s.refreshTokenCache.DeleteTokenFamily(ctx, data.FamilyID)
@@ -1844,21 +1841,81 @@ func (s *AuthService) RefreshTokenPair(ctx context.Context, refreshToken string)
 		}
 	}
 
-	// Token轮转：立即使旧Token失效
-	if err := s.refreshTokenCache.DeleteRefreshToken(ctx, tokenHash); err != nil {
-		logger.LegacyPrintf("service.auth", "[Auth] Failed to delete old refresh token: %v", err)
-		// 继续处理，不影响主流程
-	}
-
-	// 生成新的Token对，保持同一个家族ID
-	pair, err := s.GenerateTokenPair(ctx, user, data.FamilyID)
+	accessToken, err := s.generateAccessToken(user, data.FamilyID, sessionBindingHashFromContext(ctx))
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("generate access token: %w", err)
 	}
-	return &TokenPairWithUser{
-		TokenPair: *pair,
-		UserRole:  user.Role,
-	}, nil
+	material, err := s.newRefreshTokenMaterial(ctx, user, data.FamilyID)
+	if err != nil {
+		return nil, fmt.Errorf("generate refresh token: %w", err)
+	}
+	atomicCache, ok := s.refreshTokenCache.(AtomicRefreshTokenCache)
+	if !ok {
+		logger.LegacyPrintf("service.auth", "[Auth] Refresh token cache does not support atomic rotation")
+		return nil, ErrServiceUnavailable
+	}
+	rotation, err := atomicCache.RotateRefreshToken(
+		ctx,
+		tokenHash,
+		material.TokenHash,
+		material.Data,
+		material.TTL,
+		time.Now(),
+	)
+	if err != nil {
+		logger.LegacyPrintf("service.auth", "[Auth] Atomic refresh token rotation failed: %v", err)
+		return nil, ErrServiceUnavailable
+	}
+	if rotation == nil {
+		return nil, ErrServiceUnavailable
+	}
+	switch rotation.Status {
+	case RefreshTokenRotationSucceeded:
+		return &TokenPairWithUser{
+			TokenPair: TokenPair{
+				AccessToken:  accessToken,
+				RefreshToken: material.RawToken,
+				ExpiresIn:    s.GetAccessTokenExpiresIn(),
+			},
+			UserRole: user.Role,
+		}, nil
+	case RefreshTokenRotationReused:
+		return nil, s.consumedRefreshTokenError(ctx, atomicCache, tokenHash, rotation.Consumed)
+	default:
+		return nil, ErrRefreshTokenInvalid
+	}
+}
+
+func (s *AuthService) consumedRefreshTokenError(
+	ctx context.Context,
+	atomicCache AtomicRefreshTokenCache,
+	tokenHash string,
+	consumed *ConsumedRefreshTokenData,
+) error {
+	if consumed == nil {
+		var err error
+		consumed, err = atomicCache.GetConsumedRefreshToken(ctx, tokenHash)
+		if err != nil {
+			if errors.Is(err, ErrRefreshTokenNotFound) {
+				return ErrRefreshTokenInvalid
+			}
+			logger.LegacyPrintf("service.auth", "[Auth] Error getting consumed refresh token: %v", err)
+			return ErrServiceUnavailable
+		}
+	}
+	if consumed == nil || consumed.Data == nil {
+		return ErrRefreshTokenInvalid
+	}
+	age := time.Since(consumed.ConsumedAt)
+	if age >= refreshTokenReuseGracePeriod {
+		if err := s.refreshTokenCache.DeleteTokenFamily(ctx, consumed.Data.FamilyID); err != nil {
+			logger.LegacyPrintf("service.auth", "[Auth] Failed to revoke reused refresh token family: %v", err)
+		}
+		logger.LegacyPrintf("service.auth", "[Auth] Refresh token reuse detected for user %d, family revoked", consumed.Data.UserID)
+	} else {
+		logger.LegacyPrintf("service.auth", "[Auth] Duplicate refresh token use within grace period for user %d", consumed.Data.UserID)
+	}
+	return ErrRefreshTokenReused
 }
 
 // RevokeRefreshToken 撤销单个Refresh Token

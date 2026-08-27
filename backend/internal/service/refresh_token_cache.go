@@ -20,11 +20,49 @@ type RefreshTokenData struct {
 	ExpiresAt    time.Time `json:"expires_at"`
 }
 
+// ConsumedRefreshTokenData records a bounded tombstone for an atomically rotated token.
+// The original token data is retained so delayed replay can revoke only its session family.
+type ConsumedRefreshTokenData struct {
+	Data       *RefreshTokenData
+	ConsumedAt time.Time
+}
+
+// RefreshTokenRotationStatus describes the result of an atomic refresh-token rotation.
+type RefreshTokenRotationStatus int
+
+const (
+	RefreshTokenRotationNotFound RefreshTokenRotationStatus = iota
+	RefreshTokenRotationSucceeded
+	RefreshTokenRotationReused
+)
+
+// RefreshTokenRotationResult is returned by AtomicRefreshTokenCache.RotateRefreshToken.
+type RefreshTokenRotationResult struct {
+	Status   RefreshTokenRotationStatus
+	Consumed *ConsumedRefreshTokenData
+}
+
+// AtomicRefreshTokenCache is the mandatory capability used by the refresh path.
+// It is separate from RefreshTokenCache so unrelated cache test doubles remain source-compatible;
+// AuthService never falls back to a non-atomic rotation when an active token is refreshed.
+type AtomicRefreshTokenCache interface {
+	GetConsumedRefreshToken(ctx context.Context, tokenHash string) (*ConsumedRefreshTokenData, error)
+	RotateRefreshToken(
+		ctx context.Context,
+		oldTokenHash string,
+		newTokenHash string,
+		newData *RefreshTokenData,
+		newTTL time.Duration,
+		consumedAt time.Time,
+	) (*RefreshTokenRotationResult, error)
+}
+
 // RefreshTokenCache 管理Refresh Token的Redis缓存
 // 用于JWT Token刷新机制，支持Token轮转和防重放攻击
 //
 // Key 格式:
-//   - refresh_token:{token_hash}     -> RefreshTokenData (JSON)
+//   - refresh_token:{token_hash}          -> RefreshTokenData (JSON)
+//   - consumed_refresh_token:{token_hash} -> consumed-token tombstone (bounded TTL)
 //   - user_refresh_tokens:{user_id}  -> Set<token_hash>
 //   - token_family:{family_id}       -> Set<token_hash>
 type RefreshTokenCache interface {
