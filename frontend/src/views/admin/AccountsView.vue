@@ -193,7 +193,7 @@
         />
         <div ref="accountTableRef" class="flex min-h-0 flex-1 flex-col overflow-hidden">
         <DataTable
-          sticky-column-key="name"
+          :sticky-first-column="true"
           ref="dataTableRef"
           :columns="cols"
           :data="accounts"

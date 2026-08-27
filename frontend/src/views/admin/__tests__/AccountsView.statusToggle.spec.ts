@@ -43,11 +43,11 @@ vi.mock('vue-i18n', async () => {
 })
 
 const DataTableStub = {
-  props: ['data', 'stickyColumnKey', 'stickyActionsColumn'],
+  props: ['data', 'stickyFirstColumn', 'stickyActionsColumn'],
   template: `
     <div
       data-test="data-table"
-      :data-sticky-column="stickyColumnKey || ''"
+      :data-sticky-first="String(Boolean(stickyFirstColumn))"
       :data-sticky-actions="String(Boolean(stickyActionsColumn))"
     >
       <div v-for="row in data" :key="row.id" :data-test="'status-row-' + row.id">
@@ -130,10 +130,10 @@ describe('admin AccountsView status switch', () => {
     recoverState.mockReset()
   })
 
-  it('pins only the name column and leaves the actions column scrollable', async () => {
+  it('pins the selection and name columns while leaving actions scrollable', async () => {
     const wrapper = mountView(baseAccount())
     await flushPromises()
-    expect(wrapper.get('[data-test="data-table"]').attributes('data-sticky-column')).toBe('name')
+    expect(wrapper.get('[data-test="data-table"]').attributes('data-sticky-first')).toBe('true')
     expect(wrapper.get('[data-test="data-table"]').attributes('data-sticky-actions')).toBe('false')
   })
 
