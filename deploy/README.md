@@ -20,6 +20,7 @@ This directory contains files for deploying Sub2API on Linux servers and Apple-s
 | `apple-container.sh` | Native Apple `container` lifecycle script |
 | `APPLE_CONTAINER.md` | Apple `container` deployment and operations guide |
 | `.env.example` | Container environment variables template |
+| `zifeiyu/` | zifeiyu production template: isolated PostgreSQL/Redis, compatible URL policy, IPv6-only proxy egress, and Nginx vhost |
 | `DOCKER.md` | Docker Hub documentation |
 | `install.sh` | One-click binary installation script |
 | `install-datamanagementd.sh` | datamanagementd 一键安装脚本 |
