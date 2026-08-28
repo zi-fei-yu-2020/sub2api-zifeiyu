@@ -29,6 +29,7 @@ This directory contains files for deploying Sub2API on Linux servers and Apple-s
 | `config.example.yaml` | Example configuration file |
 | `EDGE_SECURITY.md` | Reverse proxy, CDN/WAF, trusted proxy, and ingress hardening guide |
 | `FIRST_RUN_SETUP_SECURITY.md` | Local-only first-run setup and token-protected remote setup guide |
+| `EASYPAY_LDC_RETURN_FLOW.md` | EasyPay/Linux DO Credit short ReturnURL and LDC configuration guide |
 
 ---
 

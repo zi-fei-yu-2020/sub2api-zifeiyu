@@ -22,6 +22,10 @@ func RegisterPaymentRoutes(
 	settingService *service.SettingService,
 	panelRateLimiter *middleware.PanelRateLimiter,
 ) {
+	// Fixed short browser return endpoint for EasyPay/LDC gateways whose
+	// return_url parameter is limited to 100 characters.
+	v1.GET("/payment/return", paymentHandler.ReturnFromProvider)
+
 	// --- User-facing payment endpoints (authenticated) ---
 	authenticated := v1.Group("/payment")
 	authenticated.Use(gin.HandlerFunc(jwtAuth))

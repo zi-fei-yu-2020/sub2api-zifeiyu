@@ -3,11 +3,67 @@ package service
 import (
 	"context"
 	"fmt"
+	"net/url"
+	"strconv"
 	"strings"
 
 	dbent "github.com/Wei-Shaw/sub2api/ent"
+	"github.com/Wei-Shaw/sub2api/ent/paymentorder"
 	infraerrors "github.com/Wei-Shaw/sub2api/internal/pkg/errors"
 )
+
+// BuildPaymentReturnRedirect resolves the EasyPay/LDC browser callback into a
+// same-origin frontend result URL. The provider-facing ReturnURL stays fixed
+// and short; the long signed resume token is added only after the browser has
+// returned to Sub2API.
+func (s *PaymentService) BuildPaymentReturnRedirect(ctx context.Context, outTradeNo string) (string, error) {
+	outTradeNo = strings.TrimSpace(outTradeNo)
+	if outTradeNo == "" {
+		return "", infraerrors.BadRequest("INVALID_OUT_TRADE_NO", "out_trade_no is required")
+	}
+	order, err := s.entClient.PaymentOrder.Query().Where(paymentorder.OutTradeNoEQ(outTradeNo)).Only(ctx)
+	if err != nil {
+		if dbent.IsNotFound(err) {
+			return "", infraerrors.NotFound("NOT_FOUND", "order not found")
+		}
+		return "", fmt.Errorf("resolve payment return order: %w", err)
+	}
+
+	resumeToken := ""
+	resume := s.paymentResume()
+	if resume != nil && resume.isSigningConfigured() {
+		providerInstanceID := strings.TrimSpace(psStringValue(order.ProviderInstanceID))
+		providerKey := strings.TrimSpace(psStringValue(order.ProviderKey))
+		if snapshot := psOrderProviderSnapshot(order); snapshot != nil {
+			if snapshot.ProviderInstanceID != "" {
+				providerInstanceID = snapshot.ProviderInstanceID
+			}
+			if snapshot.ProviderKey != "" {
+				providerKey = snapshot.ProviderKey
+			}
+		}
+		resumeToken, err = resume.CreateToken(ResumeTokenClaims{
+			OrderID:            order.ID,
+			UserID:             order.UserID,
+			ProviderInstanceID: providerInstanceID,
+			ProviderKey:        providerKey,
+			PaymentType:        order.PaymentType,
+			CanonicalReturnURL: paymentResultReturnPath,
+		})
+		if err != nil {
+			return "", fmt.Errorf("create payment return resume token: %w", err)
+		}
+	}
+
+	query := url.Values{}
+	query.Set("order_id", strconv.FormatInt(order.ID, 10))
+	query.Set("out_trade_no", order.OutTradeNo)
+	if resumeToken != "" {
+		query.Set("resume_token", resumeToken)
+	}
+	query.Set("status", "success")
+	return paymentResultReturnPath + "?" + query.Encode(), nil
+}
 
 func (s *PaymentService) GetPublicOrderByResumeToken(ctx context.Context, token string) (*dbent.PaymentOrder, error) {
 	claims, err := s.paymentResume().ParseToken(strings.TrimSpace(token))

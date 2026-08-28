@@ -18,7 +18,11 @@ import (
 	infraerrors "github.com/Wei-Shaw/sub2api/internal/pkg/errors"
 )
 
-const paymentResultReturnPath = "/payment/result"
+const (
+	paymentResultReturnPath     = "/payment/result"
+	paymentProviderReturnPath   = "/api/v1/payment/return"
+	maxEasyPayProviderReturnURL = 100
+)
 
 const (
 	PaymentSourceHostedRedirect    = "hosted_redirect"
@@ -271,6 +275,33 @@ func allowedReturnURLHost(returnURLHost string, requestHost string, refererURL s
 		return false
 	}
 	return sameOriginHost(returnURLHost, parsedReferer.Host)
+}
+
+func buildProviderPaymentReturnURL(providerKey string, base string, orderID int64, outTradeNo string, resumeToken string) (string, error) {
+	if strings.EqualFold(strings.TrimSpace(providerKey), payment.TypeEasyPay) {
+		return buildShortPaymentProviderReturnURL(base)
+	}
+	return buildPaymentReturnURL(base, orderID, outTradeNo, resumeToken)
+}
+
+func buildShortPaymentProviderReturnURL(base string) (string, error) {
+	canonical := strings.TrimSpace(base)
+	if canonical == "" {
+		return "", nil
+	}
+	parsed, err := url.Parse(canonical)
+	if err != nil || !parsed.IsAbs() || parsed.Host == "" {
+		return "", infraerrors.BadRequest("INVALID_RETURN_URL", "return_url must be a valid absolute URL")
+	}
+	parsed.Path = paymentProviderReturnPath
+	parsed.RawPath = ""
+	parsed.RawQuery = ""
+	parsed.Fragment = ""
+	result := parsed.String()
+	if len(result) > maxEasyPayProviderReturnURL {
+		return "", infraerrors.BadRequest("RETURN_URL_TOO_LONG", "the payment return URL host is too long for the configured EasyPay gateway")
+	}
+	return result, nil
 }
 
 func buildPaymentReturnURL(base string, orderID int64, outTradeNo string, resumeToken string) (string, error) {

@@ -4,6 +4,8 @@ package service
 
 import (
 	"context"
+	"net/url"
+	"strconv"
 	"testing"
 	"time"
 
@@ -39,6 +41,55 @@ func (p *paymentResumeLookupProvider) VerifyNotification(context.Context, string
 
 func (p *paymentResumeLookupProvider) Refund(context.Context, payment.RefundRequest) (*payment.RefundResponse, error) {
 	panic("unexpected call")
+}
+
+func TestBuildPaymentReturnRedirectAddsResumeTokenAfterProviderReturn(t *testing.T) {
+	ctx := context.Background()
+	client := newPaymentConfigServiceTestClient(t)
+	user, err := client.User.Create().
+		SetEmail("return@example.com").
+		SetPasswordHash("hash").
+		SetUsername("return-user").
+		Save(ctx)
+	require.NoError(t, err)
+	order, err := client.PaymentOrder.Create().
+		SetUserID(user.ID).
+		SetUserEmail(user.Email).
+		SetUserName(user.Username).
+		SetAmount(10).
+		SetPayAmount(10).
+		SetFeeRate(0).
+		SetRechargeCode("RETURN-ORDER").
+		SetOutTradeNo("sub2_return_short").
+		SetPaymentType(payment.TypeAlipay).
+		SetPaymentTradeNo("").
+		SetOrderType(payment.OrderTypeBalance).
+		SetStatus(OrderStatusPending).
+		SetExpiresAt(time.Now().Add(time.Hour)).
+		SetClientIP("127.0.0.1").
+		SetSrcHost("app.example.com").
+		SetProviderInstanceID("7").
+		SetProviderKey(payment.TypeEasyPay).
+		Save(ctx)
+	require.NoError(t, err)
+
+	svc := &PaymentService{
+		entClient:     client,
+		resumeService: NewPaymentResumeService([]byte("0123456789abcdef0123456789abcdef")),
+	}
+	redirectURL, err := svc.BuildPaymentReturnRedirect(ctx, order.OutTradeNo)
+	require.NoError(t, err)
+	parsed, err := url.Parse(redirectURL)
+	require.NoError(t, err)
+	require.Equal(t, paymentResultReturnPath, parsed.Path)
+	require.Equal(t, strconv.FormatInt(order.ID, 10), parsed.Query().Get("order_id"))
+	require.Equal(t, order.OutTradeNo, parsed.Query().Get("out_trade_no"))
+	require.Equal(t, "success", parsed.Query().Get("status"))
+	token := parsed.Query().Get("resume_token")
+	require.NotEmpty(t, token)
+	resolved, err := svc.GetPublicOrderByResumeToken(ctx, token)
+	require.NoError(t, err)
+	require.Equal(t, order.ID, resolved.ID)
 }
 
 func TestGetPublicOrderByResumeTokenReturnsMatchingOrder(t *testing.T) {

@@ -2,6 +2,7 @@ package handler
 
 import (
 	"fmt"
+	"net/http"
 	"strconv"
 	"strings"
 	"time"
@@ -28,6 +29,17 @@ func NewPaymentHandler(paymentService *service.PaymentService, configService *se
 		paymentService: paymentService,
 		configService:  configService,
 	}
+}
+
+// ReturnFromProvider handles the fixed short EasyPay/LDC browser ReturnURL.
+// GET /api/v1/payment/return
+func (h *PaymentHandler) ReturnFromProvider(c *gin.Context) {
+	redirectURL, err := h.paymentService.BuildPaymentReturnRedirect(c.Request.Context(), c.Query("out_trade_no"))
+	if err != nil {
+		response.ErrorFrom(c, err)
+		return
+	}
+	c.Redirect(http.StatusFound, redirectURL)
 }
 
 // GetPaymentConfig returns the payment system configuration.

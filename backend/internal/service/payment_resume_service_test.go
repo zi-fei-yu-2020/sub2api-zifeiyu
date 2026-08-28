@@ -10,6 +10,7 @@ import (
 	"encoding/json"
 	"net/url"
 	"strconv"
+	"strings"
 	"testing"
 	"time"
 
@@ -160,6 +161,56 @@ func TestBuildPaymentReturnURL(t *testing.T) {
 	}
 	if query.Get("status") != "success" {
 		t.Fatalf("status = %q", query.Get("status"))
+	}
+}
+
+func TestBuildProviderPaymentReturnURLUsesFixedShortEasyPayCallback(t *testing.T) {
+	t.Parallel()
+	got, err := buildProviderPaymentReturnURL(
+		payment.TypeEasyPay,
+		"https://app.example.com/payment/result?from=checkout",
+		42,
+		"sub2_42",
+		strings.Repeat("long-resume-token", 20),
+	)
+	if err != nil {
+		t.Fatalf("buildProviderPaymentReturnURL returned error: %v", err)
+	}
+	if got != "https://app.example.com/api/v1/payment/return" {
+		t.Fatalf("return URL = %q", got)
+	}
+	if len(got) > maxEasyPayProviderReturnURL {
+		t.Fatalf("return URL length = %d, limit = %d", len(got), maxEasyPayProviderReturnURL)
+	}
+}
+
+func TestBuildProviderPaymentReturnURLKeepsSignedQueryForOtherProviders(t *testing.T) {
+	t.Parallel()
+	got, err := buildProviderPaymentReturnURL(
+		payment.TypeAlipay,
+		"https://app.example.com/payment/result",
+		42,
+		"sub2_42",
+		"resume-token",
+	)
+	if err != nil {
+		t.Fatalf("buildProviderPaymentReturnURL returned error: %v", err)
+	}
+	parsed, err := url.Parse(got)
+	if err != nil {
+		t.Fatalf("parse return URL: %v", err)
+	}
+	if parsed.Query().Get("resume_token") != "resume-token" {
+		t.Fatalf("resume token missing from non-EasyPay return URL: %q", got)
+	}
+}
+
+func TestBuildShortPaymentProviderReturnURLRejectsHostOverGatewayLimit(t *testing.T) {
+	t.Parallel()
+	host := strings.Repeat("a", 80) + ".example.com"
+	_, err := buildShortPaymentProviderReturnURL("https://" + host + "/payment/result")
+	if err == nil {
+		t.Fatal("expected long EasyPay return URL to be rejected")
 	}
 }
 
