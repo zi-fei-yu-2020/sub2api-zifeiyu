@@ -259,8 +259,11 @@ func (h *RedeemHandler) resolveCreateAndRedeemExisting(ctx context.Context, exis
 		}
 	}
 
-	if existing.UsedBy != nil && *existing.UsedBy == userID {
+	if existing.IsConsistentlyUsed() && *existing.UsedBy == userID {
 		return gin.H{"redeem_code": dto.RedeemCodeFromServiceAdmin(existing)}, nil
+	}
+	if existing.UsageConsistencyIssue() != "" {
+		return nil, infraerrors.Conflict("REDEEM_CODE_USAGE_INCONSISTENT", "redeem code usage state is inconsistent")
 	}
 
 	return nil, infraerrors.Conflict("REDEEM_CODE_CONFLICT", "redeem code already used by another user")

@@ -316,21 +316,34 @@ const (
 )
 
 // resolveRedeemAction decides the idempotency action based on an existing redeem code lookup.
-// existing is the result of GetByCode; lookupErr is the error from that call.
-func resolveRedeemAction(existing *RedeemCode, lookupErr error) redeemAction {
+// A completed action is only trusted when the code is consistently used by the same user and
+// still matches the balance entitlement carried by the order.
+func resolveRedeemAction(existing *RedeemCode, lookupErr error, userID int64, amount float64) (redeemAction, error) {
 	if existing == nil || lookupErr != nil {
-		return redeemActionCreate
+		return redeemActionCreate, nil
 	}
-	if existing.IsUsed() {
-		return redeemActionSkipCompleted
+	if existing.CanUse() {
+		if existing.Type != RedeemTypeBalance || math.Abs(existing.Value-amount) > 1e-9 {
+			return redeemActionCreate, infraerrors.Conflict("REDEEM_CODE_CONFLICT", "existing redeem code does not match the payment order")
+		}
+		return redeemActionRedeem, nil
 	}
-	return redeemActionRedeem
+	if existing.IsConsistentlyUsed() {
+		if *existing.UsedBy != userID || existing.Type != RedeemTypeBalance || math.Abs(existing.Value-amount) > 1e-9 {
+			return redeemActionCreate, infraerrors.Conflict("REDEEM_CODE_CONFLICT", "redeem code belongs to a different fulfillment")
+		}
+		return redeemActionSkipCompleted, nil
+	}
+	return redeemActionCreate, infraerrors.Conflict("REDEEM_CODE_USAGE_INCONSISTENT", "redeem code usage state is inconsistent")
 }
 
 func (s *PaymentService) doBalance(ctx context.Context, o *dbent.PaymentOrder, lease *paymentFulfillmentLease) error {
 	// Idempotency: check if redeem code already exists (from a previous partial run)
 	existing, lookupErr := s.redeemService.GetByCode(ctx, o.RechargeCode)
-	action := resolveRedeemAction(existing, lookupErr)
+	action, actionErr := resolveRedeemAction(existing, lookupErr, o.UserID, o.Amount)
+	if actionErr != nil {
+		return actionErr
+	}
 
 	switch action {
 	case redeemActionSkipCompleted:

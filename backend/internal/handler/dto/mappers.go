@@ -580,9 +580,12 @@ func RedeemCodeFromServiceAdmin(rc *service.RedeemCode) *AdminRedeemCode {
 	if rc == nil {
 		return nil
 	}
+	issue := rc.UsageConsistencyIssue()
 	return &AdminRedeemCode{
-		RedeemCode: redeemCodeFromServiceBase(rc),
-		Notes:      rc.Notes,
+		RedeemCode:      redeemCodeFromServiceBase(rc),
+		Notes:           rc.Notes,
+		UsageConsistent: issue == "",
+		UsageIssue:      issue,
 	}
 }
 

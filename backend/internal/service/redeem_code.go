@@ -29,6 +29,43 @@ func (r *RedeemCode) IsUsed() bool {
 	return r.Status == StatusUsed
 }
 
+const (
+	RedeemUsageIssueNonUsedHasMarker = "non_used_has_usage_marker"
+	RedeemUsageIssueUsedMissingUser  = "used_missing_user"
+	RedeemUsageIssueUsedMissingTime  = "used_missing_time"
+)
+
+func (r *RedeemCode) HasUsageMarker() bool {
+	return r != nil && (r.UsedBy != nil || r.UsedAt != nil)
+}
+
+func (r *RedeemCode) HasCompleteUsageMarker() bool {
+	return r != nil && r.UsedBy != nil && r.UsedAt != nil
+}
+
+func (r *RedeemCode) UsageConsistencyIssue() string {
+	if r == nil {
+		return ""
+	}
+	if r.Status != StatusUsed {
+		if r.HasUsageMarker() {
+			return RedeemUsageIssueNonUsedHasMarker
+		}
+		return ""
+	}
+	if r.UsedAt == nil {
+		return RedeemUsageIssueUsedMissingTime
+	}
+	if r.UsedBy == nil {
+		return RedeemUsageIssueUsedMissingUser
+	}
+	return ""
+}
+
+func (r *RedeemCode) IsConsistentlyUsed() bool {
+	return r != nil && r.Status == StatusUsed && r.HasCompleteUsageMarker()
+}
+
 func (r *RedeemCode) IsExpired() bool {
 	return r.IsExpiredAt(time.Now())
 }
@@ -44,7 +81,7 @@ func (r *RedeemCode) IsExpiredAt(now time.Time) bool {
 }
 
 func (r *RedeemCode) CanUse() bool {
-	return r.Status == StatusUnused && !r.IsExpired()
+	return r != nil && r.Status == StatusUnused && !r.HasUsageMarker() && !r.IsExpired()
 }
 
 func GenerateRedeemCode() (string, error) {

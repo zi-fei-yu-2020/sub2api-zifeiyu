@@ -120,7 +120,15 @@ func (r *redeemCodeRepository) GetStats(ctx context.Context) (*service.RedeemCod
 	typeColumn := func(selector *entsql.Selector) string { return selector.C(redeemcode.FieldType) }
 	valueColumn := func(selector *entsql.Selector) string { return selector.C(redeemcode.FieldValue) }
 	expiresAtColumn := func(selector *entsql.Selector) string { return selector.C(redeemcode.FieldExpiresAt) }
+	usedByColumn := func(selector *entsql.Selector) string { return selector.C(redeemcode.FieldUsedBy) }
+	usedAtColumn := func(selector *entsql.Selector) string { return selector.C(redeemcode.FieldUsedAt) }
 	validityDaysColumn := func(selector *entsql.Selector) string { return selector.C(redeemcode.FieldValidityDays) }
+	consistentUsed := func(selector *entsql.Selector) string {
+		return statusColumn(selector) + " = '" + service.StatusUsed + "' AND " + usedByColumn(selector) + " IS NOT NULL AND " + usedAtColumn(selector) + " IS NOT NULL"
+	}
+	cleanUnused := func(selector *entsql.Selector) string {
+		return statusColumn(selector) + " = '" + service.StatusUnused + "' AND " + usedByColumn(selector) + " IS NULL AND " + usedAtColumn(selector) + " IS NULL"
+	}
 
 	countWhere := func(alias string, predicate func(*entsql.Selector) string) dbent.AggregateFunc {
 		return dbent.As(func(selector *entsql.Selector) string {
@@ -137,11 +145,9 @@ func (r *redeemCodeRepository) GetStats(ctx context.Context) (*service.RedeemCod
 	err := r.client.RedeemCode.Query().Aggregate(
 		dbent.As(dbent.Count(), "total_codes"),
 		countWhere("active_codes", func(selector *entsql.Selector) string {
-			return statusColumn(selector) + " = '" + service.StatusUnused + "' AND (" + expiresAtColumn(selector) + " IS NULL OR " + expiresAtColumn(selector) + " > CURRENT_TIMESTAMP)"
+			return cleanUnused(selector) + " AND (" + expiresAtColumn(selector) + " IS NULL OR " + expiresAtColumn(selector) + " > CURRENT_TIMESTAMP)"
 		}),
-		countWhere("used_codes", func(selector *entsql.Selector) string {
-			return statusColumn(selector) + " = '" + service.StatusUsed + "'"
-		}),
+		countWhere("used_codes", consistentUsed),
 		countWhere("expired_codes", func(selector *entsql.Selector) string {
 			return statusColumn(selector) + " = '" + service.StatusExpired + "' OR (" + statusColumn(selector) + " = '" + service.StatusUnused + "' AND " + expiresAtColumn(selector) + " IS NOT NULL AND " + expiresAtColumn(selector) + " <= CURRENT_TIMESTAMP)"
 		}),
@@ -158,20 +164,20 @@ func (r *redeemCodeRepository) GetStats(ctx context.Context) (*service.RedeemCod
 			return typeColumn(selector) + " = '" + service.RedeemTypeInvitation + "'"
 		}),
 		sumWhere("balance_value", valueColumn, func(selector *entsql.Selector) string {
-			return statusColumn(selector) + " = '" + service.StatusUsed + "' AND " + valueColumn(selector) + " > 0 AND " + typeColumn(selector) + " IN ('" + service.RedeemTypeBalance + "', '" + service.AdjustmentTypeAdminBalance + "', '" + service.RedeemTypeAffiliateBalance + "')"
+			return consistentUsed(selector) + " AND " + valueColumn(selector) + " > 0 AND " + typeColumn(selector) + " IN ('" + service.RedeemTypeBalance + "', '" + service.AdjustmentTypeAdminBalance + "', '" + service.RedeemTypeAffiliateBalance + "')"
 		}),
 		sumWhere("concurrency_units", func(selector *entsql.Selector) string {
 			return "TRUNC(" + valueColumn(selector) + ")"
 		}, func(selector *entsql.Selector) string {
-			return statusColumn(selector) + " = '" + service.StatusUsed + "' AND TRUNC(" + valueColumn(selector) + ") > 0 AND " + typeColumn(selector) + " IN ('" + service.RedeemTypeConcurrency + "', '" + service.AdjustmentTypeAdminConcurrency + "')"
+			return consistentUsed(selector) + " AND TRUNC(" + valueColumn(selector) + ") > 0 AND " + typeColumn(selector) + " IN ('" + service.RedeemTypeConcurrency + "', '" + service.AdjustmentTypeAdminConcurrency + "')"
 		}),
 		sumWhere("subscription_days", func(selector *entsql.Selector) string {
 			return "CASE WHEN " + validityDaysColumn(selector) + " = 0 THEN 30 ELSE " + validityDaysColumn(selector) + " END"
 		}, func(selector *entsql.Selector) string {
-			return statusColumn(selector) + " = '" + service.StatusUsed + "' AND " + validityDaysColumn(selector) + " >= 0 AND " + typeColumn(selector) + " = '" + service.RedeemTypeSubscription + "'"
+			return consistentUsed(selector) + " AND " + validityDaysColumn(selector) + " >= 0 AND " + typeColumn(selector) + " = '" + service.RedeemTypeSubscription + "'"
 		}),
 		countWhere("used_invitation_codes", func(selector *entsql.Selector) string {
-			return statusColumn(selector) + " = '" + service.StatusUsed + "' AND " + typeColumn(selector) + " = '" + service.RedeemTypeInvitation + "'"
+			return consistentUsed(selector) + " AND " + typeColumn(selector) + " = '" + service.RedeemTypeInvitation + "'"
 		}),
 	).Scan(ctx, &rows)
 	if err != nil {
@@ -228,6 +234,8 @@ func (r *redeemCodeRepository) ListWithFilters(ctx context.Context, params pagin
 		case service.StatusUnused:
 			q = q.Where(
 				redeemcode.StatusEQ(service.StatusUnused),
+				redeemcode.UsedByIsNil(),
+				redeemcode.UsedAtIsNil(),
 				redeemcode.Or(
 					redeemcode.ExpiresAtIsNil(),
 					redeemcode.ExpiresAtGT(now),
@@ -388,7 +396,7 @@ func (r *redeemCodeRepository) batchUpdate(ctx context.Context, client *dbent.Cl
 	}
 	if fields.TouchesUsedSensitiveFields() {
 		for _, code := range existing {
-			if code.Status == service.StatusUsed {
+			if code.Status == service.StatusUsed || code.UsedBy != nil || code.UsedAt != nil {
 				return 0, service.ErrRedeemCodeUsed
 			}
 		}
@@ -430,7 +438,13 @@ func (r *redeemCodeRepository) Use(ctx context.Context, id, userID int64) error 
 	now := time.Now()
 	client := clientFromContext(ctx, r.client)
 	affected, err := client.RedeemCode.Update().
-		Where(redeemcode.IDEQ(id), redeemcode.StatusEQ(service.StatusUnused)).
+		Where(
+			redeemcode.IDEQ(id),
+			redeemcode.StatusEQ(service.StatusUnused),
+			redeemcode.UsedByIsNil(),
+			redeemcode.UsedAtIsNil(),
+			redeemcode.Or(redeemcode.ExpiresAtIsNil(), redeemcode.ExpiresAtGT(now)),
+		).
 		SetStatus(service.StatusUsed).
 		SetUsedBy(userID).
 		SetUsedAt(now).
