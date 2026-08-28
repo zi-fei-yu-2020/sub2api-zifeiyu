@@ -7,6 +7,7 @@ import (
 	"errors"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 
 	"github.com/Wei-Shaw/sub2api/internal/config"
@@ -70,6 +71,26 @@ func TestPricingServiceFallsBackToMirrorWhenGitHubRawIsUnavailable(t *testing.T)
 	saved, err := os.ReadFile(filepath.Join(dataDir, "model_pricing.json"))
 	require.NoError(t, err)
 	require.JSONEq(t, string(body), string(saved))
+}
+
+func TestPricingServiceRejectsMirrorHashMismatch(t *testing.T) {
+	const (
+		mirrorJSON = "https://cdn.jsdelivr.net/gh/example/pricing.json"
+		mirrorHash = "https://cdn.jsdelivr.net/gh/example/pricing.sha256"
+	)
+	remote := &pricingMirrorRemoteStub{
+		pricingBodies: map[string][]byte{mirrorJSON: []byte(`{"model":{"input_cost_per_token":0.1}}`)},
+		hashBodies:    map[string]string{mirrorHash: strings.Repeat("0", 64)},
+	}
+	svc := NewPricingService(&config.Config{Pricing: config.PricingConfig{
+		MirrorRemoteURL: mirrorJSON,
+		MirrorHashURL:   mirrorHash,
+		DataDir:         t.TempDir(),
+	}}, remote)
+
+	err := svc.downloadPricingData()
+	require.ErrorContains(t, err, "pricing hash mismatch")
+	require.Nil(t, svc.GetModelPricing("model"))
 }
 
 func TestPricingServiceRemoteHashFallsBackToMirror(t *testing.T) {

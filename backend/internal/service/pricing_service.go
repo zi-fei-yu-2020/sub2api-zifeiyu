@@ -435,8 +435,9 @@ func (s *PricingService) downloadPricingData() error {
 		dataHash := sha256.Sum256(body)
 		dataHashStr := hex.EncodeToString(dataHash[:])
 		if remoteHash != "" && !strings.EqualFold(remoteHash, dataHashStr) {
-			logger.LegacyPrintf("service.pricing", "[Pricing] Hash mismatch warning for %s source: remote=%s data=%s (hash file may be out of sync)",
-				source.name, remoteHash[:min(8, len(remoteHash))], dataHashStr[:8])
+			failures = append(failures, fmt.Sprintf("%s: pricing hash mismatch (remote=%s data=%s)",
+				source.name, remoteHash[:min(8, len(remoteHash))], dataHashStr[:8]))
+			continue
 		}
 
 		data, parseErr := s.parsePricingData(body)
