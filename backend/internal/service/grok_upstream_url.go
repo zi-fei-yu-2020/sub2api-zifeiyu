@@ -52,9 +52,10 @@ func grokOperatorPolicyValidator(cfg *config.Config) xai.BaseURLValidator {
 		}
 	}
 	return func(raw string) (string, error) {
-		return urlvalidator.ValidateConfiguredUpstreamURL(raw, cfg.Security.URLAllowlist.AllowInsecureHTTP, urlvalidator.ValidationOptions{
-			AllowedHosts: cfg.Security.URLAllowlist.UpstreamHosts,
-			AllowPrivate: cfg.Security.URLAllowlist.AllowPrivateHosts,
+		return urlvalidator.ValidateHTTPURL(raw, cfg.Security.URLAllowlist.AllowInsecureHTTP, urlvalidator.ValidationOptions{
+			AllowedHosts:     cfg.Security.URLAllowlist.UpstreamHosts,
+			RequireAllowlist: true,
+			AllowPrivate:     cfg.Security.URLAllowlist.AllowPrivateHosts,
 		})
 	}
 }
