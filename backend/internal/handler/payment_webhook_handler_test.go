@@ -9,6 +9,7 @@ import (
 	"fmt"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
 
 	"github.com/Wei-Shaw/sub2api/internal/payment"
@@ -135,6 +136,23 @@ func TestUnknownOrderWebhookAcksWithSuccess(t *testing.T) {
 	require.Equal(t, http.StatusOK, w.Code,
 		"Stripe requires 2xx to stop retrying; anything else restarts the retry loop")
 	require.Empty(t, w.Body.String(), "Stripe expects an empty body on the ack path")
+}
+
+func TestPaymentWebhookRejectsOversizedBodyWith413(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	router := gin.New()
+	handler := &PaymentWebhookHandler{}
+	router.POST("/webhook", handler.StripeWebhook)
+
+	body := strings.Repeat("x", maxWebhookBodySize+1)
+	request := httptest.NewRequest(http.MethodPost, "/webhook", strings.NewReader(body))
+	request.Header.Set("Content-Type", "application/json")
+	response := httptest.NewRecorder()
+
+	router.ServeHTTP(response, request)
+
+	require.Equal(t, http.StatusRequestEntityTooLarge, response.Code)
+	require.Equal(t, "request body too large", response.Body.String())
 }
 
 func TestWebhookConstants(t *testing.T) {
