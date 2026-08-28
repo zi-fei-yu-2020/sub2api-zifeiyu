@@ -3,6 +3,7 @@ package service
 import (
 	"context"
 	"database/sql"
+	"fmt"
 	"os"
 	"time"
 
@@ -958,8 +959,18 @@ func ProvideUserPlatformQuotaUsageFlusher(cfg *config.Config, cache BillingCache
 
 // ProvidePaymentConfigService wraps NewPaymentConfigService to accept the named
 // payment.EncryptionKey type instead of raw []byte, avoiding Wire ambiguity.
-func ProvidePaymentConfigService(entClient *dbent.Client, settingRepo SettingRepository, key payment.EncryptionKey) *PaymentConfigService {
-	return NewPaymentConfigService(entClient, settingRepo, []byte(key))
+func ProvidePaymentConfigService(entClient *dbent.Client, settingRepo SettingRepository, key payment.EncryptionKey) (*PaymentConfigService, error) {
+	svc := NewPaymentConfigService(entClient, settingRepo, []byte(key))
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	defer cancel()
+	summary, err := svc.MigrateLegacyProviderConfigs(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("migrate legacy payment provider configs: %w", err)
+	}
+	if summary.Scanned > 0 {
+		logger.LegacyPrintf("service.payment", "[Payment] Provider config migration scanned=%d migrated=%d needs_reentry=%d", summary.Scanned, summary.Migrated, summary.NeedsReentry)
+	}
+	return svc, nil
 }
 
 // ProvideBalanceNotifyService creates BalanceNotifyService

@@ -40,9 +40,8 @@ type LoadBalancer interface {
 
 // DefaultLoadBalancer implements LoadBalancer using database queries.
 type DefaultLoadBalancer struct {
-	db            *dbent.Client
-	encryptionKey []byte
-	counter       atomic.Uint64
+	db      *dbent.Client
+	counter atomic.Uint64
 }
 
 type contextKey string
@@ -50,8 +49,8 @@ type contextKey string
 const wxpayJSAPIAppIDContextKey contextKey = "payment.wxpay.jsapi_app_id"
 
 // NewDefaultLoadBalancer creates a new load balancer.
-func NewDefaultLoadBalancer(db *dbent.Client, encryptionKey []byte) *DefaultLoadBalancer {
-	return &DefaultLoadBalancer{db: db, encryptionKey: encryptionKey}
+func NewDefaultLoadBalancer(db *dbent.Client) *DefaultLoadBalancer {
+	return &DefaultLoadBalancer{db: db}
 }
 
 func WithWxpayJSAPIAppID(ctx context.Context, appID string) context.Context {
@@ -314,36 +313,17 @@ func (lb *DefaultLoadBalancer) buildSelection(selected *dbent.PaymentProviderIns
 	}, nil
 }
 
-// decryptConfig parses a stored provider config.
-// New records are plaintext JSON; legacy records are AES-256-GCM ciphertext.
-// Unreadable values (legacy ciphertext without a valid key, or malformed data)
-// are treated as empty so the service keeps running while the admin re-enters
-// the config via the UI.
-//
-// TODO(deprecated-legacy-ciphertext): The AES fallback branch below is a
-// transitional compatibility shim for pre-plaintext records. Remove it (and
-// the encryptionKey field + the Decrypt import) after a few releases once all
-// live deployments have re-saved their provider configs through the UI.
+// decryptConfig parses the strict JSON provider config storage format.
+// Legacy ciphertext is migrated once at startup by PaymentConfigService.
 func (lb *DefaultLoadBalancer) decryptConfig(stored string) (map[string]string, error) {
-	if stored == "" {
+	if strings.TrimSpace(stored) == "" {
 		return nil, nil
 	}
 	var config map[string]string
-	if err := json.Unmarshal([]byte(stored), &config); err == nil {
-		return config, nil
+	if err := json.Unmarshal([]byte(stored), &config); err != nil || config == nil {
+		return nil, fmt.Errorf("payment provider config is not valid JSON")
 	}
-	// Deprecated: legacy AES-256-GCM ciphertext fallback — scheduled for removal.
-	if len(lb.encryptionKey) == AES256KeySize {
-		//nolint:staticcheck // SA1019: intentional legacy fallback, scheduled for removal
-		if plaintext, err := Decrypt(stored, lb.encryptionKey); err == nil {
-			if err := json.Unmarshal([]byte(plaintext), &config); err == nil {
-				return config, nil
-			}
-		}
-	}
-	slog.Warn("payment provider config unreadable, treating as empty for re-entry",
-		"stored_len", len(stored))
-	return nil, nil
+	return config, nil
 }
 
 // GetInstanceDailyAmount returns the total completed order amount for an instance today.

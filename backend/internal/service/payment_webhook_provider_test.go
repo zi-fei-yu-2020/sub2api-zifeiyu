@@ -53,7 +53,7 @@ func encryptWebhookProviderConfig(t *testing.T, config map[string]string) string
 }
 
 func newWebhookProviderTestLoadBalancer(client *dbent.Client) payment.LoadBalancer {
-	return payment.NewDefaultLoadBalancer(client, []byte(webhookProviderTestEncryptionKey))
+	return payment.NewDefaultLoadBalancer(client)
 }
 
 func encryptValidWebhookWxpayConfig(t *testing.T, suffix string) string {

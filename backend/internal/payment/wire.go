@@ -52,8 +52,8 @@ func ProvideRegistry() *Registry {
 }
 
 // ProvideDefaultLoadBalancer creates a DefaultLoadBalancer backed by the ent client.
-func ProvideDefaultLoadBalancer(client *dbent.Client, key EncryptionKey) *DefaultLoadBalancer {
-	return NewDefaultLoadBalancer(client, []byte(key))
+func ProvideDefaultLoadBalancer(client *dbent.Client) *DefaultLoadBalancer {
+	return NewDefaultLoadBalancer(client)
 }
 
 // ProviderSet is the Wire provider set for the payment package.
