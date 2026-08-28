@@ -25,10 +25,9 @@ func (s *OpenAIGatewayService) validateUpstreamBaseURL(raw string) (string, erro
 		}
 		return normalized, nil
 	}
-	normalized, err := urlvalidator.ValidateHTTPURL(raw, s.cfg.Security.URLAllowlist.AllowInsecureHTTP, urlvalidator.ValidationOptions{
-		AllowedHosts:     s.cfg.Security.URLAllowlist.UpstreamHosts,
-		RequireAllowlist: true,
-		AllowPrivate:     s.cfg.Security.URLAllowlist.AllowPrivateHosts,
+	normalized, err := urlvalidator.ValidateConfiguredUpstreamURL(raw, s.cfg.Security.URLAllowlist.AllowInsecureHTTP, urlvalidator.ValidationOptions{
+		AllowedHosts: s.cfg.Security.URLAllowlist.UpstreamHosts,
+		AllowPrivate: s.cfg.Security.URLAllowlist.AllowPrivateHosts,
 	})
 	if err != nil {
 		return "", fmt.Errorf("invalid base_url: %w", err)

@@ -197,6 +197,7 @@ func NewHTTPUpstream(cfg *config.Config) service.HTTPUpstream {
 //   - 调用方必须关闭 resp.Body，否则会导致 inFlight 计数泄漏
 //   - inFlight > 0 的客户端不会被淘汰，确保活跃请求不被中断
 func (s *httpUpstreamService) Do(req *http.Request, proxyURL string, accountID int64, accountConcurrency int) (*http.Response, error) {
+	req = service.WithHTTPUpstreamConfiguredHost(req)
 	applyGrokCLIProxyHeaders(req)
 	if err := s.validateRequestHost(req); err != nil {
 		return nil, err
@@ -243,6 +244,7 @@ func (s *httpUpstreamService) Do(req *http.Request, proxyURL string, accountID i
 // profile 为 nil 时不启用 TLS 指纹，行为与 Do 方法相同。
 // profile 非 nil 时使用指定的 Profile 进行 TLS 指纹伪装。
 func (s *httpUpstreamService) DoWithTLS(req *http.Request, proxyURL string, accountID int64, accountConcurrency int, profile *tlsfingerprint.Profile) (*http.Response, error) {
+	req = service.WithHTTPUpstreamConfiguredHost(req)
 	if profile == nil {
 		return s.Do(req, proxyURL, accountID, accountConcurrency)
 	}
@@ -593,17 +595,34 @@ func (s *httpUpstreamService) validateRequestHost(req *http.Request) error {
 		return errors.New("request host is empty")
 	}
 	policy := s.cfg.Security.URLAllowlist
+	allowedHosts := append([]string(nil), policy.UpstreamHosts...)
+	if configuredHost := service.HTTPUpstreamConfiguredHostFromContext(req.Context()); configuredHost != "" {
+		allowedHosts = append(allowedHosts, configuredHost)
+	}
 	if _, err := urlvalidator.ValidateHTTPURL(req.URL.String(), policy.AllowInsecureHTTP, urlvalidator.ValidationOptions{
-		AllowedHosts:     policy.UpstreamHosts,
+		AllowedHosts:     allowedHosts,
 		RequireAllowlist: true,
 		AllowPrivate:     policy.AllowPrivateHosts,
 	}); err != nil {
 		return err
 	}
-	if err := urlvalidator.ValidateResolvedIPWithOptions(host, policy.AllowPrivateHosts); err != nil {
+
+	// Request-scoped configured hosts are allowed only when they resolve to
+	// public addresses. Private-network targets must also be present in the
+	// operator-managed global allowlist.
+	if err := urlvalidator.ValidateResolvedIPWithOptions(host, false); err == nil {
+		return nil
+	} else if !policy.AllowPrivateHosts {
 		return err
 	}
-	return nil
+	if _, err := urlvalidator.ValidateHTTPURL(req.URL.String(), policy.AllowInsecureHTTP, urlvalidator.ValidationOptions{
+		AllowedHosts:     policy.UpstreamHosts,
+		RequireAllowlist: true,
+		AllowPrivate:     true,
+	}); err != nil {
+		return err
+	}
+	return urlvalidator.ValidateResolvedIPWithOptions(host, true)
 }
 
 func (s *httpUpstreamService) redirectChecker(req *http.Request, via []*http.Request) error {

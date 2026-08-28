@@ -126,3 +126,38 @@ func TestValidateResolvedIPWithOptions(t *testing.T) {
 		t.Fatal("expected AWS metadata IPv6 to fail even in private-network mode")
 	}
 }
+
+func TestValidateConfiguredUpstreamURLAllowsPublicCustomHost(t *testing.T) {
+	got, err := ValidateConfiguredUpstreamURL("https://token-plan.cn-beijing.maas.aliyuncs.com/compatible-mode", false, ValidationOptions{
+		AllowedHosts: []string{"api.openai.com"},
+	})
+	if err != nil {
+		t.Fatalf("public custom upstream should be allowed: %v", err)
+	}
+	if got != "https://token-plan.cn-beijing.maas.aliyuncs.com/compatible-mode" {
+		t.Fatalf("normalized URL = %q", got)
+	}
+}
+
+func TestValidateConfiguredUpstreamURLRejectsPrivateHostInStrictMode(t *testing.T) {
+	_, err := ValidateConfiguredUpstreamURL("http://127.0.0.1:11434", true, ValidationOptions{
+		AllowedHosts: []string{"127.0.0.1:11434"},
+		AllowPrivate: false,
+	})
+	if err == nil {
+		t.Fatal("strict mode must reject private upstreams")
+	}
+}
+
+func TestValidateConfiguredUpstreamURLAllowsExplicitPrivateHost(t *testing.T) {
+	got, err := ValidateConfiguredUpstreamURL("http://127.0.0.1:11434", true, ValidationOptions{
+		AllowedHosts: []string{"127.0.0.1:11434"},
+		AllowPrivate: true,
+	})
+	if err != nil {
+		t.Fatalf("explicit private upstream should be allowed: %v", err)
+	}
+	if got != "http://127.0.0.1:11434" {
+		t.Fatalf("normalized URL = %q", got)
+	}
+}

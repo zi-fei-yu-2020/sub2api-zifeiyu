@@ -2889,7 +2889,7 @@ func TestOpenAIValidateUpstreamBaseURLDisabledAllowsHTTP(t *testing.T) {
 	}
 }
 
-func TestOpenAIValidateUpstreamBaseURLEnabledEnforcesAllowlist(t *testing.T) {
+func TestOpenAIValidateUpstreamBaseURLEnabledAllowsPublicCustomHost(t *testing.T) {
 	cfg := &config.Config{
 		Security: config.SecurityConfig{
 			URLAllowlist: config.URLAllowlistConfig{
@@ -2903,8 +2903,11 @@ func TestOpenAIValidateUpstreamBaseURLEnabledEnforcesAllowlist(t *testing.T) {
 	if _, err := svc.validateUpstreamBaseURL("https://example.com"); err != nil {
 		t.Fatalf("expected allowlisted host to pass, got %v", err)
 	}
-	if _, err := svc.validateUpstreamBaseURL("https://evil.com"); err == nil {
-		t.Fatalf("expected non-allowlisted host to fail")
+	if _, err := svc.validateUpstreamBaseURL("https://public-relay.example.com"); err != nil {
+		t.Fatalf("expected public custom host to pass, got %v", err)
+	}
+	if _, err := svc.validateUpstreamBaseURL("http://127.0.0.1:11434"); err == nil {
+		t.Fatalf("expected private host to fail in strict mode")
 	}
 }
 

@@ -182,6 +182,35 @@ func TestBuildUpstreamModelsRequestSupportsOpenAIOAuth(t *testing.T) {
 	require.NotEmpty(t, req.Header.Get("Version"))
 }
 
+func TestFetchUpstreamSupportedModelsAllowsStrictPublicCustomBaseURL(t *testing.T) {
+	upstream := &httpUpstreamRecorder{resp: &http.Response{
+		StatusCode: http.StatusOK,
+		Header:     http.Header{"Content-Type": []string{"application/json"}},
+		Body:       io.NopCloser(strings.NewReader(`{"data":[{"id":"qwen3.7-max"},{"id":"wan2.7-image"}]}`)),
+	}}
+	svc := &AccountTestService{
+		httpUpstream: upstream,
+		cfg: &config.Config{Security: config.SecurityConfig{URLAllowlist: config.URLAllowlistConfig{
+			Enabled:       true,
+			UpstreamHosts: []string{"api.openai.com"},
+		}}},
+	}
+	account := &Account{
+		ID:       60,
+		Platform: PlatformOpenAI,
+		Type:     AccountTypeAPIKey,
+		Credentials: map[string]any{
+			"api_key":  "test-key",
+			"base_url": "https://token-plan.cn-beijing.maas.aliyuncs.com/compatible-mode",
+		},
+	}
+
+	models, err := svc.FetchUpstreamSupportedModels(context.Background(), account)
+	require.NoError(t, err)
+	require.Equal(t, []string{"qwen3.7-max", "wan2.7-image"}, models)
+	require.Equal(t, "https://token-plan.cn-beijing.maas.aliyuncs.com/compatible-mode/v1/models", upstream.lastReq.URL.String())
+}
+
 func TestFetchUpstreamSupportedModelsParsesOpenAIOAuthManifest(t *testing.T) {
 	upstream := &httpUpstreamRecorder{resp: &http.Response{
 		StatusCode: http.StatusOK,

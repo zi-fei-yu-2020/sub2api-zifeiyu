@@ -63,3 +63,15 @@ The legacy environment variables remain accepted during migration, but an explic
 - `compatible` 仅用于旧部署过渡：保留历史 URL 格式/协议检查，不强制主机白名单和 DNS SSRF 检查，不建议长期使用。
 
 已有配置文件如果没有 `security.url_policy.profile`，升级时会暂时保留原有 `url_allowlist` 行为，避免突然中断 HTTP 或私网上游。建议尽快核对白名单，然后显式迁移到 `strict` 或 `private-network`。
+
+## Account-configured public upstreams
+
+In `strict` mode, an administrator may save a custom **public HTTPS** account
+endpoint without copying that hostname into `upstream_hosts`. The initial
+request is pinned to that exact configured host; redirects to another host are
+still rejected.
+
+Private, loopback, link-local, and metadata destinations are not granted by an
+account URL. Private-network endpoints require the `private-network` profile
+and an explicit `security.url_allowlist.upstream_hosts` entry (including the
+port when it is non-default).

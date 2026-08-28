@@ -69,6 +69,25 @@ func ValidateHTTPURL(raw string, allowInsecureHTTP bool, opts ValidationOptions)
 	return strings.TrimRight(parsed.String(), "/"), nil
 }
 
+// ValidateConfiguredUpstreamURL validates an operator-configured account
+// endpoint. Public HTTPS hosts may be configured per account without being
+// duplicated in the global allowlist. Private-network targets still require
+// both AllowPrivate and an explicit global allowlist entry.
+func ValidateConfiguredUpstreamURL(raw string, allowInsecureHTTP bool, opts ValidationOptions) (string, error) {
+	publicURL, publicErr := ValidateHTTPURL(raw, allowInsecureHTTP, ValidationOptions{AllowPrivate: false})
+	if publicErr == nil {
+		return publicURL, nil
+	}
+	if !opts.AllowPrivate {
+		return "", publicErr
+	}
+	return ValidateHTTPURL(raw, allowInsecureHTTP, ValidationOptions{
+		AllowedHosts:     opts.AllowedHosts,
+		RequireAllowlist: true,
+		AllowPrivate:     true,
+	})
+}
+
 func ValidateURLFormat(raw string, allowInsecureHTTP bool) (string, error) {
 	// Minimal parser used only by compatible and legacy configurations.
 	// It intentionally does not enforce host allowlists or private-address policy.
