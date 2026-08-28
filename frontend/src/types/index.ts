@@ -1745,9 +1745,11 @@ export interface RedeemCode {
   code: string
   type: RedeemCodeType
   value: number
-  status: 'active' | 'used' | 'expired' | 'unused' | 'disabled'
+  status: 'used' | 'expired' | 'unused' | 'disabled'
   used_by: number | null
   used_at: string | null
+  usage_consistent?: boolean
+  usage_issue?: string
   created_at: string
   expires_at?: string | null
   updated_at?: string

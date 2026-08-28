@@ -308,6 +308,8 @@ export default {
       codesDeleted: '成功删除 {count} 个未使用的兑换码',
       noUnusedCodes: '没有未使用的兑换码可删除',
       userPrefix: '用户 #{id}',
+      unknownUsedUser: '用户已删除或未知',
+      usageInconsistent: '使用状态异常',
       failedToExport: '导出兑换码失败',
       failedToDeleteUnused: '删除未使用的兑换码失败',
       failedToCopy: '复制失败',

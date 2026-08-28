@@ -24,7 +24,7 @@ export async function list(
   pageSize: number = 20,
   filters?: {
     type?: RedeemCodeType
-    status?: 'active' | 'used' | 'expired' | 'unused' | 'disabled'
+    status?: 'used' | 'expired' | 'unused' | 'disabled'
     search?: string
     sort_by?: string
     sort_order?: 'asc' | 'desc'

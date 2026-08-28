@@ -141,24 +141,33 @@
             </span>
           </template>
 
-          <template #cell-status="{ value }">
-            <span
-              :class="[
-                'badge',
-                value === 'unused'
-                  ? 'badge-success'
-                  : value === 'used'
-                    ? 'badge-gray'
-                    : 'badge-danger'
-              ]"
-            >
-              {{ t('admin.redeem.status.' + value) }}
-            </span>
+          <template #cell-status="{ value, row }">
+            <div class="flex flex-col items-start gap-1">
+              <span
+                :class="[
+                  'badge',
+                  value === 'unused'
+                    ? 'badge-success'
+                    : value === 'used'
+                      ? 'badge-gray'
+                      : 'badge-danger'
+                ]"
+              >
+                {{ t('admin.redeem.status.' + value) }}
+              </span>
+              <span
+                v-if="row.usage_consistent === false"
+                class="badge badge-danger"
+                :title="row.usage_issue || t('admin.redeem.usageInconsistent')"
+              >
+                {{ t('admin.redeem.usageInconsistent') }}
+              </span>
+            </div>
           </template>
 
           <template #cell-used_by="{ value, row }">
             <span class="text-sm text-gray-500 dark:text-dark-400">
-              {{ row.user?.email || (value ? t('admin.redeem.userPrefix', { id: value }) : '-') }}
+              {{ row.user?.email || (value ? t('admin.redeem.userPrefix', { id: value }) : row.status === 'used' ? t('admin.redeem.unknownUsedUser') : '-') }}
             </span>
           </template>
 
@@ -184,7 +193,7 @@
           <template #cell-actions="{ row }">
             <div class="flex items-center space-x-2">
               <button
-                v-if="row.status === 'unused'"
+                v-if="row.status === 'unused' && row.usage_consistent !== false && !row.used_by && !row.used_at"
                 @click="handleDelete(row)"
                 class="flex flex-col items-center gap-0.5 rounded-xl p-1.5 text-gray-500 transition-colors hover:bg-red-50 hover:text-red-600 dark:hover:bg-red-900/20 dark:hover:text-red-400"
               >

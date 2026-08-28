@@ -265,6 +265,8 @@ export default {
         actions: 'Actions'
       },
       userPrefix: 'User #{id}',
+      unknownUsedUser: 'Deleted or unknown user',
+      usageInconsistent: 'Inconsistent usage state',
       exportCsv: 'Export CSV',
       batchUpdate: 'Batch Update',
       batchUpdateTitle: 'Batch Update Redeem Codes',
