@@ -10,7 +10,13 @@
             ? 'bg-amber-100 text-amber-700 hover:bg-amber-200 dark:bg-amber-900/30 dark:text-amber-400 dark:hover:bg-amber-900/50'
             : 'bg-gray-100 text-gray-600 hover:bg-gray-200 dark:bg-dark-800 dark:text-dark-400 dark:hover:bg-dark-700'
         ]"
-        :title="hasUpdate ? t('version.updateAvailable') : t('version.upToDate')"
+        :title="
+          hasUpdate
+            ? isCustomBuild
+              ? t('version.upstreamUpdateAvailable')
+              : t('version.updateAvailable')
+            : t('version.upToDate')
+        "
       >
         <span v-if="currentVersion" class="font-medium">v{{ currentVersion }}</span>
         <span
@@ -231,7 +237,7 @@
                 </button>
               </div>
 
-              <!-- Priority 3: Update available for source build - show git pull hint -->
+              <!-- Priority 3: Non-upstream build - show a safe manual update hint -->
               <div v-else-if="hasUpdate && !isReleaseBuild" class="space-y-2">
                 <a
                   v-if="releaseInfo?.html_url && releaseInfo.html_url !== '#'"
@@ -252,7 +258,11 @@
                   </div>
                   <div class="min-w-0 flex-1">
                     <p class="text-sm font-medium text-amber-700 dark:text-amber-300">
-                      {{ t('version.updateAvailable') }}
+                      {{
+                        isCustomBuild
+                          ? t('version.upstreamUpdateAvailable')
+                          : t('version.updateAvailable')
+                      }}
                     </p>
                     <p class="text-xs text-amber-600/70 dark:text-amber-400/70">
                       v{{ latestVersion }}
@@ -286,7 +296,9 @@
                     />
                   </svg>
                   <p class="text-xs text-blue-600 dark:text-blue-400">
-                    {{ t('version.sourceModeHint') }}
+                    {{
+                      isCustomBuild ? t('version.customModeHint') : t('version.sourceModeHint')
+                    }}
                   </p>
                 </div>
               </div>
@@ -414,7 +426,11 @@
                           />
                         </svg>
                         <p class="min-w-0 flex-1 text-xs leading-4 text-blue-600 dark:text-blue-400">
-                          {{ t('version.rollbackSourceHint') }}
+                          {{
+                            isCustomBuild
+                              ? t('version.rollbackCustomHint')
+                              : t('version.rollbackSourceHint')
+                          }}
                         </p>
                       </div>
 
@@ -729,6 +745,7 @@ const activeManualCommand = computed(() =>
 )
 
 // Only show update check for release builds (binary/docker deployment)
+const isCustomBuild = computed(() => buildType.value === 'custom')
 const isReleaseBuild = computed(() => buildType.value === 'release')
 
 function toggleDropdown() {

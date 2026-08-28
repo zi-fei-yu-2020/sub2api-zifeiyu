@@ -23,6 +23,7 @@ export default {
     latestVersion: 'Latest Version',
     upToDate: "You're running the latest version.",
     updateAvailable: 'A new version is available!',
+    upstreamUpdateAvailable: 'A new upstream version is available',
     releaseNotes: 'Release Notes',
     noReleaseNotes: 'No release notes',
     viewUpdate: 'View Update',
@@ -31,6 +32,8 @@ export default {
     refresh: 'Refresh',
     sourceMode: 'Source Build',
     sourceModeHint: 'Source build, use git pull to update',
+    customModeHint:
+      'This is the zifeiyu custom edition. Sync and test upstream source, then rebuild the Docker image; upstream binary updates are disabled.',
     updateNow: 'Update Now',
     updating: 'Updating...',
     updateComplete: 'Update Complete',
@@ -53,6 +56,8 @@ export default {
     noRollbackVersions: 'No versions available for rollback',
     loadVersionsFailed: 'Failed to load versions',
     rollbackSourceHint: 'Online rollback is not available for source builds',
+    rollbackCustomHint:
+      'Custom editions cannot roll back with upstream binaries. Roll back through Git and a rebuilt Docker image.',
     deployScript: 'Script',
     deployDocker: 'Docker',
     dockerEditCompose: 'Edit the image tag in docker-compose.yml',
