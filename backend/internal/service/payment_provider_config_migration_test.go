@@ -17,6 +17,7 @@ func TestMigrateLegacyProviderConfigsConvertsCiphertextToJSON(t *testing.T) {
 	for i := range key {
 		key[i] = byte(i + 1)
 	}
+	//nolint:staticcheck // Intentionally seed the deprecated format for migration coverage.
 	legacy, err := payment.Encrypt(`{"pid":"merchant","pkey":"secret"}`, key)
 	require.NoError(t, err)
 	instance := client.PaymentProviderInstance.Create().
@@ -91,7 +92,7 @@ func readLegacyPaymentConfigBackup(t *testing.T, client *dbent.Client, instanceI
 	err := client.Driver().Query(context.Background(), `SELECT encrypted_config, migration_status, migration_error
 FROM payment_provider_config_legacy_backups WHERE provider_instance_id = ?`, []any{instanceID}, &rows)
 	require.NoError(t, err)
-	defer rows.Close()
+	defer func() { require.NoError(t, rows.Close()) }()
 	require.True(t, rows.Next())
 	var backup legacyPaymentConfigBackup
 	require.NoError(t, rows.Scan(&backup.encryptedConfig, &backup.status, &backup.migrationError))

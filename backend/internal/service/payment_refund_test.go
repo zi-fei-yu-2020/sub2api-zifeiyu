@@ -222,7 +222,7 @@ func TestGwRefundRejectsAlipayMerchantIdentitySnapshotMismatch(t *testing.T) {
 	inst, err := client.PaymentProviderInstance.Create().
 		SetProviderKey(payment.TypeAlipay).
 		SetName("alipay-refund-mismatch-instance").
-		SetConfig(encryptWebhookProviderConfig(t, map[string]string{
+		SetConfig(encodeWebhookProviderConfig(t, map[string]string{
 			"appId":      "runtime-alipay-app",
 			"privateKey": "runtime-private-key",
 		})).

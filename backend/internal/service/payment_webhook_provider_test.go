@@ -41,15 +41,11 @@ func (p webhookProviderTestDouble) Refund(context.Context, payment.RefundRequest
 	panic("unexpected call")
 }
 
-func encryptWebhookProviderConfig(t *testing.T, config map[string]string) string {
+func encodeWebhookProviderConfig(t *testing.T, config map[string]string) string {
 	t.Helper()
-
 	data, err := json.Marshal(config)
 	require.NoError(t, err)
-
-	encrypted, err := payment.Encrypt(string(data), []byte(webhookProviderTestEncryptionKey))
-	require.NoError(t, err)
-	return encrypted
+	return string(data)
 }
 
 func newWebhookProviderTestLoadBalancer(client *dbent.Client) payment.LoadBalancer {
@@ -67,7 +63,7 @@ func encryptValidWebhookWxpayConfig(t *testing.T, suffix string) string {
 	pubDER, err := x509.MarshalPKIXPublicKey(&key.PublicKey)
 	require.NoError(t, err)
 
-	return encryptWebhookProviderConfig(t, map[string]string{
+	return encodeWebhookProviderConfig(t, map[string]string{
 		"appId":       "wx-app-" + suffix,
 		"mchId":       "mch-" + suffix,
 		"privateKey":  string(pem.EncodeToMemory(&pem.Block{Type: "PRIVATE KEY", Bytes: privDER})),
@@ -84,7 +80,7 @@ func TestGetOrderProviderInstanceResolvesUniqueLegacyProviderKey(t *testing.T) {
 	inst, err := client.PaymentProviderInstance.Create().
 		SetProviderKey(payment.TypeStripe).
 		SetName("stripe-a").
-		SetConfig(encryptWebhookProviderConfig(t, map[string]string{"secretKey": "sk_test_legacy_provider_key"})).
+		SetConfig(encodeWebhookProviderConfig(t, map[string]string{"secretKey": "sk_test_legacy_provider_key"})).
 		SetSupportedTypes("stripe").
 		SetEnabled(true).
 		Save(ctx)
@@ -238,7 +234,7 @@ func TestGetOrderProviderInstanceUsesProviderSnapshotWhenPinnedColumnMissing(t *
 	inst, err := client.PaymentProviderInstance.Create().
 		SetProviderKey(payment.TypeStripe).
 		SetName("stripe-snapshot").
-		SetConfig(encryptWebhookProviderConfig(t, map[string]string{"secretKey": "sk_snapshot"})).
+		SetConfig(encodeWebhookProviderConfig(t, map[string]string{"secretKey": "sk_snapshot"})).
 		SetSupportedTypes("stripe").
 		SetEnabled(true).
 		Save(ctx)
@@ -271,7 +267,7 @@ func TestGetOrderProviderInstanceRejectsMissingSnapshotInstanceWithoutLegacyFall
 	_, err := client.PaymentProviderInstance.Create().
 		SetProviderKey(payment.TypeStripe).
 		SetName("stripe-legacy-fallback").
-		SetConfig(encryptWebhookProviderConfig(t, map[string]string{"secretKey": "sk_legacy"})).
+		SetConfig(encodeWebhookProviderConfig(t, map[string]string{"secretKey": "sk_legacy"})).
 		SetSupportedTypes("stripe").
 		SetEnabled(true).
 		Save(ctx)
