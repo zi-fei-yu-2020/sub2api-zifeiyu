@@ -166,6 +166,7 @@ export default {
     sectionResources: 'Resources & Users',
     sectionCommerce: 'Commerce & Sales',
     sectionSystem: 'Platform & System',
+    home: 'Home',
     dashboard: 'Dashboard',
     announcements: 'Announcements',
     apiKeys: 'API Keys',

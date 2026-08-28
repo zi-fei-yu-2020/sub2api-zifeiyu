@@ -73,10 +73,6 @@
             </div>
           </template>
 
-          <template #cell-description="{ value }">
-            <span class="text-sm text-slate-600 dark:text-slate-400">{{ value || '-' }}</span>
-          </template>
-
           <template #cell-status="{ row }">
             <Toggle
               :modelValue="row.status === 'active'"
@@ -705,7 +701,6 @@ interface PlatformSection {
 // ── Table columns ──
 const columns = computed<Column[]>(() => [
   { key: 'name', label: t('admin.channels.columns.name', 'Name'), sortable: true },
-  { key: 'description', label: t('admin.channels.columns.description', 'Description'), sortable: false },
   { key: 'status', label: t('admin.channels.columns.status', 'Status'), sortable: true },
   { key: 'group_count', label: t('admin.channels.columns.groups', 'Groups'), sortable: false },
   { key: 'pricing_count', label: t('admin.channels.columns.pricing', 'Pricing'), sortable: false },
