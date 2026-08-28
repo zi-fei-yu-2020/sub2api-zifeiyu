@@ -185,3 +185,68 @@ func TestUpdateServiceRollbackToVersionAcceptsVPrefix(t *testing.T) {
 	require.NotErrorIs(t, err, ErrRollbackVersionNotAllowed)
 	require.Contains(t, err.Error(), "no compatible release found")
 }
+
+func TestUpdateServiceCustomBuildUsesUpstreamBaseVersion(t *testing.T) {
+	tests := []struct {
+		name       string
+		latest     string
+		hasUpdate  bool
+		latestBase string
+	}{
+		{name: "same upstream base", latest: "v0.1.183", hasUpdate: false, latestBase: "0.1.183"},
+		{name: "newer upstream base", latest: "v0.1.184", hasUpdate: true, latestBase: "0.1.184"},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			svc := NewUpdateService(
+				&updateServiceCacheStub{},
+				&updateServiceGitHubClientStub{release: &GitHubRelease{TagName: tt.latest}},
+				"0.1.183-zifeiyu",
+				"release",
+			)
+
+			info, err := svc.CheckUpdate(context.Background(), true)
+
+			require.NoError(t, err)
+			require.Equal(t, "0.1.183-zifeiyu", info.CurrentVersion)
+			require.Equal(t, tt.latestBase, info.LatestVersion)
+			require.Equal(t, tt.hasUpdate, info.HasUpdate)
+			require.Equal(t, customBuildType, info.BuildType)
+		})
+	}
+}
+
+func TestUpdateServiceCustomBuildRejectsBinaryUpdateAndRollback(t *testing.T) {
+	svc := NewUpdateService(
+		&updateServiceCacheStub{},
+		&updateServiceGitHubClientStub{},
+		"0.1.183-zifeiyu",
+		"release",
+	)
+
+	require.ErrorIs(t, svc.PerformUpdate(context.Background()), ErrCustomBuildUpdateNotSupported)
+	require.ErrorIs(t, svc.Rollback(), ErrCustomBuildUpdateNotSupported)
+	require.ErrorIs(t, svc.RollbackToVersion(context.Background(), "0.1.182"), ErrCustomBuildUpdateNotSupported)
+
+	versions, err := svc.ListRollbackVersions(context.Background())
+	require.NoError(t, err)
+	require.Empty(t, versions)
+}
+
+func TestCompareVersionsTreatsZifeiyuSuffixAsEditionMetadata(t *testing.T) {
+	tests := []struct {
+		current string
+		latest  string
+		want    int
+	}{
+		{current: "0.1.183-zifeiyu", latest: "0.1.183", want: 0},
+		{current: "v0.1.183-zifeiyu.2", latest: "0.1.184", want: -1},
+		{current: "0.1.184-zifeiyu", latest: "v0.1.183", want: 1},
+		{current: "0.1.183-zifeiyu+build.7", latest: "0.1.183", want: 0},
+	}
+
+	for _, tt := range tests {
+		require.Equal(t, tt.want, compareVersions(tt.current, tt.latest), "%s vs %s", tt.current, tt.latest)
+	}
+}

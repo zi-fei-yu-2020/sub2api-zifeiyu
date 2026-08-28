@@ -23,8 +23,9 @@ import (
 )
 
 var (
-	ErrNoUpdateAvailable         = infraerrors.Conflict("ALREADY_UP_TO_DATE", "no update available; current version is latest")
-	ErrRollbackVersionNotAllowed = infraerrors.BadRequest("ROLLBACK_VERSION_NOT_ALLOWED", "version is not in the allowed rollback list")
+	ErrNoUpdateAvailable             = infraerrors.Conflict("ALREADY_UP_TO_DATE", "no update available; current version is latest")
+	ErrRollbackVersionNotAllowed     = infraerrors.BadRequest("ROLLBACK_VERSION_NOT_ALLOWED", "version is not in the allowed rollback list")
+	ErrCustomBuildUpdateNotSupported = infraerrors.Conflict("CUSTOM_BUILD_UPDATE_NOT_SUPPORTED", "custom builds must be updated by rebuilding from their source repository")
 )
 
 const (
@@ -43,6 +44,9 @@ const (
 	maxRollbackVersions = 3
 	// Fetch a few extra releases so filtering (current/newer/prerelease) still leaves enough candidates
 	rollbackFetchPageSize = 15
+
+	customBuildType     = "custom"
+	customVersionMarker = "-zifeiyu"
 )
 
 // UpdateCache defines cache operations for update service
@@ -151,7 +155,7 @@ func (s *UpdateService) CheckUpdate(ctx context.Context, force bool) (*UpdateInf
 			LatestVersion:  s.currentVersion,
 			HasUpdate:      false,
 			Warning:        err.Error(),
-			BuildType:      s.buildType,
+			BuildType:      s.effectiveBuildType(),
 		}, nil
 	}
 
@@ -163,6 +167,10 @@ func (s *UpdateService) CheckUpdate(ctx context.Context, force bool) (*UpdateInf
 // PerformUpdate downloads and applies the update
 // Uses atomic file replacement pattern for safe in-place updates
 func (s *UpdateService) PerformUpdate(ctx context.Context) error {
+	if s.isCustomBuild() {
+		return ErrCustomBuildUpdateNotSupported
+	}
+
 	info, err := s.CheckUpdate(ctx, true)
 	if err != nil {
 		return err
@@ -281,6 +289,10 @@ func (s *UpdateService) applyReleaseAssets(ctx context.Context, releaseAssets []
 
 // Rollback restores the previous version
 func (s *UpdateService) Rollback() error {
+	if s.isCustomBuild() {
+		return ErrCustomBuildUpdateNotSupported
+	}
+
 	exePath, err := os.Executable()
 	if err != nil {
 		return fmt.Errorf("failed to get executable path: %w", err)
@@ -307,6 +319,10 @@ func (s *UpdateService) Rollback() error {
 // strictly older than the current version (the current version itself is excluded),
 // newest first. Draft and prerelease entries are skipped.
 func (s *UpdateService) ListRollbackVersions(ctx context.Context) ([]RollbackVersion, error) {
+	if s.isCustomBuild() {
+		return []RollbackVersion{}, nil
+	}
+
 	releases, err := s.fetchRollbackCandidates(ctx)
 	if err != nil {
 		return nil, err
@@ -327,6 +343,10 @@ func (s *UpdateService) ListRollbackVersions(ctx context.Context) ([]RollbackVer
 // The target must be one of the versions returned by ListRollbackVersions;
 // anything else (including the current version) is rejected.
 func (s *UpdateService) RollbackToVersion(ctx context.Context, version string) error {
+	if s.isCustomBuild() {
+		return ErrCustomBuildUpdateNotSupported
+	}
+
 	target := strings.TrimPrefix(strings.TrimSpace(version), "v")
 	if target == "" {
 		return ErrRollbackVersionNotAllowed
@@ -428,7 +448,7 @@ func (s *UpdateService) fetchLatestRelease(ctx context.Context) (*UpdateInfo, er
 			Assets:      assets,
 		},
 		Cached:    false,
-		BuildType: s.buildType,
+		BuildType: s.effectiveBuildType(),
 	}, nil
 }
 
@@ -618,7 +638,7 @@ func (s *UpdateService) getFromCache(ctx context.Context) (*UpdateInfo, error) {
 		HasUpdate:      compareVersions(s.currentVersion, cached.Latest) < 0,
 		ReleaseInfo:    cached.ReleaseInfo,
 		Cached:         true,
-		BuildType:      s.buildType,
+		BuildType:      s.effectiveBuildType(),
 	}, nil
 }
 
@@ -637,7 +657,24 @@ func (s *UpdateService) saveToCache(ctx context.Context, info *UpdateInfo) {
 	_ = s.cache.SetUpdateInfo(ctx, string(data), time.Duration(updateCacheTTL)*time.Second)
 }
 
-// compareVersions compares two semantic versions
+func (s *UpdateService) isCustomBuild() bool {
+	return isCustomBuildVersion(s.currentVersion)
+}
+
+func (s *UpdateService) effectiveBuildType() string {
+	if s.isCustomBuild() {
+		return customBuildType
+	}
+	return s.buildType
+}
+
+func isCustomBuildVersion(version string) bool {
+	return strings.Contains(strings.ToLower(strings.TrimSpace(version)), customVersionMarker)
+}
+
+// compareVersions compares the three-part upstream base versions. Downstream
+// build metadata such as "0.1.183-zifeiyu" identifies the edition, not an
+// older upstream patch level, so it must not turn patch 183 into patch 0.
 func compareVersions(current, latest string) int {
 	currentParts := parseVersion(current)
 	latestParts := parseVersion(latest)
@@ -654,7 +691,14 @@ func compareVersions(current, latest string) int {
 }
 
 func parseVersion(v string) [3]int {
-	v = strings.TrimPrefix(v, "v")
+	v = strings.TrimPrefix(strings.TrimSpace(v), "v")
+	if marker := strings.Index(strings.ToLower(v), customVersionMarker); marker >= 0 {
+		v = v[:marker]
+	}
+	if metadata := strings.IndexByte(v, '+'); metadata >= 0 {
+		v = v[:metadata]
+	}
+
 	parts := strings.Split(v, ".")
 	result := [3]int{0, 0, 0}
 	for i := 0; i < len(parts) && i < 3; i++ {
