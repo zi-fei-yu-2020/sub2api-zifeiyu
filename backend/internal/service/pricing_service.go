@@ -176,6 +176,46 @@ type PricingService struct {
 	wg     sync.WaitGroup
 }
 
+type pricingRemoteSource struct {
+	name      string
+	remoteURL string
+	hashURL   string
+}
+
+func (s *PricingService) pricingRemoteSources() []pricingRemoteSource {
+	if s == nil || s.cfg == nil {
+		return nil
+	}
+	candidates := []pricingRemoteSource{
+		{name: "primary", remoteURL: s.cfg.Pricing.RemoteURL, hashURL: s.cfg.Pricing.HashURL},
+		{name: "mirror", remoteURL: s.cfg.Pricing.MirrorRemoteURL, hashURL: s.cfg.Pricing.MirrorHashURL},
+	}
+	sources := make([]pricingRemoteSource, 0, len(candidates))
+	seen := make(map[string]struct{}, len(candidates))
+	for _, candidate := range candidates {
+		candidate.remoteURL = strings.TrimSpace(candidate.remoteURL)
+		candidate.hashURL = strings.TrimSpace(candidate.hashURL)
+		if candidate.remoteURL == "" {
+			continue
+		}
+		if _, exists := seen[candidate.remoteURL]; exists {
+			continue
+		}
+		seen[candidate.remoteURL] = struct{}{}
+		sources = append(sources, candidate)
+	}
+	return sources
+}
+
+func (s *PricingService) hasRemoteHashSource() bool {
+	for _, source := range s.pricingRemoteSources() {
+		if source.hashURL != "" {
+			return true
+		}
+	}
+	return false
+}
+
 // NewPricingService 创建价格服务
 func NewPricingService(cfg *config.Config, remoteClient PricingRemoteClient) *PricingService {
 	if cfg != nil {
@@ -225,7 +265,7 @@ func (s *PricingService) Stop() {
 
 // startUpdateScheduler 启动定时更新调度器
 func (s *PricingService) startUpdateScheduler() {
-	if s == nil || s.cfg == nil || strings.TrimSpace(s.cfg.Pricing.RemoteURL) == "" {
+	if len(s.pricingRemoteSources()) == 0 {
 		logger.LegacyPrintf("service.pricing", "%s", "[Pricing] Remote sync disabled: pricing remote URL is empty")
 		return
 	}
@@ -274,7 +314,7 @@ func (s *PricingService) checkAndUpdatePricing() error {
 	}
 
 	// 如果配置了哈希URL，通过远程哈希检查是否有更新
-	if s.cfg.Pricing.HashURL != "" {
+	if s.hasRemoteHashSource() {
 		remoteHash, err := s.fetchRemoteHash()
 		if err != nil {
 			logger.LegacyPrintf("service.pricing", "[Pricing] Failed to fetch remote hash on startup: %v", err)
@@ -317,7 +357,7 @@ func (s *PricingService) checkAndUpdatePricing() error {
 // syncWithRemote 与远程同步（基于哈希校验）
 func (s *PricingService) syncWithRemote() error {
 	// 如果配置了哈希URL，从远程获取哈希进行比对
-	if s.cfg.Pricing.HashURL != "" {
+	if s.hasRemoteHashSource() {
 		remoteHash, err := s.fetchRemoteHash()
 		if err != nil {
 			logger.LegacyPrintf("service.pricing", "[Pricing] Failed to fetch remote hash: %v", err)
@@ -357,71 +397,80 @@ func (s *PricingService) syncWithRemote() error {
 
 // downloadPricingData 从远程下载价格数据
 func (s *PricingService) downloadPricingData() error {
-	remoteURL, err := s.validatePricingURL(s.cfg.Pricing.RemoteURL)
-	if err != nil {
-		return err
+	sources := s.pricingRemoteSources()
+	if len(sources) == 0 {
+		return fmt.Errorf("pricing remote URL is empty")
 	}
-	logger.LegacyPrintf("service.pricing", "[Pricing] Downloading from %s", remoteURL)
 
-	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
-	defer cancel()
-
-	// 获取远程哈希（用于同步锚点，不作为完整性校验）
-	var remoteHash string
-	if strings.TrimSpace(s.cfg.Pricing.HashURL) != "" {
-		remoteHash, err = s.fetchRemoteHash()
+	failures := make([]string, 0, len(sources))
+	for _, source := range sources {
+		remoteURL, err := s.validatePricingURL(source.remoteURL)
 		if err != nil {
-			logger.LegacyPrintf("service.pricing", "[Pricing] Failed to fetch remote hash (continuing): %v", err)
+			failures = append(failures, fmt.Sprintf("%s: %v", source.name, err))
+			continue
 		}
+		logger.LegacyPrintf("service.pricing", "[Pricing] Downloading from %s source: %s", source.name, remoteURL)
+		if s.remoteClient == nil {
+			failures = append(failures, fmt.Sprintf("%s: pricing remote client is not configured", source.name))
+			continue
+		}
+
+		var remoteHash string
+		if source.hashURL != "" {
+			remoteHash, err = s.fetchRemoteHashFromURL(source.hashURL)
+			if err != nil {
+				logger.LegacyPrintf("service.pricing", "[Pricing] Failed to fetch %s hash (continuing): %v", source.name, err)
+				remoteHash = ""
+			}
+		}
+
+		ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+		body, fetchErr := s.remoteClient.FetchPricingJSON(ctx, remoteURL)
+		cancel()
+		if fetchErr != nil {
+			failures = append(failures, fmt.Sprintf("%s: download failed: %v", source.name, fetchErr))
+			continue
+		}
+
+		dataHash := sha256.Sum256(body)
+		dataHashStr := hex.EncodeToString(dataHash[:])
+		if remoteHash != "" && !strings.EqualFold(remoteHash, dataHashStr) {
+			logger.LegacyPrintf("service.pricing", "[Pricing] Hash mismatch warning for %s source: remote=%s data=%s (hash file may be out of sync)",
+				source.name, remoteHash[:min(8, len(remoteHash))], dataHashStr[:8])
+		}
+
+		data, parseErr := s.parsePricingData(body)
+		if parseErr != nil {
+			failures = append(failures, fmt.Sprintf("%s: parse pricing data: %v", source.name, parseErr))
+			continue
+		}
+		data = s.mergeFallbackPricingData(data)
+
+		pricingFile := s.getPricingFilePath()
+		if err := os.WriteFile(pricingFile, body, 0644); err != nil {
+			logger.LegacyPrintf("service.pricing", "[Pricing] Failed to save file: %v", err)
+		}
+
+		syncHash := dataHashStr
+		if remoteHash != "" {
+			syncHash = remoteHash
+		}
+		hashFile := s.getHashFilePath()
+		if err := os.WriteFile(hashFile, []byte(syncHash+"\n"), 0644); err != nil {
+			logger.LegacyPrintf("service.pricing", "[Pricing] Failed to save hash: %v", err)
+		}
+
+		s.mu.Lock()
+		s.pricingData = data
+		s.lastUpdated = time.Now()
+		s.localHash = syncHash
+		s.mu.Unlock()
+
+		logger.LegacyPrintf("service.pricing", "[Pricing] Downloaded %d models successfully from %s source", len(data), source.name)
+		return nil
 	}
 
-	body, err := s.remoteClient.FetchPricingJSON(ctx, remoteURL)
-	if err != nil {
-		return fmt.Errorf("download failed: %w", err)
-	}
-
-	// 哈希校验：不匹配时仅告警，不阻止更新
-	// 远程哈希文件可能与数据文件不同步（如维护者更新了数据但未更新哈希文件）
-	dataHash := sha256.Sum256(body)
-	dataHashStr := hex.EncodeToString(dataHash[:])
-	if remoteHash != "" && !strings.EqualFold(remoteHash, dataHashStr) {
-		logger.LegacyPrintf("service.pricing", "[Pricing] Hash mismatch warning: remote=%s data=%s (hash file may be out of sync)",
-			remoteHash[:min(8, len(remoteHash))], dataHashStr[:8])
-	}
-
-	// 解析JSON数据（使用灵活的解析方式）
-	data, err := s.parsePricingData(body)
-	if err != nil {
-		return fmt.Errorf("parse pricing data: %w", err)
-	}
-	data = s.mergeFallbackPricingData(data)
-
-	// 保存到本地文件
-	pricingFile := s.getPricingFilePath()
-	if err := os.WriteFile(pricingFile, body, 0644); err != nil {
-		logger.LegacyPrintf("service.pricing", "[Pricing] Failed to save file: %v", err)
-	}
-
-	// 使用远程哈希作为同步锚点，防止重复下载
-	// 当远程哈希不可用时，回退到数据本身的哈希
-	syncHash := dataHashStr
-	if remoteHash != "" {
-		syncHash = remoteHash
-	}
-	hashFile := s.getHashFilePath()
-	if err := os.WriteFile(hashFile, []byte(syncHash+"\n"), 0644); err != nil {
-		logger.LegacyPrintf("service.pricing", "[Pricing] Failed to save hash: %v", err)
-	}
-
-	// 更新内存数据
-	s.mu.Lock()
-	s.pricingData = data
-	s.lastUpdated = time.Now()
-	s.localHash = syncHash
-	s.mu.Unlock()
-
-	logger.LegacyPrintf("service.pricing", "[Pricing] Downloaded %d models successfully", len(data))
-	return nil
+	return fmt.Errorf("all pricing sources failed: %s", strings.Join(failures, "; "))
 }
 
 // parsePricingData 解析价格数据（处理各种格式）
@@ -612,7 +661,28 @@ func (s *PricingService) useFallbackPricing() error {
 
 // fetchRemoteHash 从远程获取哈希值
 func (s *PricingService) fetchRemoteHash() (string, error) {
-	hashURL, err := s.validatePricingURL(s.cfg.Pricing.HashURL)
+	if s.remoteClient == nil {
+		return "", fmt.Errorf("pricing remote client is not configured")
+	}
+	failures := make([]string, 0, 2)
+	for _, source := range s.pricingRemoteSources() {
+		if source.hashURL == "" {
+			continue
+		}
+		hash, err := s.fetchRemoteHashFromURL(source.hashURL)
+		if err == nil {
+			return hash, nil
+		}
+		failures = append(failures, fmt.Sprintf("%s: %v", source.name, err))
+	}
+	if len(failures) == 0 {
+		return "", fmt.Errorf("pricing hash URL is empty")
+	}
+	return "", fmt.Errorf("all pricing hash sources failed: %s", strings.Join(failures, "; "))
+}
+
+func (s *PricingService) fetchRemoteHashFromURL(rawURL string) (string, error) {
+	hashURL, err := s.validatePricingURL(rawURL)
 	if err != nil {
 		return "", err
 	}

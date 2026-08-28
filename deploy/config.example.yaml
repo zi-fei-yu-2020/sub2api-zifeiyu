@@ -159,6 +159,7 @@ security:
     # 允许下载定价数据的主机列表
     pricing_hosts:
       - "raw.githubusercontent.com"
+      - "cdn.jsdelivr.net"
     # Allowed hosts for CRS sync (required when using CRS sync)
     # 允许 CRS 同步的主机列表（使用 CRS 同步功能时必须配置）
     crs_hosts: []
@@ -1062,12 +1063,18 @@ plugins:
 # 定价数据源（可选）
 # =============================================================================
 pricing:
-  # URL to fetch model pricing data (default: pinned model-price-repo commit)
+  # URL to fetch model pricing data (default: model-price-repo main branch)
   # 获取模型定价数据的 URL（默认：固定 commit 的 model-price-repo）
-  remote_url: "https://raw.githubusercontent.com/Wei-Shaw/model-price-repo/refs/heads/main//model_prices_and_context_window.json"
+  remote_url: "https://raw.githubusercontent.com/Wei-Shaw/model-price-repo/main/model_prices_and_context_window.json"
   # Hash verification URL (optional)
   # 哈希校验 URL（可选）
-  hash_url: "https://raw.githubusercontent.com/Wei-Shaw/model-price-repo/refs/heads/main//model_prices_and_context_window.sha256"
+  hash_url: "https://raw.githubusercontent.com/Wei-Shaw/model-price-repo/main/model_prices_and_context_window.sha256"
+  # Mirror used automatically when GitHub Raw is unavailable
+  # Automatic fallback when GitHub Raw is unavailable
+  mirror_remote_url: "https://cdn.jsdelivr.net/gh/Wei-Shaw/model-price-repo@main/model_prices_and_context_window.json"
+  # Hash file served by the same mirror
+  # Hash file for the configured mirror
+  mirror_hash_url: "https://cdn.jsdelivr.net/gh/Wei-Shaw/model-price-repo@main/model_prices_and_context_window.sha256"
   # Local data directory for caching
   # 本地数据缓存目录
   data_dir: "./data"

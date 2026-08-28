@@ -18,6 +18,7 @@ security:
       - api.anthropic.com
     pricing_hosts:
       - raw.githubusercontent.com
+      - cdn.jsdelivr.net
     crs_hosts: []
 ```
 

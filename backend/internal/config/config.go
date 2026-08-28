@@ -664,6 +664,10 @@ type PricingConfig struct {
 	RemoteURL string `mapstructure:"remote_url"`
 	// 哈希校验文件URL
 	HashURL string `mapstructure:"hash_url"`
+	// Primary source fallback for networks where GitHub Raw is unavailable.
+	MirrorRemoteURL string `mapstructure:"mirror_remote_url"`
+	// Hash file served by the same mirror.
+	MirrorHashURL string `mapstructure:"mirror_hash_url"`
 	// 本地数据目录
 	DataDir string `mapstructure:"data_dir"`
 	// 回退文件路径
@@ -2169,6 +2173,7 @@ func setDefaults() {
 	})
 	viper.SetDefault("security.url_allowlist.pricing_hosts", []string{
 		"raw.githubusercontent.com",
+		"cdn.jsdelivr.net",
 	})
 	viper.SetDefault("security.url_allowlist.crs_hosts", []string{})
 	viper.SetDefault("security.url_allowlist.allow_private_hosts", true)
@@ -2400,6 +2405,8 @@ func setDefaults() {
 	// Pricing - 从 model-price-repo 同步模型定价和上下文窗口数据（固定到 commit，避免分支漂移）
 	viper.SetDefault("pricing.remote_url", "https://raw.githubusercontent.com/Wei-Shaw/model-price-repo/main/model_prices_and_context_window.json")
 	viper.SetDefault("pricing.hash_url", "https://raw.githubusercontent.com/Wei-Shaw/model-price-repo/main/model_prices_and_context_window.sha256")
+	viper.SetDefault("pricing.mirror_remote_url", "https://cdn.jsdelivr.net/gh/Wei-Shaw/model-price-repo@main/model_prices_and_context_window.json")
+	viper.SetDefault("pricing.mirror_hash_url", "https://cdn.jsdelivr.net/gh/Wei-Shaw/model-price-repo@main/model_prices_and_context_window.sha256")
 	viper.SetDefault("pricing.data_dir", "./data")
 	viper.SetDefault("pricing.fallback_file", "./resources/model-pricing/model_prices_and_context_window.json")
 	viper.SetDefault("pricing.update_interval_hours", 24)
