@@ -266,7 +266,14 @@ type geminiFileData struct {
 }
 
 type geminiGenerationConfig struct {
-	ResponseModalities []string `json:"responseModalities"`
+	ResponseModalities []string           `json:"responseModalities"`
+	ResponseMimeType   string             `json:"responseMimeType,omitempty"`
+	ImageConfig        *geminiImageConfig `json:"imageConfig,omitempty"`
+}
+
+type geminiImageConfig struct {
+	AspectRatio string `json:"aspectRatio,omitempty"`
+	ImageSize   string `json:"imageSize,omitempty"`
 }
 
 func BuildGeminiBatchJSONL(input BatchImageInput) ([]byte, error) {
@@ -299,17 +306,25 @@ func BuildGeminiBatchJSONL(input BatchImageInput) ([]byte, error) {
 			return nil, err
 		}
 
-		// TODO(batch-image): add response_mime_type/aspect_ratio/image_size once the
-		// Gemini batch image REST shape is stabilized for those options.
+		generationConfig := geminiGenerationConfig{
+			ResponseModalities: []string{"TEXT", "IMAGE"},
+			ResponseMimeType:   geminiBatchTextResponseMimeType(input.ResponseMimeType),
+		}
+		aspectRatio := strings.TrimSpace(input.AspectRatio)
+		imageSize := strings.ToUpper(strings.TrimSpace(input.ImageSize))
+		if aspectRatio != "" || imageSize != "" {
+			generationConfig.ImageConfig = &geminiImageConfig{
+				AspectRatio: aspectRatio,
+				ImageSize:   imageSize,
+			}
+		}
 		line := geminiJSONLLine{
 			Key: customID,
 			Request: geminiGenerateRequest{
 				Contents: []geminiContent{{
 					Parts: parts,
 				}},
-				GenerationConfig: geminiGenerationConfig{
-					ResponseModalities: []string{"TEXT", "IMAGE"},
-				},
+				GenerationConfig: generationConfig,
 			},
 		}
 		if err := enc.Encode(line); err != nil {
@@ -317,6 +332,19 @@ func BuildGeminiBatchJSONL(input BatchImageInput) ([]byte, error) {
 		}
 	}
 	return buf.Bytes(), nil
+}
+
+func geminiBatchTextResponseMimeType(raw string) string {
+	normalized := strings.ToLower(strings.TrimSpace(raw))
+	switch normalized {
+	case "text/plain", "application/json", "application/xml", "application/yaml", "text/x.enum":
+		return normalized
+	default:
+		// Gemini's responseMimeType controls generated text, not the MIME type of
+		// image inlineData. image/png and image/jpeg are therefore intentionally
+		// omitted while aspectRatio/imageSize are sent through imageConfig.
+		return ""
+	}
 }
 
 func batchImageGeminiParts(prompt string, refs []BatchImageReference) ([]geminiPart, error) {

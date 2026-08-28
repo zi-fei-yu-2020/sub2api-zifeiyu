@@ -58,6 +58,39 @@ func TestBuildGeminiBatchJSONL_WritesValidLinesAndPreservesCustomID(t *testing.T
 	requireJSONLLine(t, lines[1], "cover_002", "Second prompt")
 }
 
+func TestBuildGeminiBatchJSONL_WritesImageGenerationConfig(t *testing.T) {
+	input := validGeminiBatchInput()
+	input.ResponseMimeType = "image/png"
+	input.AspectRatio = "16:9"
+	input.ImageSize = "1k"
+
+	jsonl, err := BuildGeminiBatchJSONL(input)
+	require.NoError(t, err)
+
+	var got map[string]any
+	require.NoError(t, json.Unmarshal(bytes.TrimSpace(jsonl), &got))
+	request := got["request"].(map[string]any)
+	config := request["generationConfig"].(map[string]any)
+	require.NotContains(t, config, "responseMimeType", "image MIME is returned in inlineData and is not a Gemini text responseMimeType")
+	imageConfig := config["imageConfig"].(map[string]any)
+	require.Equal(t, "16:9", imageConfig["aspectRatio"])
+	require.Equal(t, "1K", imageConfig["imageSize"])
+}
+
+func TestBuildGeminiBatchJSONL_WritesSupportedTextResponseMimeType(t *testing.T) {
+	input := validGeminiBatchInput()
+	input.ResponseMimeType = "application/json"
+
+	jsonl, err := BuildGeminiBatchJSONL(input)
+	require.NoError(t, err)
+
+	var got map[string]any
+	require.NoError(t, json.Unmarshal(bytes.TrimSpace(jsonl), &got))
+	request := got["request"].(map[string]any)
+	config := request["generationConfig"].(map[string]any)
+	require.Equal(t, "application/json", config["responseMimeType"])
+}
+
 func TestBuildGeminiBatchJSONL_RejectsDuplicateCustomIDs(t *testing.T) {
 	input := validGeminiBatchInput()
 	input.Items = append(input.Items, BatchImageInputItem{CustomID: "cover_001", Prompt: "Duplicate"})
