@@ -41,6 +41,12 @@ describe('buildAuthErrorMessage', () => {
     expect(message).toBe('error message')
   })
 
+  it('supports interceptor plain-object and string errors without loading i18n', () => {
+    expect(buildAuthErrorMessage({ detail: 'top-level detail' }, { fallback: 'fallback' })).toBe('top-level detail')
+    expect(buildAuthErrorMessage({ error: 'top-level error' }, { fallback: 'fallback' })).toBe('top-level error')
+    expect(buildAuthErrorMessage('string error', { fallback: 'fallback' })).toBe('string error')
+  })
+
   it('uses fallback when no message can be extracted', () => {
     expect(buildAuthErrorMessage({}, { fallback: 'fallback' })).toBe('fallback')
   })

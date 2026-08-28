@@ -7,24 +7,21 @@
  */
 
 import { getLocale } from '@/i18n'
+import {
+  extractApiErrorCode,
+  extractApiErrorMetadata,
+  normalizeApiError,
+} from './apiErrorCore'
 
-interface ApiErrorLike {
-  status?: number
-  code?: number | string
-  message?: string
-  error?: string
-  reason?: string
-  metadata?: Record<string, unknown>
-  response?: {
-    status?: number
-    data?: {
-      detail?: string
-      message?: string
-      code?: number | string
-      error?: string
-    }
-  }
-}
+export {
+  extractApiErrorCode,
+  extractApiErrorMetadata,
+  extractApiErrorReason,
+  extractApiErrorStatus,
+  isApiErrorCode,
+  normalizeApiError,
+} from './apiErrorCore'
+export type { ApiErrorLike, NormalizedApiError } from './apiErrorCore'
 
 const ZH_ERROR_TRANSLATIONS: Record<string, string> = {
   'internal server error': '服务器内部错误，请稍后重试',
@@ -101,19 +98,6 @@ function localizeRawErrorMessage(rawMsg: string, status?: number): string {
   return trimmed
 }
 
-export function extractApiErrorCode(err: unknown): string | undefined {
-  if (!err || typeof err !== 'object') return undefined
-  const e = err as ApiErrorLike
-  const code = e.reason ?? e.code ?? e.response?.data?.code
-  return code != null ? String(code) : undefined
-}
-
-export function extractApiErrorMetadata(err: unknown): Record<string, unknown> | undefined {
-  if (!err || typeof err !== 'object') return undefined
-  const e = err as ApiErrorLike
-  return e.metadata
-}
-
 type TranslateFn = (key: string, params?: Record<string, unknown>) => string
 type TranslateWithExistsFn = TranslateFn & { te?: (key: string) => boolean }
 
@@ -168,16 +152,12 @@ export function extractApiErrorMessage(
     const code = extractApiErrorCode(err)
     if (code && i18nMap[code]) return i18nMap[code]
   }
-  if (typeof err === 'object' && err !== null) {
-    const e = err as ApiErrorLike
-    const status = e.status ?? e.response?.status
-    const raw = e.message || e.error || e.response?.data?.detail || e.response?.data?.message || e.response?.data?.error
-    if (raw) {
-      return localizeRawErrorMessage(raw, status)
-    }
-    if (status && STATUS_TO_ZH[status]) {
-      return getLocale() === 'zh' ? STATUS_TO_ZH[status] : ('HTTP ' + status)
-    }
+  const normalized = normalizeApiError(err)
+  if (normalized.message) {
+    return localizeRawErrorMessage(normalized.message, normalized.status)
+  }
+  if (normalized.status && STATUS_TO_ZH[normalized.status]) {
+    return getLocale() === 'zh' ? STATUS_TO_ZH[normalized.status] : ('HTTP ' + normalized.status)
   }
   if (err instanceof Error) {
     return localizeRawErrorMessage(err.message)

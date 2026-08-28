@@ -1,6 +1,8 @@
 import axios from 'axios'
 import type { ApiResponse } from '@/types'
 import { getAPIBaseURL } from './url'
+import { publishAuthSessionEvent } from '@/utils/authSessionSync'
+import { logAuthEvent } from '@/utils/authLog'
 
 const AUTH_TOKEN_KEY = 'auth_token'
 const AUTH_USER_KEY = 'auth_user'
@@ -139,6 +141,8 @@ function persistTokenPair(tokens: RefreshTokenResponse): void {
     localStorage.removeItem(REFRESH_COOKIE_KEY)
   }
   localStorage.setItem(REFRESH_GENERATION_KEY, `${Date.now()}-${Math.random()}`)
+  publishAuthSessionEvent('refresh')
+  logAuthEvent('debug', 'token_refresh_succeeded')
 }
 
 async function requestTokenPair(
@@ -199,8 +203,10 @@ async function requestTokenPair(
         : Date.now() + PEER_REFRESH_WAIT_MS
     )
     if (peerResult) {
+      logAuthEvent('debug', 'token_refresh_peer_adopted')
       return peerResult
     }
+    logAuthEvent('warn', 'token_refresh_failed', error)
     throw error
   }
 }

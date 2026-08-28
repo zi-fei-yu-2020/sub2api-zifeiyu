@@ -13,6 +13,9 @@ import type {
   AuthResponse,
   ActionCaptchaRequestProof
 } from '@/types'
+import { clearStoredAuthSession, publishAuthSessionEvent, subscribeAuthSessionEvents } from '@/utils/authSessionSync'
+import { extractApiErrorStatus } from '@/utils/apiError'
+import { logAuthEvent } from '@/utils/authLog'
 
 const AUTH_TOKEN_KEY = 'auth_token'
 const AUTH_USER_KEY = 'auth_user'
@@ -86,6 +89,7 @@ export const useAuthStore = defineStore('auth', () => {
   const pendingAuthSession = ref<PendingAuthSessionSummary | null>(null)
   let refreshIntervalId: ReturnType<typeof setInterval> | null = null
   let tokenRefreshTimeoutId: ReturnType<typeof setTimeout> | null = null
+  let authSyncUnsubscribe: (() => void) | null = null
 
   // ==================== Computed ====================
 
@@ -102,12 +106,53 @@ export const useAuthStore = defineStore('auth', () => {
 
   // ==================== Actions ====================
 
+  function syncAuthFromStorage(): void {
+    stopAutoRefresh()
+    stopTokenRefresh()
+
+    const savedToken = localStorage.getItem(AUTH_TOKEN_KEY)
+    const savedUser = localStorage.getItem(AUTH_USER_KEY)
+    if (!savedToken || !savedUser) {
+      token.value = null
+      refreshTokenValue.value = null
+      tokenExpiresAt.value = null
+      user.value = null
+      return
+    }
+
+    try {
+      token.value = savedToken
+      user.value = JSON.parse(savedUser)
+      refreshTokenValue.value = localStorage.getItem(REFRESH_TOKEN_KEY)
+      const savedExpiresAt = localStorage.getItem(TOKEN_EXPIRES_AT_KEY)
+      tokenExpiresAt.value = savedExpiresAt ? parseInt(savedExpiresAt, 10) : null
+      startAutoRefresh()
+      if ((refreshTokenValue.value || localStorage.getItem(REFRESH_COOKIE_KEY) === '1') && tokenExpiresAt.value !== null) {
+        scheduleTokenRefreshAt(tokenExpiresAt.value)
+      }
+    } catch (error) {
+      logAuthEvent('warn', 'cross_tab_session_parse_failed', error)
+      clearAuth({ broadcast: false })
+    }
+  }
+
+  function initializeAuthSync(): void {
+    if (authSyncUnsubscribe) return
+    authSyncUnsubscribe = subscribeAuthSessionEvents((event) => {
+      syncAuthFromStorage()
+      if ((event.type === 'logout' || event.type === 'clear') && !window.location.pathname.includes('/login')) {
+        window.location.href = '/login'
+      }
+    })
+  }
+
   /**
    * Initialize auth state from localStorage
    * Call this on app startup to restore session
    * Also starts auto-refresh and immediately fetches latest user data
    */
   function checkAuth(): void {
+    initializeAuthSync()
     const savedToken = localStorage.getItem(AUTH_TOKEN_KEY)
     const savedUser = localStorage.getItem(AUTH_USER_KEY)
     const savedRefreshToken = localStorage.getItem(REFRESH_TOKEN_KEY)
@@ -123,7 +168,7 @@ export const useAuthStore = defineStore('auth', () => {
 
         // Immediately refresh user data from backend (async, don't block)
         refreshUser().catch((error) => {
-          console.error('Failed to refresh user on init:', error)
+          logAuthEvent('warn', 'initial_user_refresh_failed', error)
         })
 
         // Start auto-refresh interval for user data
@@ -152,7 +197,7 @@ export const useAuthStore = defineStore('auth', () => {
     refreshIntervalId = setInterval(() => {
       if (token.value) {
         refreshUser().catch((error) => {
-          console.error('Auto-refresh user failed:', error)
+          logAuthEvent('warn', 'automatic_user_refresh_failed', error)
         })
       }
     }, AUTO_REFRESH_INTERVAL)
@@ -229,7 +274,7 @@ export const useAuthStore = defineStore('auth', () => {
       // Schedule next refresh (this also updates tokenExpiresAt and localStorage)
       scheduleTokenRefresh(response.expires_in)
     } catch (error) {
-      console.error('Token refresh failed:', error)
+      logAuthEvent('warn', 'proactive_token_refresh_failed', error)
       // Don't clear auth here - the interceptor will handle 401 errors
     }
   }
@@ -337,6 +382,7 @@ export const useAuthStore = defineStore('auth', () => {
     if ((response.refresh_cookie || response.refresh_token) && response.expires_in) {
       scheduleTokenRefresh(response.expires_in)
     }
+    publishAuthSessionEvent('login')
   }
 
   /**
@@ -398,6 +444,7 @@ export const useAuthStore = defineStore('auth', () => {
       }
 
       clearPendingAuthSession()
+      publishAuthSessionEvent('login')
       return userData
     } catch (error) {
       clearAuth({ preservePendingAuthSession: pendingAuthSession.value !== null })
@@ -429,8 +476,7 @@ export const useAuthStore = defineStore('auth', () => {
       // Call API logout (revokes refresh token on server)
       await authAPI.logout()
     } catch (err) {
-      // 服务端吊销失败（网络/5xx/超时）不应阻止本地登出，否则用户点了退出仍处于登录态。
-      console.warn('Logout API call failed, clearing local session anyway', err)
+      logAuthEvent('warn', 'logout_api_failed', err)
     } finally {
       // Always clear local state (tokens, user data, refresh timers)
       clearAuth()
@@ -462,7 +508,7 @@ export const useAuthStore = defineStore('auth', () => {
       return userData
     } catch (error) {
       // If refresh fails with 401, clear auth state
-      if ((error as { status?: number }).status === 401) {
+      if (extractApiErrorStatus(error) === 401) {
         clearAuth({ preservePendingAuthSession: pendingAuthSession.value !== null })
       }
       throw error
@@ -473,7 +519,7 @@ export const useAuthStore = defineStore('auth', () => {
    * Clear all authentication state
    * Internal helper function
    */
-  function clearAuth(options?: { preservePendingAuthSession?: boolean }): void {
+  function clearAuth(options?: { preservePendingAuthSession?: boolean; broadcast?: boolean }): void {
     // Stop auto-refresh
     stopAutoRefresh()
     // Stop token refresh
@@ -483,12 +529,10 @@ export const useAuthStore = defineStore('auth', () => {
     refreshTokenValue.value = null
     tokenExpiresAt.value = null
     user.value = null
-    localStorage.removeItem(AUTH_TOKEN_KEY)
-    localStorage.removeItem(AUTH_USER_KEY)
-    localStorage.removeItem(REFRESH_TOKEN_KEY)
-    localStorage.removeItem(TOKEN_EXPIRES_AT_KEY)
-    localStorage.removeItem('refresh_cookie_enabled')
-    localStorage.removeItem('refresh_generation')
+    clearStoredAuthSession()
+    if (options?.broadcast !== false) {
+      publishAuthSessionEvent('logout')
+    }
 
     if (options?.preservePendingAuthSession) {
       pendingAuthSession.value = getPersistedPendingAuthSession()

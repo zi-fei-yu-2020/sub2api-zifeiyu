@@ -1145,6 +1145,7 @@ import type { Column } from '@/components/common/types'
 import type { BatchApiKeyUsageStats } from '@/api/usage'
 import { formatDateTime } from '@/utils/format'
 import { maskApiKey } from '@/utils/maskApiKey'
+import { extractApiErrorMessage } from '@/utils/apiError'
 import {
   buildCcSwitchImportDeeplink,
   type CcSwitchClientType
@@ -1754,8 +1755,8 @@ const handleSubmit = async () => {
     }
     closeModals()
     loadApiKeys()
-  } catch (error: any) {
-    const errorMsg = error.response?.data?.detail || t('keys.failedToSave')
+  } catch (error: unknown) {
+    const errorMsg = extractApiErrorMessage(error, t('keys.failedToSave'))
     appStore.showError(errorMsg)
     // Don't advance tour on error
   } finally {

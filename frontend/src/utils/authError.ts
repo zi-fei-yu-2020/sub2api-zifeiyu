@@ -1,16 +1,29 @@
-interface APIErrorLike {
+interface AuthErrorLike {
+  detail?: string
   message?: string
+  error?: string
   response?: {
     data?: {
       detail?: string
       message?: string
+      error?: string
     }
   }
 }
 
-function extractErrorMessage(error: unknown): string {
-  const err = (error || {}) as APIErrorLike
-  return err.response?.data?.detail || err.response?.data?.message || err.message || ''
+function extractAuthErrorMessage(error: unknown): string {
+  if (typeof error === 'string') return error.trim()
+  if (!error || typeof error !== 'object') return ''
+  const err = error as AuthErrorLike
+  return (
+    err.response?.data?.detail ||
+    err.response?.data?.message ||
+    err.response?.data?.error ||
+    err.detail ||
+    err.message ||
+    err.error ||
+    ''
+  ).trim()
 }
 
 export function buildAuthErrorMessage(
@@ -19,7 +32,5 @@ export function buildAuthErrorMessage(
     fallback: string
   }
 ): string {
-  const { fallback } = options
-  const message = extractErrorMessage(error)
-  return message || fallback
+  return extractAuthErrorMessage(error) || options.fallback
 }

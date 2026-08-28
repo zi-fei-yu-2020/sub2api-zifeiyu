@@ -14,6 +14,8 @@ import {
 } from './adminUIRequest'
 import { refreshAuthTokens } from './tokenRefresh'
 import { getAPIBaseURL } from './url'
+import { clearStoredAuthSession, publishAuthSessionEvent } from '@/utils/authSessionSync'
+import { logAuthEvent } from '@/utils/authLog'
 export { buildApiUrl, buildGatewayUrl } from './url'
 
 // ==================== Axios Instance Configuration ====================
@@ -201,10 +203,9 @@ apiClient.interceptors.response.use(
             }
 
             // Clear tokens and redirect to login
-            localStorage.removeItem('auth_token')
-            localStorage.removeItem('refresh_token')
-            localStorage.removeItem('auth_user')
-            localStorage.removeItem('token_expires_at')
+            clearStoredAuthSession()
+            publishAuthSessionEvent('clear')
+            logAuthEvent('error', 'token_refresh_session_cleared')
             sessionStorage.setItem('auth_expired', '1')
 
             if (!window.location.pathname.includes('/login')) {
@@ -230,10 +231,8 @@ apiClient.interceptors.response.use(
               ? authHeader.length > 0
               : !!authHeader
 
-        localStorage.removeItem('auth_token')
-        localStorage.removeItem('refresh_token')
-        localStorage.removeItem('auth_user')
-        localStorage.removeItem('token_expires_at')
+        clearStoredAuthSession()
+        publishAuthSessionEvent('clear')
         if ((hasToken || sentAuth) && !isAuthEndpoint) {
           sessionStorage.setItem('auth_expired', '1')
         }
