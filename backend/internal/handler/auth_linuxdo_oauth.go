@@ -255,7 +255,7 @@ func (h *AuthHandler) LinuxDoOAuthCallback(c *gin.Context) {
 	// 安全考虑：不要把第三方返回的 email 直接映射到本地账号（可能与本地邮箱用户冲突导致账号被接管）。
 	// 统一使用基于 subject 的稳定合成邮箱来做账号绑定。
 	if subject != "" {
-		email = linuxDoSyntheticEmail(subject)
+		email = buildLinuxDoOAuthEmail(username, subject)
 	}
 	identityKey := service.PendingAuthIdentityKey{
 		ProviderType:    "linuxdo",
@@ -763,7 +763,7 @@ func linuxDoParseUserInfo(body string, cfg config.LinuxDoConnectConfig) (email s
 	email = strings.TrimSpace(email)
 	if email == "" {
 		// LinuxDo Connect 的 userinfo 可能不提供 email。为兼容现有用户模型（email 必填且唯一），使用稳定的合成邮箱。
-		email = linuxDoSyntheticEmail(subject)
+		email = buildLinuxDoOAuthEmail(username, subject)
 	}
 
 	username = strings.TrimSpace(username)
@@ -1163,11 +1163,7 @@ func isSafeLinuxDoSubject(subject string) bool {
 }
 
 func linuxDoSyntheticEmail(subject string) string {
-	subject = strings.TrimSpace(subject)
-	if subject == "" {
-		return ""
-	}
-	return "linuxdo-" + subject + service.LinuxDoConnectSyntheticEmailDomain
+	return buildLinuxDoOAuthEmail("", subject)
 }
 
 func normalizeOAuthIntent(raw string) string {

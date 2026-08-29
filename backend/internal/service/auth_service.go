@@ -1181,7 +1181,7 @@ func inferLegacySignupSource(email string) string {
 	switch {
 	case strings.HasSuffix(normalized, DingTalkConnectSyntheticEmailDomain):
 		return "dingtalk"
-	case strings.HasSuffix(normalized, LinuxDoConnectSyntheticEmailDomain):
+	case strings.HasSuffix(normalized, LinuxDoConnectSyntheticEmailDomain), strings.HasSuffix(normalized, LinuxDoConnectLegacyEmailDomain):
 		return "linuxdo"
 	case strings.HasSuffix(normalized, OIDCConnectSyntheticEmailDomain):
 		return "oidc"
@@ -1399,7 +1399,7 @@ func randomHexString(byteLength int) (string, error) {
 
 func isReservedEmail(email string) bool {
 	normalized := strings.ToLower(strings.TrimSpace(email))
-	return strings.HasSuffix(normalized, LinuxDoConnectSyntheticEmailDomain) ||
+	return strings.HasSuffix(normalized, LinuxDoConnectSyntheticEmailDomain) || strings.HasSuffix(normalized, LinuxDoConnectLegacyEmailDomain) ||
 		strings.HasSuffix(normalized, OIDCConnectSyntheticEmailDomain) ||
 		strings.HasSuffix(normalized, WeChatConnectSyntheticEmailDomain) ||
 		strings.HasSuffix(normalized, DingTalkConnectSyntheticEmailDomain)
