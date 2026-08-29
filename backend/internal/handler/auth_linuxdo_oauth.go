@@ -1006,7 +1006,33 @@ func sanitizeFrontendRedirectPath(path string) string {
 	if strings.ContainsAny(path, "\r\n") {
 		return ""
 	}
+	if isOAuthCallbackRedirectPath(path) {
+		return ""
+	}
 	return path
+}
+
+func isOAuthCallbackRedirectPath(path string) bool {
+	parsed, err := url.Parse(path)
+	if err != nil {
+		return true
+	}
+	pathname := strings.TrimSuffix(strings.ToLower(parsed.Path), "/")
+	if pathname == "" {
+		return false
+	}
+	if pathname == "/auth/callback" || pathname == "/auth/oauth/callback" {
+		return true
+	}
+	if strings.HasPrefix(pathname, "/oauth/") ||
+		strings.HasPrefix(pathname, "/api/oauth/") ||
+		strings.HasPrefix(pathname, "/api/v1/oauth/") {
+		return true
+	}
+	if strings.HasPrefix(pathname, "/auth/") && strings.HasSuffix(pathname, "/callback") {
+		return true
+	}
+	return strings.HasPrefix(pathname, "/api/v1/auth/oauth/") && strings.HasSuffix(pathname, "/callback")
 }
 
 func isRequestHTTPS(c *gin.Context) bool {
