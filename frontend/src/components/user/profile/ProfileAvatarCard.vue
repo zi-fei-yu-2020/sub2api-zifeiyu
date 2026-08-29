@@ -236,7 +236,7 @@ async function handleAvatarSave() {
   avatarSaving.value = true
   try {
     const updated = await userAPI.updateProfile({ avatar_url: normalized })
-    authStore.user = updated
+    authStore.updateUserSnapshot(updated)
     avatarDraft.value = updated.avatar_url?.trim() || ''
     appStore.showSuccess(t('profile.avatar.saveSuccess'))
   } catch (error: unknown) {
@@ -258,7 +258,7 @@ async function handleAvatarDelete() {
   avatarSaving.value = true
   try {
     const updated = await userAPI.updateProfile({ avatar_url: '' })
-    authStore.user = updated
+    authStore.updateUserSnapshot(updated)
     avatarDraft.value = ''
     appStore.showSuccess(t('profile.avatar.deleteSuccess'))
   } catch (error: unknown) {

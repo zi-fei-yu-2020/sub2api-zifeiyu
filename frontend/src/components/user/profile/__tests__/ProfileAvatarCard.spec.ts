@@ -13,7 +13,10 @@ const {
   showSuccessMock: vi.fn(),
   showErrorMock: vi.fn(),
   authStoreState: {
-    user: null as User | null
+    user: null as User | null,
+    updateUserSnapshot: vi.fn((user: User) => {
+      authStoreState.user = user
+    })
   }
 }))
 
@@ -150,6 +153,7 @@ describe('ProfileAvatarCard', () => {
     showSuccessMock.mockReset()
     showErrorMock.mockReset()
     authStoreState.user = null
+    authStoreState.updateUserSnapshot.mockClear()
   })
 
   afterEach(() => {
@@ -205,6 +209,7 @@ describe('ProfileAvatarCard', () => {
     expect(updateProfileMock).toHaveBeenCalledWith({
       avatar_url: 'data:image/webp;base64,Y29tcHJlc3NlZC1hdmF0YXI='
     })
+    expect(authStoreState.updateUserSnapshot).toHaveBeenCalledWith(updatedUser)
     expect(showErrorMock).not.toHaveBeenCalled()
   })
 

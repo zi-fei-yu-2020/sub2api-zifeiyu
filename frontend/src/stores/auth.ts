@@ -483,6 +483,12 @@ export const useAuthStore = defineStore('auth', () => {
     }
   }
 
+  function updateUserSnapshot(userData: User): void {
+    user.value = userData
+    localStorage.setItem(AUTH_USER_KEY, JSON.stringify(userData))
+    publishAuthSessionEvent('profile')
+  }
+
   /**
    * Refresh current user data
    * Fetches latest user info from the server
@@ -502,7 +508,7 @@ export const useAuthStore = defineStore('auth', () => {
       const { run_mode: _run_mode, ...userData } = response.data
       user.value = userData
 
-      // Update localStorage
+      // Update localStorage without broadcasting every periodic refresh.
       localStorage.setItem(AUTH_USER_KEY, JSON.stringify(userData))
 
       return userData
@@ -567,6 +573,7 @@ export const useAuthStore = defineStore('auth', () => {
     logout,
     checkAuth,
     refreshUser,
+    updateUserSnapshot,
     setPendingAuthSession,
     clearPendingAuthSession
   }

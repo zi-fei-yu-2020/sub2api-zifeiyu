@@ -342,6 +342,18 @@ describe('useAuthStore', () => {
     })
   })
 
+  describe('updateUserSnapshot', () => {
+    it('updates memory and localStorage immediately after a profile change', () => {
+      const store = useAuthStore()
+      const updatedUser = { ...fakeUser, avatar_url: 'data:image/webp;base64,YXZhdGFy' }
+
+      store.updateUserSnapshot(updatedUser)
+
+      expect(store.user).toEqual(updatedUser)
+      expect(JSON.parse(localStorage.getItem('auth_user')!)).toEqual(updatedUser)
+    })
+  })
+
   // --- refreshUser ---
 
   describe('refreshUser', () => {

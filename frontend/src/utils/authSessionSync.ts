@@ -11,7 +11,7 @@ const AUTH_SYNC_CHANNEL = 'sub2api-auth-session'
 const AUTH_SYNC_EVENT_KEY = 'auth_session_event'
 const sourceId = `${Date.now()}-${Math.random()}`
 
-export type AuthSessionEventType = 'login' | 'logout' | 'refresh' | 'clear'
+export type AuthSessionEventType = 'login' | 'logout' | 'refresh' | 'profile' | 'clear'
 
 export interface AuthSessionEvent {
   type: AuthSessionEventType

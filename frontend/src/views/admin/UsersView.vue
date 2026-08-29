@@ -279,12 +279,18 @@
           @sort="handleSort"
           @update:selected-keys="handleSelectedKeysUpdate"
         >
-          <template #cell-email="{ value }">
+          <template #cell-email="{ value, row }">
             <div class="flex items-center gap-2">
               <div
-                class="flex h-8 w-8 items-center justify-center rounded-full bg-primary-100 dark:bg-primary-900/30"
+                class="flex h-8 w-8 items-center justify-center overflow-hidden rounded-full bg-primary-100 dark:bg-primary-900/30"
               >
-                <span class="text-sm font-medium text-primary-700 dark:text-primary-300">
+                <img
+                  v-if="row.avatar_url"
+                  :src="row.avatar_url"
+                  :alt="row.username || value"
+                  class="h-full w-full object-cover"
+                >
+                <span v-else class="text-sm font-medium text-primary-700 dark:text-primary-300">
                   {{ value.charAt(0).toUpperCase() }}
                 </span>
               </div>
