@@ -106,6 +106,18 @@ sudo systemctl reload nginx
 
 The application port remains loopback-only. Public access goes through Nginx and the configured TLS/CDN layer.
 
+### LinuxDO Connect callback
+
+Register this exact callback URL in both the Sub2API admin setting and the LinuxDO Connect application:
+
+```text
+https://sub2api.112102.xyz/api/v1/auth/oauth/linuxdo/callback
+```
+
+The tracked Nginx vhost redirects legacy New-API callback paths (`/oauth/linuxdo` and `/api/oauth/linuxdo`) to the canonical backend callback while preserving `code` and `state`. The redirect is required before backend handling so path-scoped OAuth cookies are sent on the canonical request.
+
+Do not use the incorrect path `/api/v1/auth/linuxdo/callback`; it is missing the `/oauth/` segment.
+
 ## IPv6-only SOCKS proxies
 
 Verify the application received an IPv6 route:
