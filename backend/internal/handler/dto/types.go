@@ -13,6 +13,8 @@ type User struct {
 	ID            int64      `json:"id"`
 	Email         string     `json:"email"`
 	Username      string     `json:"username"`
+	AvatarURL     string     `json:"avatar_url,omitempty"`
+	AvatarSource  string     `json:"avatar_source,omitempty"`
 	Role          string     `json:"role"`
 	Balance       float64    `json:"balance"`
 	FrozenBalance float64    `json:"frozen_balance"`

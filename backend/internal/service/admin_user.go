@@ -21,6 +21,10 @@ import (
 	"github.com/Wei-Shaw/sub2api/internal/pkg/usagestats"
 )
 
+type userAvatarBatchReader interface {
+	GetUserAvatars(ctx context.Context, userIDs []int64) (map[int64]*UserAvatar, error)
+}
+
 // User management implementations
 func (s *adminServiceImpl) ListUsers(ctx context.Context, page, pageSize int, filters UserListFilters, sortBy, sortOrder string) ([]User, int64, error) {
 	params := pagination.PaginationParams{Page: page, PageSize: pageSize, SortBy: sortBy, SortOrder: sortOrder}
@@ -43,6 +47,7 @@ func (s *adminServiceImpl) ListUsers(ctx context.Context, page, pageSize int, fi
 		}
 	}
 	// 批量加载用户专属分组倍率
+	s.hydrateAdminUserAvatars(ctx, users)
 	if s.userGroupRateRepo != nil && len(users) > 0 {
 		if batchRepo, ok := s.userGroupRateRepo.(userGroupRateBatchReader); ok {
 			userIDs := make([]int64, 0, len(users))
@@ -86,6 +91,9 @@ func (s *adminServiceImpl) GetUser(ctx context.Context, id int64) (*User, error)
 	if err != nil {
 		return nil, err
 	}
+	if avatars := s.loadAdminUserAvatars(ctx, []int64{id}); avatars != nil {
+		applyUserAvatar(user, avatars[id])
+	}
 	lastUsedAt, latestErr := s.userRepo.GetLatestUsedAtByUserID(ctx, id)
 	if latestErr != nil {
 		logger.LegacyPrintf("service.admin", "failed to load user last_used_at: user_id=%d err=%v", id, latestErr)
@@ -105,7 +113,44 @@ func (s *adminServiceImpl) GetUser(ctx context.Context, id int64) (*User, error)
 }
 
 func (s *adminServiceImpl) GetUserIncludeDeleted(ctx context.Context, id int64) (*User, error) {
-	return s.userRepo.GetByIDIncludeDeleted(ctx, id)
+	user, err := s.userRepo.GetByIDIncludeDeleted(ctx, id)
+	if err != nil {
+		return nil, err
+	}
+	if avatars := s.loadAdminUserAvatars(ctx, []int64{id}); avatars != nil {
+		applyUserAvatar(user, avatars[id])
+	}
+	return user, nil
+}
+
+func (s *adminServiceImpl) loadAdminUserAvatars(ctx context.Context, userIDs []int64) map[int64]*UserAvatar {
+	reader, ok := s.userRepo.(userAvatarBatchReader)
+	if !ok || len(userIDs) == 0 {
+		return nil
+	}
+	avatars, err := reader.GetUserAvatars(ctx, userIDs)
+	if err != nil {
+		logger.LegacyPrintf("service.admin", "failed to load user avatars in batch: err=%v", err)
+		return nil
+	}
+	return avatars
+}
+
+func (s *adminServiceImpl) hydrateAdminUserAvatars(ctx context.Context, users []User) {
+	if len(users) == 0 {
+		return
+	}
+	userIDs := make([]int64, 0, len(users))
+	for i := range users {
+		userIDs = append(userIDs, users[i].ID)
+	}
+	avatars := s.loadAdminUserAvatars(ctx, userIDs)
+	if avatars == nil {
+		return
+	}
+	for i := range users {
+		applyUserAvatar(&users[i], avatars[users[i].ID])
+	}
 }
 
 // normalizeUserRole 校验并归一化角色输入。

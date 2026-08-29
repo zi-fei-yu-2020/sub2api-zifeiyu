@@ -19,6 +19,8 @@ func TestUserFromServiceAdmin_MapsActivityTimestamps(t *testing.T) {
 		ID:           42,
 		Email:        "admin@example.com",
 		Username:     "admin",
+		AvatarURL:    "data:image/webp;base64,YXZhdGFy",
+		AvatarSource: "inline",
 		Role:         service.RoleAdmin,
 		Status:       service.StatusActive,
 		LastActiveAt: &lastActiveAt,
@@ -26,6 +28,8 @@ func TestUserFromServiceAdmin_MapsActivityTimestamps(t *testing.T) {
 	})
 
 	require.NotNil(t, out)
+	require.Equal(t, "data:image/webp;base64,YXZhdGFy", out.AvatarURL)
+	require.Equal(t, "inline", out.AvatarSource)
 	require.NotNil(t, out.LastActiveAt)
 	require.NotNil(t, out.LastUsedAt)
 	require.WithinDuration(t, lastActiveAt, *out.LastActiveAt, time.Second)

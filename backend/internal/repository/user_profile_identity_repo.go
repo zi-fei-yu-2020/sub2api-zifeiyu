@@ -21,6 +21,7 @@ import (
 	dbpredicate "github.com/Wei-Shaw/sub2api/ent/predicate"
 	infraerrors "github.com/Wei-Shaw/sub2api/internal/pkg/errors"
 	"github.com/Wei-Shaw/sub2api/internal/service"
+	"github.com/lib/pq"
 )
 
 var (
@@ -761,6 +762,48 @@ WHERE user_id = $1`, userID)
 		return nil, err
 	}
 	return &avatar, nil
+}
+
+func (r *userRepository) GetUserAvatars(ctx context.Context, userIDs []int64) (map[int64]*service.UserAvatar, error) {
+	result := make(map[int64]*service.UserAvatar, len(userIDs))
+	if len(userIDs) == 0 {
+		return result, nil
+	}
+
+	exec, err := r.userProfileIdentitySQL(ctx)
+	if err != nil {
+		return nil, err
+	}
+	rows, err := exec.QueryContext(ctx, `
+SELECT user_id, storage_provider, storage_key, url, content_type, byte_size, sha256
+FROM user_avatars
+WHERE user_id = ANY($1)`, pq.Array(userIDs))
+	if err != nil {
+		return nil, err
+	}
+	defer func() { _ = rows.Close() }()
+
+	for rows.Next() {
+		var userID int64
+		var avatar service.UserAvatar
+		if err := rows.Scan(
+			&userID,
+			&avatar.StorageProvider,
+			&avatar.StorageKey,
+			&avatar.URL,
+			&avatar.ContentType,
+			&avatar.ByteSize,
+			&avatar.SHA256,
+		); err != nil {
+			return nil, err
+		}
+		avatarCopy := avatar
+		result[userID] = &avatarCopy
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return result, nil
 }
 
 func (r *userRepository) UpsertUserAvatar(ctx context.Context, userID int64, input service.UpsertUserAvatarInput) (*service.UserAvatar, error) {

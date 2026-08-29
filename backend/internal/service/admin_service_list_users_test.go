@@ -19,6 +19,8 @@ type userRepoStubForListUsers struct {
 	listWithFiltersParams pagination.PaginationParams
 	lastUsedByUserID      map[int64]*time.Time
 	lastUsedErr           error
+	avatarsByUserID       map[int64]*UserAvatar
+	avatarsErr            error
 }
 
 func (s *userRepoStubForListUsers) ListWithFilters(_ context.Context, params pagination.PaginationParams, _ UserListFilters) ([]User, *pagination.PaginationResult, error) {
@@ -53,6 +55,19 @@ func (s *userRepoStubForListUsers) GetLatestUsedAtByUserID(_ context.Context, us
 		return nil, s.lastUsedErr
 	}
 	return s.lastUsedByUserID[userID], nil
+}
+
+func (s *userRepoStubForListUsers) GetUserAvatars(_ context.Context, userIDs []int64) (map[int64]*UserAvatar, error) {
+	if s.avatarsErr != nil {
+		return nil, s.avatarsErr
+	}
+	result := make(map[int64]*UserAvatar, len(userIDs))
+	for _, userID := range userIDs {
+		if avatar, ok := s.avatarsByUserID[userID]; ok {
+			result[userID] = avatar
+		}
+	}
+	return result, nil
 }
 
 type userGroupRateRepoStubForListUsers struct {
@@ -148,6 +163,23 @@ func TestAdminService_ListUsers_BatchRateFallbackToSingle(t *testing.T) {
 	require.ElementsMatch(t, []int64{101, 202}, rateRepo.singleCall)
 	require.Equal(t, 1.1, users[0].GroupRates[11])
 	require.Equal(t, 2.2, users[1].GroupRates[22])
+}
+
+func TestAdminService_ListUsers_PopulatesAvatars(t *testing.T) {
+	userRepo := &userRepoStubForListUsers{
+		users: []User{{ID: 101, Email: "u@example.com"}, {ID: 202, Email: "v@example.com"}},
+		avatarsByUserID: map[int64]*UserAvatar{
+			101: {StorageProvider: "inline", URL: "data:image/webp;base64,YXZhdGFy"},
+		},
+	}
+	svc := &adminServiceImpl{userRepo: userRepo}
+
+	users, total, err := svc.ListUsers(context.Background(), 1, 20, UserListFilters{}, "", "")
+	require.NoError(t, err)
+	require.Equal(t, int64(2), total)
+	require.Equal(t, "data:image/webp;base64,YXZhdGFy", users[0].AvatarURL)
+	require.Equal(t, "inline", users[0].AvatarSource)
+	require.Empty(t, users[1].AvatarURL)
 }
 
 func TestAdminService_ListUsers_PassesSortParams(t *testing.T) {
