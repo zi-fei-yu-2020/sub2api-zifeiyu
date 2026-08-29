@@ -1,4 +1,4 @@
-﻿package handler
+package handler
 
 import (
 	"strings"
@@ -29,4 +29,13 @@ func buildLinuxDoOAuthEmail(username string, subject string) string {
 		return "linuxdo-" + subject + service.LinuxDoConnectSyntheticEmailDomain
 	}
 	return ""
+}
+
+func isReservedOAuthSyntheticEmail(email string) bool {
+	normalized := strings.ToLower(strings.TrimSpace(email))
+	return strings.HasSuffix(normalized, service.LinuxDoConnectSyntheticEmailDomain) ||
+		strings.HasSuffix(normalized, service.LinuxDoConnectLegacyEmailDomain) ||
+		strings.HasSuffix(normalized, service.OIDCConnectSyntheticEmailDomain) ||
+		strings.HasSuffix(normalized, service.WeChatConnectSyntheticEmailDomain) ||
+		strings.HasSuffix(normalized, service.DingTalkConnectSyntheticEmailDomain)
 }

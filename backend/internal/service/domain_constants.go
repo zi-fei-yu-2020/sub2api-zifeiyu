@@ -199,6 +199,8 @@ const (
 
 // LinuxDoConnectSyntheticEmailDomain 是 LinuxDo Connect 用户的合成邮箱后缀（RFC 保留域名）。
 const LinuxDoConnectSyntheticEmailDomain = "@ldc.112102.xyz"
+
+// LinuxDoConnectLegacyEmailDomain ?????????????????????????
 const LinuxDoConnectLegacyEmailDomain = "@linuxdo-connect.invalid"
 
 // OIDCConnectSyntheticEmailDomain 是 OIDC 用户的合成邮箱后缀（RFC 保留域名）。

@@ -68,7 +68,7 @@ func TestLinuxDoParseUserInfoParsesIDAndUsername(t *testing.T) {
 	require.NoError(t, err)
 	require.Equal(t, "123", subject)
 	require.Equal(t, "alice", username)
-	require.Equal(t, "linuxdo-123@linuxdo-connect.invalid", email)
+	require.Equal(t, "alice@ldc.112102.xyz", email)
 	require.Equal(t, "Alice", displayName)
 	require.Equal(t, "https://cdn.example/avatar.png", avatarURL)
 }
@@ -82,7 +82,7 @@ func TestLinuxDoParseUserInfoDefaultsUsername(t *testing.T) {
 	require.NoError(t, err)
 	require.Equal(t, "123", subject)
 	require.Equal(t, "linuxdo_123", username)
-	require.Equal(t, "linuxdo-123@linuxdo-connect.invalid", email)
+	require.Equal(t, "linuxdo-123@ldc.112102.xyz", email)
 	require.Equal(t, "linuxdo_123", displayName)
 	require.Equal(t, "", avatarURL)
 }
@@ -695,7 +695,7 @@ func TestLinuxDoOAuthCallbackEmailVerificationCompletesWithBoundEmail(t *testing
 	require.Equal(t, oauthIntentLogin, session.Intent)
 	require.Nil(t, session.TargetUserID)
 	require.Empty(t, session.ResolvedEmail)
-	require.Equal(t, "linuxdo-email-verify-123@linuxdo-connect.invalid", session.UpstreamIdentityClaims["email"])
+	require.Equal(t, "linuxdo_email@ldc.112102.xyz", session.UpstreamIdentityClaims["email"])
 
 	completion, ok := session.LocalFlowState[oauthCompletionResponseKey].(map[string]any)
 	require.True(t, ok)
@@ -796,7 +796,7 @@ func TestLinuxDoOAuthCallbackDirectlyLogsInNewUserWhenEmailVerificationDisabled(
 
 	ctx := context.Background()
 	userEntity, err := client.User.Query().
-		Where(dbuser.EmailEQ("linuxdo-direct-123@linuxdo-connect.invalid")).
+		Where(dbuser.EmailEQ("linuxdo_direct@ldc.112102.xyz")).
 		Only(ctx)
 	require.NoError(t, err)
 	require.Equal(t, "linuxdo_direct", userEntity.Username)
@@ -884,7 +884,7 @@ func TestLinuxDoOAuthCallbackCreatesBindPendingSessionForCurrentUser(t *testing.
 	require.Equal(t, oauthIntentBindCurrentUser, session.Intent)
 	require.NotNil(t, session.TargetUserID)
 	require.Equal(t, currentUser.ID, *session.TargetUserID)
-	require.Equal(t, linuxDoSyntheticEmail("999"), session.ResolvedEmail)
+	require.Equal(t, "bind_user@ldc.112102.xyz", session.ResolvedEmail)
 
 	completion, ok := session.LocalFlowState[oauthCompletionResponseKey].(map[string]any)
 	require.True(t, ok)

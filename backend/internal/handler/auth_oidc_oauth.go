@@ -522,11 +522,7 @@ func (h *AuthHandler) findOIDCCompatEmailUser(ctx context.Context, email string)
 	}
 
 	email = strings.TrimSpace(strings.ToLower(email))
-	if email == "" ||
-		strings.HasSuffix(email, service.LinuxDoConnectSyntheticEmailDomain) ||
-		strings.HasSuffix(email, service.OIDCConnectSyntheticEmailDomain) ||
-		strings.HasSuffix(email, service.WeChatConnectSyntheticEmailDomain) ||
-		strings.HasSuffix(email, service.DingTalkConnectSyntheticEmailDomain) {
+	if email == "" || isReservedOAuthSyntheticEmail(email) {
 		return nil, nil
 	}
 
