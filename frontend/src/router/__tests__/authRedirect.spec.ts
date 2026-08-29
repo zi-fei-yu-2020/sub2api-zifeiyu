@@ -26,6 +26,19 @@ describe('post-login redirect resolution', () => {
     expect(resolvePostLoginRedirect('//evil.example', false)).toBe('/dashboard')
   })
 
+  it('rejects OAuth callback paths as final login destinations', () => {
+    for (const callback of [
+      '/oauth/linuxdo?code=code&state=state',
+      '/api/oauth/linuxdo?code=code&state=state',
+      '/api/v1/oauth/linuxdo?code=code&state=state',
+      '/api/v1/auth/oauth/linuxdo/callback?code=code&state=state',
+      '/auth/linuxdo/callback'
+    ]) {
+      expect(resolvePostLoginRedirect(callback, true)).toBe('/admin/dashboard')
+      expect(resolvePostLoginRedirect(callback, false)).toBe('/dashboard')
+    }
+  })
+
   it('accepts the first router query value when an array is provided', () => {
     expect(resolvePostLoginRedirect(['/dashboard', '/keys'], true)).toBe('/admin/dashboard')
   })

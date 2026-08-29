@@ -257,6 +257,7 @@ import PendingOAuthCreateAccountForm, {
 } from '@/components/auth/PendingOAuthCreateAccountForm.vue'
 import { apiClient } from '@/api/client'
 import { useAuthStore, useAppStore } from '@/stores'
+import { isAuthenticationCallbackPath } from '@/router/authRedirect'
 import {
   completeLinuxDoOAuthRegistration,
   exchangePendingOAuthCompletion,
@@ -398,6 +399,7 @@ function sanitizeRedirectPath(path: string | null | undefined): string {
   if (path.startsWith('//')) return '/dashboard'
   if (path.includes('://')) return '/dashboard'
   if (path.includes('\n') || path.includes('\r')) return '/dashboard'
+  if (isAuthenticationCallbackPath(path)) return '/dashboard'
   return path
 }
 

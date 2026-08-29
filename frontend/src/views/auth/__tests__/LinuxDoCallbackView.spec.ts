@@ -122,6 +122,32 @@ describe('LinuxDoCallbackView', () => {
     expect(replace).toHaveBeenCalledWith('/legacy-dashboard')
   })
 
+  it('rejects an OAuth callback path as the post-login destination', async () => {
+    exchangePendingOAuthCompletion.mockResolvedValue({
+      access_token: 'access-token',
+      refresh_token: 'refresh-token',
+      expires_in: 3600,
+      redirect: '/oauth/linuxdo?code=stale-code&state=stale-state'
+    })
+    setToken.mockResolvedValue({})
+
+    mount(LinuxDoCallbackView, {
+      global: {
+        stubs: {
+          AuthLayout: { template: '<div><slot /></div>' },
+          Icon: true,
+          RouterLink: { template: '<a><slot /></a>' },
+          transition: false
+        }
+      }
+    })
+
+    await flushPromises()
+
+    expect(setToken).toHaveBeenCalledWith('access-token')
+    expect(replace).toHaveBeenCalledWith('/dashboard')
+  })
+
   it('accepts the legacy pending oauth invitation fragment without pending-session exchange', async () => {
     window.location.hash = '#error=invitation_required&pending_oauth_token=legacy-pending-token&redirect=%2Flegacy-invite'
     apiClientPost.mockResolvedValue({
