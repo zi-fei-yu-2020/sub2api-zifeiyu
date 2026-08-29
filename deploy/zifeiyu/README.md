@@ -118,6 +118,17 @@ The tracked Nginx vhost redirects legacy New-API callback paths (`/oauth/linuxdo
 
 Do not use the incorrect path `/api/v1/auth/linuxdo/callback`; it is missing the `/oauth/` segment.
 
+### CPA OpenAI and Gemini routes
+
+The tracked `nginx/cpa.112102.xyz.conf` exposes both protocol families from CLIProxyAPI:
+
+```text
+/v1/*      -> OpenAI-compatible API
+/v1beta/*  -> Gemini native API
+```
+
+The `/v1beta/` route is required when a Sub2API account is configured as `Gemini + API Key`; live model sync calls `/v1beta/models` with `x-goog-api-key`. If the same CPA endpoint is configured as `OpenAI + API Key`, model sync instead calls `/v1/models`.
+
 ## IPv6-only SOCKS proxies
 
 Verify the application received an IPv6 route:
