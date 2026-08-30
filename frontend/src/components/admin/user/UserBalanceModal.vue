@@ -8,7 +8,23 @@
       <div>
         <label class="input-label">{{ operation === 'add' ? t('admin.users.depositAmount') : t('admin.users.withdrawAmount') }}</label>
         <div class="relative flex gap-2">
-          <div class="relative flex-1"><div class="absolute left-3 top-1/2 -translate-y-1/2 font-medium text-slate-400">$</div><input v-model.number="form.amount" type="number" step="any" min="0" required class="input pl-8" /></div>
+          <div class="relative min-w-0 flex-1">
+            <span
+              data-testid="balance-currency-prefix"
+              aria-hidden="true"
+              class="pointer-events-none absolute inset-y-px left-px z-10 flex w-10 items-center justify-center rounded-l-md border-r border-slate-200 bg-slate-50 font-medium text-slate-500 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-400"
+            >$</span>
+            <input
+              v-model.number="form.amount"
+              data-testid="balance-amount-input"
+              type="number"
+              inputmode="decimal"
+              step="any"
+              min="0"
+              required
+              class="input pl-12 tabular-nums"
+            />
+          </div>
           <button v-if="operation === 'subtract'" type="button" @click="fillAllBalance" class="btn btn-secondary whitespace-nowrap">{{ t('admin.users.withdrawAll') }}</button>
         </div>
       </div>
