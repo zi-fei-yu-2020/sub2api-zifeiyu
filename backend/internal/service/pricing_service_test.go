@@ -477,6 +477,31 @@ func TestPricingService_Gemini36FlashThinkingTiersUseBasePricing(t *testing.T) {
 	}
 }
 
+func TestPricingService_GeminiCPAReasoningAndAgentAliasesUseBasePricing(t *testing.T) {
+	prices := map[string]*LiteLLMModelPricing{
+		"gemini-3-flash":     {InputCostPerToken: 0.5e-6},
+		"gemini-3.1-pro-low": {InputCostPerToken: 2e-6},
+		"gemini-3.5-flash":   {InputCostPerToken: 1.5e-6},
+		"gemini-3.6-flash":   {InputCostPerToken: 1.5e-6},
+		"gemini-3.7-flash":   {InputCostPerToken: 0.75e-6},
+	}
+	svc := &PricingService{pricingData: prices}
+
+	tests := map[string]string{
+		"gemini-3-flash-agent":       "gemini-3-flash",
+		"gemini-pro-agent":           "gemini-3.1-pro-low",
+		"gemini-3.5-flash-extra-low": "gemini-3.5-flash",
+		"gemini-3.5-flash-low":       "gemini-3.5-flash",
+		"gemini-3.6-flash-high":      "gemini-3.6-flash",
+		"gemini-3.7-flash-high":      "gemini-3.7-flash",
+	}
+	for alias, canonical := range tests {
+		t.Run(alias, func(t *testing.T) {
+			require.Same(t, prices[canonical], svc.GetModelPricing(alias))
+		})
+	}
+}
+
 func TestPricingService_Gemini36FlashTierSpecificPricingTakesPrecedence(t *testing.T) {
 	basePricing := &LiteLLMModelPricing{InputCostPerToken: 1.5e-6}
 	tierPricing := &LiteLLMModelPricing{InputCostPerToken: 2e-6}
